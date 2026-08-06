@@ -1,20 +1,23 @@
 # TaskFlow — Full Production Plan
 
 > ## 🎯 Current Focus (read this first)
-> **Active phase: Phase 6 — Email Verification**
+> **Active phase: Phase 10 — Automated Backups**
 > 
-> **Phase 5 Status: ✅ COMPLETE** — Password reset with real email delivery shipped
-> - [x] `POST /auth/forgot-password` — generates time-limited token, stores SHA-256 hash, 1h TTL, enum-safe 200
-> - [x] `POST /auth/reset-password` — validates token expiry + used state, updates password atomically
-> - [x] Nodemailer email service — SMTP in production, console-log fallback in `NODE_ENV=development`
-> - [x] `GET /auth/_test/last-reset-token` debug endpoint — 404 unless `NODE_ENV=test`
-> - [x] `ForgotPassword.jsx` and `ResetPassword.jsx` frontend pages (matching auth card style)
-> - [x] "Forgot password?" link wired into Login.jsx
-> - [x] 8 Jest tests passing (enumeration prevention, email mock, expiry, replay, re-use)
-> - [x] `scripts/test-password-reset.sh` — 12-step end-to-end bash script, all checks passed
-> - Run dev server: `cd frontend && npm run dev`
+> **Phase 9 Status: ✅ COMPLETE** — Sentry error tracking integrated in backend and frontend
+> - [x] `instrument.js` — Sentry SDK initialised from `SENTRY_DSN` env var; no-op when var is absent
+> - [x] `beforeSend` scrubs sensitive fields: `password`, `token`, `newPassword`, `currentPassword`, `authorization` header, query-string tokens
+> - [x] `GET /debug/sentry-test` endpoint — triggers a deliberate error; guarded to non-production only
+> - [x] `Sentry.setupExpressErrorHandler` wired into Express for automatic exception capture
+> - [x] Frontend `sentry.js` — scrubs token from URL query strings before sending events
+> - [x] 10 Jest tests passing (`backend/__tests__/phase9-sentry.test.js`)
+>
+> **Previously completed:**
+> - Phase 8: Rate limiting (429 on `/auth/login`, `/auth/register`, `/auth/forgot-password`), `GET /health` endpoint, pagination on task list and activity log, Dockerfile + docker-compose
+> - Phase 7: `helmet` headers, CORS locked to `CORS_ORIGIN`, startup env-var guard, `npm audit` script — tests in `security.test.js` and `phase7-extended.test.js`
+> - Phase 6: Email verification on register, `GET /auth/verify-email`, resend endpoint, `VerifyEmail.jsx` frontend page, unverified banner in Dashboard
+> - Phase 5: Password reset with nodemailer, `ForgotPassword.jsx`, `ResetPassword.jsx`
 > 
-> **When tagging this file in Kiro, say which phase you mean** — e.g. "using PLAN.md, implement Phase 6" — so Kiro doesn't try to reason about all 17 phases at once.
+> **When tagging this file in Kiro, say which phase you mean** — e.g. "using PLAN.md, implement Phase 10" — so Kiro doesn't try to reason about all 17 phases at once.
 >
 > _Update this block yourself as you finish phases — it's the only part of this file you need to keep current._
 
@@ -46,6 +49,10 @@
 - [x] Input validation & XSS sanitization (Zod + xss) — Phase 3
 - [x] Assignee dropdown, My Tasks tab, debounced search — Phase 4
 - [x] Password reset with email delivery (nodemailer) — Phase 5
+- [x] Email verification on registration, resend option, unverified banner — Phase 6
+- [x] Helmet headers, CORS locked to origin, startup env guard, npm audit script — Phase 7
+- [x] Rate limiting (auth routes), `/health` endpoint, pagination, Dockerfile + docker-compose — Phase 8
+- [x] Sentry error tracking (backend + frontend), sensitive field scrubbing — Phase 9
 - [ ] Everything below
 
 ---
@@ -62,6 +69,8 @@
 | E — Data integrity & compliance | 10–12 | Backups, GDPR-lite rights, legal basics |
 | F — Polish | 13–14 | Due dates, frontend resilience & accessibility |
 | G — Ship it | 15–16 | CI/CD gate, real staging/production deployment |
+
+> ✅ Milestones A through D (Phases 0–9) are complete. Next up: Milestone E — Phase 10.
 
 ---
 
@@ -235,7 +244,7 @@ run the suite.
 - [ ] Resend-verification option works and invalidates the previous token
 - [ ] Unverified users can still log in (just see the banner) — confirm this UX choice was actually implemented, not an accidental hard lockout
 
-**Status:** ⬜ Not started
+**Status:** ✅ **Complete** — `GET /auth/verify-email`, resend endpoint, `VerifyEmail.jsx` page, unverified banner in Dashboard. Tests passing (`backend/__tests__/email-verification.test.js`, `phase6-extended.test.js`)
 
 ---
 
@@ -261,7 +270,7 @@ non-allowed origin is rejected by CORS, and run the test suite to confirm it pas
 - [ ] Manually test CORS with `curl -H "Origin: https://evil.example.com"` and confirm it's rejected
 - [ ] Note: HTTPS enforcement itself happens at the hosting/proxy layer in Phase 16 — this phase is the app-level half
 
-**Status:** ⬜ Not started
+**Status:** ✅ **Complete** — `helmet` configured, CORS locked to `CORS_ORIGIN` env var, startup guard fails loudly on missing vars, `npm audit` script added. Tests passing (`backend/__tests__/security.test.js`, `phase7-extended.test.js`)
 
 ---
 
@@ -286,7 +295,7 @@ confirming repeated requests past the rate limit return 429, then run the suite.
 - [ ] Rate limiting actually triggers on repeated failed logins *and* repeated forgot-password requests (test both manually)
 - [ ] Pagination doesn't break existing frontend list views
 
-**Status:** ⬜ Not started
+**Status:** ✅ **Complete** — Rate limiting on auth routes (429 on abuse), `GET /health` with real DB check, pagination on task list and activity log, `Dockerfile` + `docker-compose.yml`. Tests passing (`backend/__tests__/phase8.test.js`, `phase8-extended.test.js`)
 
 ---
 
@@ -309,7 +318,7 @@ dashboard.
 - [ ] Sensitive data (passwords, tokens) is confirmed scrubbed from error reports
 - [ ] Uptime monitor is pinging the live URL once Phase 16 is done
 
-**Status:** ⬜ Not started
+**Status:** ✅ **Complete** — Sentry integrated in backend (`instrument.js`) and frontend (`sentry.js`). Sensitive fields scrubbed from captured events. `GET /debug/sentry-test` endpoint for manual verification. 10 tests passing (`backend/__tests__/phase9-sentry.test.js`). Uptime monitor (Phase 9 manual step) to be configured once Phase 16 deploys the live URL.
 
 ---
 
