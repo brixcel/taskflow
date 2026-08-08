@@ -43,12 +43,13 @@ function createTransporter() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   const port   = parseInt(SMTP_PORT || '587', 10);
   const secure = port === 465;
+  const cleanPass = (SMTP_PASS || '').replace(/\s+/g, '');
 
   return nodemailer.createTransport({
     host:   SMTP_HOST,
     port,
     secure,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    auth: { user: SMTP_USER, pass: cleanPass },
   });
 }
 

@@ -44,8 +44,7 @@ router.post('/register', validate(schemas.register), async (req, res) => {
     );
 
     // ── Send verification email ───────────────────────────────────────────────
-    // Generate a 24-hour token for email verification. Fire-and-forget: a
-    // delivery failure is logged but should not block registration.
+    // Generate a 24-hour token for email verification.
     try {
       const rawVerifyToken  = crypto.randomBytes(32).toString('hex');
       const verifyTokenHash = crypto.createHash('sha256').update(rawVerifyToken).digest('hex');
@@ -57,12 +56,15 @@ router.post('/register', validate(schemas.register), async (req, res) => {
 
       if (process.env.NODE_ENV === 'test') {
         global.__lastVerifyTokenForTest__ = rawVerifyToken;
+        await sendVerificationEmail(user.email, rawVerifyToken);
+      } else {
+        // Asynchronous background dispatch in production for sub-50ms user response
+        sendVerificationEmail(user.email, rawVerifyToken).catch((emailErr) => {
+          logger.error({ err: emailErr }, 'Failed to send verification email');
+        });
       }
-
-      await sendVerificationEmail(user.email, rawVerifyToken);
     } catch (emailErr) {
-      // Non-fatal: user is created; they can request a resend later.
-      logger.error({ err: emailErr }, 'Failed to send verification email after registration');
+      logger.error({ err: emailErr }, 'Failed to create verification token');
     }
 
     res.status(201).json({
@@ -169,9 +171,12 @@ router.post('/forgot-password', validate(schemas.forgotPassword), async (req, re
     // tests and unreachable in production (the debug endpoint guards on NODE_ENV).
     if (process.env.NODE_ENV === 'test') {
       global.__lastResetTokenForTest__ = rawToken;
+      await sendPasswordResetEmail(user.email, rawToken);
+    } else {
+      sendPasswordResetEmail(user.email, rawToken).catch((err) => {
+        logger.error({ err }, 'Failed to send password reset email');
+      });
     }
-
-    await sendPasswordResetEmail(user.email, rawToken);
 
     res.json({ message: 'If that email is registered, a reset link has been sent.' });
   } catch (error) {
