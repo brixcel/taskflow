@@ -20,8 +20,13 @@ const REQUIRED_ENV_VARS = [
   'APP_URL',
 ];
 
-const hasResend = Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY);
-const requiredToCheck = hasResend
+const hasHttpProvider = Boolean(
+  process.env.BREVO_API_KEY ||
+  process.env.SENDINBLUE_API_KEY ||
+  process.env.RESEND_API_KEY ||
+  process.env.EMAIL_API_KEY
+);
+const requiredToCheck = hasHttpProvider
   ? ['DATABASE_URL', 'JWT_SECRET', 'CORS_ORIGIN', 'APP_URL']
   : REQUIRED_ENV_VARS;
 

@@ -128,8 +128,84 @@ async function sendViaResend({ from, to, subject, text, html }) {
   });
 }
 
+/** Returns true when Brevo API key is present in environment. */
+function brevoConfigured() {
+  return Boolean(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY);
+}
+
 /**
- * Dispatch email using configured provider (Resend API -> SMTP -> Dev fallback).
+ * Send email via Brevo REST API (HTTPS POST to api.brevo.com/v3/smtp/email).
+ * 100% free, sends over port 443 (never blocked by Render), and delivers to any external inbox.
+ */
+async function sendViaBrevo({ from, to, subject, text, html }) {
+  const apiKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
+
+  // Extract name and email from "TaskFlow <email@domain.com>" or fallback to raw string
+  let senderName  = 'TaskFlow';
+  let senderEmail = from;
+  const match = from.match(/^([^<]+)<([^>]+)>$/);
+  if (match) {
+    senderName  = match[1].trim();
+    senderEmail = match[2].trim();
+  }
+
+  const recipientList = (Array.isArray(to) ? to : [to]).map((addr) => ({ email: addr }));
+
+  const payload = JSON.stringify({
+    sender: { name: senderName, email: senderEmail },
+    to: recipientList,
+    subject,
+    htmlContent: html,
+    textContent: text,
+  });
+
+  if (typeof fetch === 'function') {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+      },
+      body: payload,
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(`Brevo API error (${res.status}): ${errJson.message || res.statusText}`);
+    }
+    return;
+  }
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.brevo.com',
+      path: '/v3/smtp/email',
+      method: 'POST',
+      headers: {
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Brevo API error (${res.statusCode}): ${data}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+/**
+ * Dispatch email using configured provider (Brevo API -> Resend API -> SMTP -> Dev fallback).
  */
 async function dispatchEmail({ from, to, subject, text, html, linkType, link }) {
   if (process.env.NODE_ENV === 'test') {
@@ -137,15 +213,31 @@ async function dispatchEmail({ from, to, subject, text, html, linkType, link }) 
     return;
   }
 
+  // 1. Brevo HTTP API (Best for Render free tier — sends over HTTPS port 443 to any inbox)
+  if (brevoConfigured()) {
+    try {
+      await sendViaBrevo({ from, to, subject, text, html });
+      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via Brevo API\n`);
+      return;
+    } catch (err) {
+      console.error(`\n❌ [Email Service] Brevo API error delivering to ${to}: ${err.message}`);
+      if (!resendConfigured() && !smtpConfigured()) {
+        logFallback(linkType, to, link);
+        return;
+      }
+    }
+  }
+
+  // 2. Resend API
   if (resendConfigured()) {
     try {
       await sendViaResend({ from, to, subject, text, html });
-      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via Resend API`);
+      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via Resend API\n`);
       return;
     } catch (err) {
       console.warn(`\n⚠️  [Email Service] Resend API could not deliver email to ${to}: ${err.message}`);
       console.warn(`    (Note: Resend onboarding@resend.dev only allows sending to the account owner's email).`);
-      console.warn(`    To deliver to all users, verify your domain in Resend or configure Gmail SMTP.\n`);
+      console.warn(`    To deliver to all users, verify your domain in Resend or configure Brevo/Gmail SMTP.\n`);
       if (!smtpConfigured()) {
         logFallback(linkType, to, link);
         return;
