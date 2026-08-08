@@ -41,14 +41,21 @@ function smtpConfigured() {
 /** Build a Nodemailer transporter from env vars. */
 function createTransporter() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  const port   = parseInt(SMTP_PORT || '587', 10);
-  const secure = port === 465;
+  const port      = parseInt(SMTP_PORT || '587', 10);
   const cleanPass = (SMTP_PASS || '').replace(/\s+/g, '');
+
+  // Gmail-specific built-in transporter for optimal TLS and connection pooling
+  if (SMTP_HOST === 'smtp.gmail.com' || (SMTP_USER && SMTP_USER.endsWith('@gmail.com'))) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: SMTP_USER, pass: cleanPass },
+    });
+  }
 
   return nodemailer.createTransport({
     host:   SMTP_HOST,
     port,
-    secure,
+    secure: port === 465,
     auth: { user: SMTP_USER, pass: cleanPass },
   });
 }

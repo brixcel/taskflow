@@ -360,9 +360,12 @@ router.post('/resend-verification', validate(schemas.resendVerification), async 
 
     if (process.env.NODE_ENV === 'test') {
       global.__lastVerifyTokenForTest__ = rawToken;
+      await sendVerificationEmail(user.email, rawToken);
+    } else {
+      sendVerificationEmail(user.email, rawToken).catch((err) => {
+        logger.error({ err }, 'Failed to resend verification email');
+      });
     }
-
-    await sendVerificationEmail(user.email, rawToken);
 
     res.json({ message: 'If that email is registered and unverified, a new verification link has been sent.' });
   } catch (error) {
