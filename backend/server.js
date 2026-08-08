@@ -55,6 +55,9 @@ const activityRoutes = require('./routes/activities');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust reverse proxy (Render / Railway / Vercel) for accurate client IP identification in rate limiters
+app.set('trust proxy', 1);
+
 // ─── Structured HTTP request logging ─────────────────────────────────────────
 // Must come before routes so every request is logged.
 app.use(logger.httpLogger);
