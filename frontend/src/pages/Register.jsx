@@ -85,15 +85,22 @@ export default function Register() {
     try {
       const res = await axios.post(`${API_URL}/auth/register`, {
         name: name.trim(), email: email.trim(), password,
-      });
+      }, { timeout: 30000 });
       const { token, user } = res.data;
       if (token) localStorage.setItem('token', token);
       if (user)  localStorage.setItem('user', JSON.stringify(user));
       setRegistered(true);
     } catch (err) {
       const data = err.response?.data;
-      if (data?.errors && typeof data.errors === 'object') setFieldErrors(data.errors);
-      else setError(data?.error || data?.message || 'Registration failed. Please try again.');
+      if (data?.errors && typeof data.errors === 'object') {
+        setFieldErrors(data.errors);
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Server is waking up (cold start) or taking longer than expected. Please wait a moment and click Create account again.');
+      } else if (!err.response) {
+        setError(`Unable to connect to backend at ${API_URL}. Please ensure the backend is running and VITE_API_URL is configured in Vercel.`);
+      } else {
+        setError(data?.error || data?.message || 'Registration failed. Please try again.');
+      }
     } finally { setLoading(false); }
   };
 

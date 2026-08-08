@@ -40,15 +40,24 @@ function smtpConfigured() {
 
 /** Build a Nodemailer transporter from env vars. */
 function createTransporter() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  const { SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT } = process.env;
   const port      = parseInt(SMTP_PORT || '587', 10);
   const cleanPass = (SMTP_PASS || '').replace(/\s+/g, '');
+  const isGmail   = SMTP_HOST === 'smtp.gmail.com' || (SMTP_USER && SMTP_USER.endsWith('@gmail.com'));
 
-  // Gmail-specific built-in transporter for optimal TLS and connection pooling
-  if (SMTP_HOST === 'smtp.gmail.com' || (SMTP_USER && SMTP_USER.endsWith('@gmail.com'))) {
+  if (isGmail) {
+    // Cloud hosting environments (Render / Railway / AWS) block or throttle port 587 STARTTLS.
+    // We force direct SSL on port 465 with IPv4 to guarantee instant, reliable delivery.
     return nodemailer.createTransport({
       service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: { user: SMTP_USER, pass: cleanPass },
+      family: 4, // Force IPv4 to avoid cloud VM IPv6 handshake stalls
+      connectionTimeout: 15000, // 15s connection timeout
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
     });
   }
 
@@ -57,6 +66,8 @@ function createTransporter() {
     port,
     secure: port === 465,
     auth: { user: SMTP_USER, pass: cleanPass },
+    family: 4,
+    connectionTimeout: 10000,
   });
 }
 
@@ -129,24 +140,32 @@ async function dispatchEmail({ from, to, subject, text, html, linkType, link }) 
   if (resendConfigured()) {
     try {
       await sendViaResend({ from, to, subject, text, html });
+      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via Resend API`);
       return;
     } catch (err) {
       console.warn(`\n⚠️  [Email Service] Resend API could not deliver email to ${to}: ${err.message}`);
       console.warn(`    (Note: Resend onboarding@resend.dev only allows sending to the account owner's email).`);
-      console.warn(`    Falling back to console-logging the link for local testing:\n`);
-      logFallback(linkType, to, link);
-      return;
+      console.warn(`    To deliver to all users, verify your domain in Resend or configure Gmail SMTP.\n`);
+      if (!smtpConfigured()) {
+        logFallback(linkType, to, link);
+        return;
+      }
     }
   }
 
   if (smtpConfigured()) {
     try {
       const transporter = createTransporter();
-      await transporter.sendMail({ from, to, subject, text, html });
+      const info = await transporter.sendMail({ from, to, subject, text, html });
+      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via Gmail SMTP (Message ID: ${info?.messageId || 'ok'})\n`);
       return;
     } catch (err) {
-      console.warn(`\n⚠️  [Email Service] SMTP delivery failed to ${to}: ${err.message}`);
-      console.warn(`    Falling back to console-logging the link for local testing:\n`);
+      console.error(`\n❌ [Email Service] SMTP delivery failed to ${to}: ${err.message}`);
+      if (err.code === 'EAUTH' || (err.message && err.message.includes('535'))) {
+        console.error(`   👉 Google Authentication Error (535): Ensure SMTP_PASS is a 16-character Google App Password (not your personal Gmail password) and 2-Step Verification is active on ${process.env.SMTP_USER}.`);
+      } else if (err.code === 'ETIMEDOUT' || err.code === 'ESOCKET') {
+        console.error(`   👉 Connection timed out to SMTP host: Try switching SMTP_PORT between 465 (SSL) and 587 (TLS).`);
+      }
       logFallback(linkType, to, link);
       return;
     }

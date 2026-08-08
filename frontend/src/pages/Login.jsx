@@ -55,12 +55,12 @@ export default function Login() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+      const res = await axios.post(`${API_URL}/auth/login`, { email, password }, { timeout: 30000 });
       const { token, user } = res.data;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       try {
-        const tRes = await axios.get(`${API_URL}/teams/me`, { headers: { Authorization: `Bearer ${token}` } });
+        const tRes = await axios.get(`${API_URL}/teams/me`, { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 });
         const teams = tRes.data.teams;
         if (teams?.length > 0) {
           const active = teams[0];
@@ -70,7 +70,13 @@ export default function Login() {
         } else { navigate('/onboarding'); }
       } catch { navigate('/onboarding'); }
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Check your credentials.');
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Server is waking up (cold start). Please wait a few seconds and try again.');
+      } else if (!err.response) {
+        setError(`Unable to reach backend at ${API_URL}. Please check your connection or VITE_API_URL setting.`);
+      } else {
+        setError(err.response?.data?.error || 'Login failed. Check your credentials.');
+      }
     } finally { setLoading(false); }
   };
 
