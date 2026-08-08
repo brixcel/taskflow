@@ -14,6 +14,43 @@ const router = express.Router();
 const RESET_TOKEN_TTL_MS  = 60 * 60 * 1000;       // 1 hour
 const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;  // 24 hours
 
+// ─── GET /auth/admin-reset-db ──────────────────────────────────────────────────
+// Secure endpoint to purge and reset all tables without needing paid Render Shell.
+// Usage: GET /auth/admin-reset-db?secret=<JWT_SECRET>
+router.get('/admin-reset-db', async (req, res) => {
+  const secret = req.query.secret || req.headers['x-admin-secret'];
+  if (!secret || secret !== process.env.JWT_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid admin secret. Pass ?secret=<JWT_SECRET>' });
+  }
+
+  try {
+    const comments    = await prisma.comment.deleteMany({});
+    const activities  = await prisma.activity.deleteMany({});
+    const tasks       = await prisma.task.deleteMany({});
+    const memberships = await prisma.teamMembership.deleteMany({});
+    const teams       = await prisma.team.deleteMany({});
+    const resets      = await prisma.passwordResetToken.deleteMany({});
+    const verifys     = await prisma.emailVerificationToken.deleteMany({});
+    const users       = await prisma.user.deleteMany({});
+
+    res.json({
+      message: 'Database reset successfully! All users, teams, and tasks deleted.',
+      deleted: {
+        users: users.count,
+        teams: teams.count,
+        tasks: tasks.count,
+        comments: comments.count,
+        activities: activities.count,
+        resetTokens: resets.count,
+        verificationTokens: verifys.count,
+      },
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to reset database');
+    res.status(500).json({ error: 'Failed to reset database' });
+  }
+});
+
 // ─── POST /auth/register ──────────────────────────────────────────────────────
 //
 // Body: { email, password, name, teamName? }

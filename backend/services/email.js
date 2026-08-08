@@ -40,34 +40,23 @@ function smtpConfigured() {
 
 /** Build a Nodemailer transporter from env vars. */
 function createTransporter() {
-  const { SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT } = process.env;
-  const port      = parseInt(SMTP_PORT || '587', 10);
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  const port = parseInt(SMTP_PORT || '587', 10);
   const cleanPass = (SMTP_PASS || '').replace(/\s+/g, '');
-  const isGmail   = SMTP_HOST === 'smtp.gmail.com' || (SMTP_USER && SMTP_USER.endsWith('@gmail.com'));
 
-  if (isGmail) {
-    // Cloud hosting environments (Render / Railway / AWS) block or throttle port 587 STARTTLS.
-    // We force direct SSL on port 465 with IPv4 to guarantee instant, reliable delivery.
+  // Gmail-specific built-in transporter for optimal TLS and connection pooling
+  if (SMTP_HOST === 'smtp.gmail.com' || (SMTP_USER && SMTP_USER.endsWith('@gmail.com'))) {
     return nodemailer.createTransport({
       service: 'gmail',
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
       auth: { user: SMTP_USER, pass: cleanPass },
-      family: 4, // Force IPv4 to avoid cloud VM IPv6 handshake stalls
-      connectionTimeout: 15000, // 15s connection timeout
-      greetingTimeout: 15000,
-      socketTimeout: 20000,
     });
   }
 
   return nodemailer.createTransport({
-    host:   SMTP_HOST,
+    host: SMTP_HOST,
     port,
     secure: port === 465,
     auth: { user: SMTP_USER, pass: cleanPass },
-    family: 4,
-    connectionTimeout: 10000,
   });
 }
 
@@ -128,84 +117,8 @@ async function sendViaResend({ from, to, subject, text, html }) {
   });
 }
 
-/** Returns true when Brevo API key is present in environment. */
-function brevoConfigured() {
-  return Boolean(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY);
-}
-
 /**
- * Send email via Brevo REST API (HTTPS POST to api.brevo.com/v3/smtp/email).
- * 100% free, sends over port 443 (never blocked by Render), and delivers to any external inbox.
- */
-async function sendViaBrevo({ from, to, subject, text, html }) {
-  const apiKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
-
-  // Extract name and email from "TaskFlow <email@domain.com>" or fallback to raw string
-  let senderName  = 'TaskFlow';
-  let senderEmail = from;
-  const match = from.match(/^([^<]+)<([^>]+)>$/);
-  if (match) {
-    senderName  = match[1].trim();
-    senderEmail = match[2].trim();
-  }
-
-  const recipientList = (Array.isArray(to) ? to : [to]).map((addr) => ({ email: addr }));
-
-  const payload = JSON.stringify({
-    sender: { name: senderName, email: senderEmail },
-    to: recipientList,
-    subject,
-    htmlContent: html,
-    textContent: text,
-  });
-
-  if (typeof fetch === 'function') {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': apiKey,
-        'Content-Type': 'application/json',
-        'accept': 'application/json',
-      },
-      body: payload,
-    });
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      throw new Error(`Brevo API error (${res.status}): ${errJson.message || res.statusText}`);
-    }
-    return;
-  }
-
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: 'api.brevo.com',
-      path: '/v3/smtp/email',
-      method: 'POST',
-      headers: {
-        'api-key': apiKey,
-        'Content-Type': 'application/json',
-        'accept': 'application/json',
-        'Content-Length': Buffer.byteLength(payload),
-      },
-    }, (res) => {
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve();
-        } else {
-          reject(new Error(`Brevo API error (${res.statusCode}): ${data}`));
-        }
-      });
-    });
-    req.on('error', reject);
-    req.write(payload);
-    req.end();
-  });
-}
-
-/**
- * Dispatch email using configured provider (Brevo API -> Resend API -> SMTP -> Dev fallback).
+ * Dispatch email using configured provider (Resend API -> SMTP -> Dev fallback).
  */
 async function dispatchEmail({ from, to, subject, text, html, linkType, link }) {
   if (process.env.NODE_ENV === 'test') {
@@ -213,31 +126,14 @@ async function dispatchEmail({ from, to, subject, text, html, linkType, link }) 
     return;
   }
 
-  // 1. Brevo HTTP API (Best for Render free tier — sends over HTTPS port 443 to any inbox)
-  if (brevoConfigured()) {
-    try {
-      await sendViaBrevo({ from, to, subject, text, html });
-      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via Brevo API\n`);
-      return;
-    } catch (err) {
-      console.error(`\n❌ [Email Service] Brevo API error delivering to ${to}: ${err.message}`);
-      if (!resendConfigured() && !smtpConfigured()) {
-        logFallback(linkType, to, link);
-        return;
-      }
-    }
-  }
-
-  // 2. Resend API
   if (resendConfigured()) {
     try {
       await sendViaResend({ from, to, subject, text, html });
-      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via Resend API\n`);
       return;
     } catch (err) {
       console.warn(`\n⚠️  [Email Service] Resend API could not deliver email to ${to}: ${err.message}`);
       console.warn(`    (Note: Resend onboarding@resend.dev only allows sending to the account owner's email).`);
-      console.warn(`    To deliver to all users, verify your domain in Resend or configure Brevo/Gmail SMTP.\n`);
+      console.warn(`    To deliver to all users, verify your domain in Resend or configure Gmail SMTP.\n`);
       if (!smtpConfigured()) {
         logFallback(linkType, to, link);
         return;
@@ -248,16 +144,11 @@ async function dispatchEmail({ from, to, subject, text, html, linkType, link }) 
   if (smtpConfigured()) {
     try {
       const transporter = createTransporter();
-      const info = await transporter.sendMail({ from, to, subject, text, html });
-      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via Gmail SMTP (Message ID: ${info?.messageId || 'ok'})\n`);
+      await transporter.sendMail({ from, to, subject, text, html });
       return;
     } catch (err) {
-      console.error(`\n❌ [Email Service] SMTP delivery failed to ${to}: ${err.message}`);
-      if (err.code === 'EAUTH' || (err.message && err.message.includes('535'))) {
-        console.error(`   👉 Google Authentication Error (535): Ensure SMTP_PASS is a 16-character Google App Password (not your personal Gmail password) and 2-Step Verification is active on ${process.env.SMTP_USER}.`);
-      } else if (err.code === 'ETIMEDOUT' || err.code === 'ESOCKET') {
-        console.error(`   👉 Connection timed out to SMTP host: Try switching SMTP_PORT between 465 (SSL) and 587 (TLS).`);
-      }
+      console.warn(`\n⚠️  [Email Service] SMTP delivery failed to ${to}: ${err.message}`);
+      console.warn(`    Falling back to console-logging the link for local testing:\n`);
       logFallback(linkType, to, link);
       return;
     }
@@ -284,9 +175,9 @@ function logFallback(type, to, link) {
  * @param {string} resetToken - The raw (unhashed) token to embed in the link.
  */
 async function sendPasswordResetEmail(to, resetToken) {
-  const appUrl    = process.env.APP_URL || 'http://localhost:5173';
+  const appUrl = process.env.APP_URL || 'http://localhost:5173';
   const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
-  const from      = process.env.EMAIL_FROM || 'TaskFlow <onboarding@resend.dev>';
+  const from = process.env.EMAIL_FROM || 'TaskFlow <onboarding@resend.dev>';
 
   await dispatchEmail({
     from,
@@ -333,9 +224,9 @@ async function sendPasswordResetEmail(to, resetToken) {
  * @param {string} verifyToken  - The raw (unhashed) token to embed in the link.
  */
 async function sendVerificationEmail(to, verifyToken) {
-  const appUrl     = process.env.APP_URL || 'http://localhost:5173';
+  const appUrl = process.env.APP_URL || 'http://localhost:5173';
   const verifyLink = `${appUrl}/verify-email?token=${verifyToken}`;
-  const from       = process.env.EMAIL_FROM || 'TaskFlow <onboarding@resend.dev>';
+  const from = process.env.EMAIL_FROM || 'TaskFlow <onboarding@resend.dev>';
 
   await dispatchEmail({
     from,

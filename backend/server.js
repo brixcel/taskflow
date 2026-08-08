@@ -20,13 +20,8 @@ const REQUIRED_ENV_VARS = [
   'APP_URL',
 ];
 
-const hasHttpProvider = Boolean(
-  process.env.BREVO_API_KEY ||
-  process.env.SENDINBLUE_API_KEY ||
-  process.env.RESEND_API_KEY ||
-  process.env.EMAIL_API_KEY
-);
-const requiredToCheck = hasHttpProvider
+const hasResend = Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY);
+const requiredToCheck = hasResend
   ? ['DATABASE_URL', 'JWT_SECRET', 'CORS_ORIGIN', 'APP_URL']
   : REQUIRED_ENV_VARS;
 
@@ -39,24 +34,21 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-const express        = require('express');
-const cors           = require('cors');
-const helmet         = require('helmet');
-const rateLimit      = require('express-rate-limit');
-const prisma         = require('./prisma');
-const logger         = require('./middleware/logger');
-const authRoutes     = require('./routes/auth');
-const userRoutes     = require('./routes/users');
-const taskRoutes     = require('./routes/tasks');
-const teamRoutes     = require('./routes/teams');
-const commentRoutes  = require('./routes/comments');
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const prisma = require('./prisma');
+const logger = require('./middleware/logger');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const taskRoutes = require('./routes/tasks');
+const teamRoutes = require('./routes/teams');
+const commentRoutes = require('./routes/comments');
 const activityRoutes = require('./routes/activities');
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Trust reverse proxy (Render / Railway / Vercel) for accurate client IP identification in rate limiters
-app.set('trust proxy', 1);
 
 // ─── Structured HTTP request logging ─────────────────────────────────────────
 // Must come before routes so every request is logged.
@@ -119,20 +111,20 @@ app.use(express.json({ limit: '10kb' }));
 const isTest = process.env.NODE_ENV === 'test';
 
 const authRateLimiter = rateLimit({
-  windowMs:          15 * 60 * 1000, // 15 minutes
-  max:               isTest ? 1000 : 20,
-  standardHeaders:   true,
-  legacyHeaders:     false,
-  message:           { error: 'Too many requests, please try again later.' },
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isTest ? 1000 : 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
   skipSuccessfulRequests: false,
 });
 
 const forgotPasswordRateLimiter = rateLimit({
-  windowMs:        15 * 60 * 1000, // 15 minutes
-  max:             isTest ? 1000 : 5,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isTest ? 1000 : 5,
   standardHeaders: true,
-  legacyHeaders:   false,
-  message:         { error: 'Too many password reset requests, please try again later.' },
+  legacyHeaders: false,
+  message: { error: 'Too many password reset requests, please try again later.' },
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
@@ -155,17 +147,17 @@ app.get('/health', async (req, res) => {
 // ─── Routes ───────────────────────────────────────────────────────────────────
 // Rate limiters are applied per-path, before the route handler.
 
-app.use('/auth/login',          authRateLimiter);
-app.use('/auth/register',       authRateLimiter);
+app.use('/auth/login', authRateLimiter);
+app.use('/auth/register', authRateLimiter);
 app.use('/auth/forgot-password', forgotPasswordRateLimiter);
 
-app.use('/auth',  authRoutes);
+app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/teams', teamRoutes);
 
 // Comments and activities are nested under tasks
-app.use('/tasks/:taskId/comments',   commentRoutes);
+app.use('/tasks/:taskId/comments', commentRoutes);
 app.use('/tasks/:taskId/activities', activityRoutes);
 
 // ─── Test-error endpoint (non-production only) ───────────────────────────────
