@@ -4,6 +4,7 @@ const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
 const validate    = require('../middleware/validate');
 const schemas     = require('../validation/schemas');
+const logger      = require('../middleware/logger');
 
 const router = express.Router();
 
@@ -31,7 +32,7 @@ router.get('/me', async (req, res) => {
 
     res.json({ teams });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'Route handler failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -59,7 +60,7 @@ router.post('/', validate(schemas.teamCreate), async (req, res) => {
 
     res.status(201).json({ team });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'Route handler failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -102,7 +103,7 @@ router.post('/:id/members', validate(schemas.memberAdd), async (req, res) => {
 
     res.status(201).json({ membership });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'Route handler failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -136,7 +137,7 @@ router.post('/join', validate(schemas.teamJoin), async (req, res) => {
       membership,
     });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'Route handler failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -170,7 +171,7 @@ router.get('/:id/members', async (req, res) => {
     }));
     res.json({ members });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'Route handler failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -194,7 +195,7 @@ async function resolveTeamFromParam(req, res, next) {
     req.teamRole = membership.role;
     next();
   } catch (err) {
-    console.error('resolveTeamFromParam error:', err);
+    logger.error({ err }, 'resolveTeamFromParam failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 }
@@ -225,7 +226,7 @@ router.delete('/:id/members/:userId', resolveTeamFromParam, requireRole('owner')
 
     res.status(204).send();
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'Route handler failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -254,7 +255,7 @@ router.patch('/:id/members/:userId/role', resolveTeamFromParam, requireRole('own
 
     res.json({ membership: updated });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'Route handler failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });

@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import ThemeToggle from '../components/ThemeToggle';
+import { API_URL } from '../api/config';
 
 function Onboarding() {
   // 'create' | 'join'
@@ -12,11 +14,14 @@ function Onboarding() {
 
   const token = localStorage.getItem('token');
 
-  // If somehow no token, bounce to login.
-  if (!token) {
-    navigate('/');
-    return null;
-  }
+  // If no token, bounce to login.
+  useEffect(() => {
+    if (!token) {
+      navigate('/');
+    }
+  }, [token, navigate]);
+
+  if (!token) return null;
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -36,14 +41,14 @@ function Onboarding() {
 
       if (mode === 'create') {
         const res = await axios.post(
-          'http://localhost:3000/teams',
+          `${API_URL}/teams`,
           { name },
           { headers: authHeaders }
         );
         team = res.data.team;
       } else {
         const res = await axios.post(
-          'http://localhost:3000/teams/join',
+          `${API_URL}/teams/join`,
           { teamName: name },
           { headers: authHeaders }
         );
@@ -51,7 +56,7 @@ function Onboarding() {
       }
 
       // Fetch fresh membership to get the role.
-      const teamsRes = await axios.get('http://localhost:3000/teams/me', {
+      const teamsRes = await axios.get(`${API_URL}/teams/me`, {
         headers: authHeaders,
       });
       const membership = teamsRes.data.teams.find((t) => t.id === team.id);
@@ -62,25 +67,31 @@ function Onboarding() {
 
       navigate('/dashboard');
     } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        navigate('/');
+        return;
+      }
       setError(err.response?.data?.error || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const inputClass =
-    'w-full h-10 px-3 bg-[#ffffff] text-[#171717] border border-[#ebebeb] rounded-[6px] outline-none transition-colors placeholder:text-[#888888] focus:border-[#a1a1a1] focus:ring-2 focus:ring-[#171717]/5';
-
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-[var(--color-canvas-bg,#fafafa)] flex flex-col items-center justify-center px-4 relative">
+      {/* Top right theme toggle */}
+      <div style={{ position: 'absolute', top: 20, right: 24 }}>
+        <ThemeToggle variant="icon" size="sm" />
+      </div>
 
       {/* Wordmark */}
       <div className="mb-8 flex items-center gap-2">
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] bg-[#171717]">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] bg-[var(--color-canvas-ink,#171717)] text-[var(--color-canvas-main,#ffffff)]">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path
               d="M2 11 L7 3 L12 11"
-              stroke="white"
+              stroke="currentColor"
               strokeWidth="1.75"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -88,7 +99,7 @@ function Onboarding() {
           </svg>
         </span>
         <span
-          className="text-[#171717] font-semibold tracking-[-0.6px]"
+          className="text-[var(--color-canvas-ink,#171717)] font-semibold tracking-[-0.6px]"
           style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: '18px' }}
         >
           TaskFlow
@@ -97,24 +108,23 @@ function Onboarding() {
 
       {/* Card */}
       <div
-        className="w-full max-w-[400px] bg-[#ffffff] rounded-[12px] p-8"
+        className="w-full max-w-[400px] bg-[var(--color-canvas-card,#ffffff)] rounded-[12px] p-8 border border-[var(--color-canvas-hairline,#ebebeb)]"
         style={{
-          boxShadow:
-            '0 0 0 1px rgba(0,0,0,0.08), 0px 1px 1px rgba(0,0,0,0.03), 0px 2px 2px rgba(0,0,0,0.06)',
+          boxShadow: '0 8px 32px var(--color-modal-backdrop, rgba(0,0,0,0.06))',
         }}
       >
         <h1
-          className="text-[#171717] font-semibold mb-1 tracking-[-0.96px]"
+          className="text-[var(--color-canvas-ink,#171717)] font-semibold mb-1 tracking-[-0.96px]"
           style={{ fontSize: '24px', lineHeight: '32px' }}
         >
           Set up your team
         </h1>
-        <p className="text-[#888888] mb-6" style={{ fontSize: '14px', lineHeight: '20px' }}>
+        <p className="text-[var(--color-canvas-mute,#888888)] mb-6" style={{ fontSize: '14px', lineHeight: '20px' }}>
           Create a new team or join an existing one to get started.
         </p>
 
         {/* Mode toggle */}
-        <div className="flex gap-1 p-1 bg-[#f5f5f5] rounded-[8px] mb-6">
+        <div className="flex gap-1 p-1 bg-[var(--color-canvas-hover,#f5f5f5)] rounded-[8px] mb-6">
           {[
             { value: 'create', label: 'Create a team' },
             { value: 'join',   label: 'Join a team'   },
@@ -123,10 +133,10 @@ function Onboarding() {
               key={value}
               type="button"
               onClick={() => { setMode(value); setError(''); setTeamName(''); }}
-              className={`flex-1 h-8 rounded-[6px] font-medium transition-colors cursor-pointer ${
+              className={`flex-1 h-8 rounded-[6px] font-medium transition-colors cursor-pointer border-0 ${
                 mode === value
-                  ? 'bg-[#ffffff] text-[#171717] shadow-sm'
-                  : 'text-[#888888] hover:text-[#171717]'
+                  ? 'bg-[var(--color-canvas-card,#ffffff)] text-[var(--color-canvas-ink,#171717)] shadow-sm'
+                  : 'bg-transparent text-[var(--color-canvas-mute,#888888)] hover:text-[var(--color-canvas-ink,#171717)]'
               }`}
               style={{ fontSize: '13px', lineHeight: '20px', letterSpacing: '-0.28px' }}
             >
@@ -139,7 +149,7 @@ function Onboarding() {
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor="teamName"
-              className="text-[#171717] font-medium"
+              className="text-[var(--color-canvas-body,#171717)] font-medium"
               style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
             >
               {mode === 'create' ? 'Team name' : 'Team name to join'}
@@ -151,7 +161,7 @@ function Onboarding() {
               onChange={(e) => { setTeamName(e.target.value); setError(''); }}
               placeholder={mode === 'create' ? 'e.g. Acme Engineering' : 'Enter the exact team name'}
               required
-              className={inputClass}
+              className="field-input"
               style={{ fontSize: '14px', lineHeight: '20px' }}
               autoComplete="off"
             />
@@ -159,20 +169,20 @@ function Onboarding() {
 
           {/* Error banner */}
           {error && (
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-[#f7d4d6] border border-[#ee0000]/20 rounded-[6px]">
+            <div className="error-banner">
               <svg
                 width="14"
                 height="14"
                 viewBox="0 0 14 14"
                 fill="none"
-                className="shrink-0 text-[#ee0000]"
+                className="shrink-0"
                 aria-hidden="true"
               >
                 <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 <circle cx="7" cy="10" r="0.75" fill="currentColor" />
               </svg>
-              <p className="text-[#c50000]" style={{ fontSize: '13px', lineHeight: '20px' }}>
+              <p style={{ margin: 0, fontSize: '13px', lineHeight: '20px' }}>
                 {error}
               </p>
             </div>
@@ -181,8 +191,8 @@ function Onboarding() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-10 bg-[#171717] text-white font-medium rounded-[100px] transition-opacity hover:opacity-80 active:opacity-70 cursor-pointer mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
+            className="btn-primary"
+            style={{ width: '100%', height: 40, marginTop: 4 }}
           >
             {loading
               ? mode === 'create' ? 'Creating…' : 'Joining…'
@@ -191,7 +201,7 @@ function Onboarding() {
         </form>
       </div>
 
-      <p className="mt-6 text-[#888888]" style={{ fontSize: '12px' }}>
+      <p className="mt-6 text-[var(--color-canvas-mute,#888888)]" style={{ fontSize: '12px' }}>
         TaskFlow — team task manager
       </p>
     </div>

@@ -15,7 +15,8 @@
  * or 404 if the user has no team memberships at all.
  */
 
-const prisma = require('../prisma');
+const prisma  = require('../prisma');
+const logger  = require('./logger');
 
 async function resolveTeam(req, res, next) {
   try {
@@ -59,7 +60,7 @@ async function resolveTeam(req, res, next) {
 
     next();
   } catch (err) {
-    console.error('resolveTeam error:', err);
+    logger.error({ err }, 'resolveTeam failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 }

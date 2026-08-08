@@ -1,311 +1,239 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import ThemeToggle from '../components/ThemeToggle';
+import { API_URL } from '../api/config';
 
-// Minimum password length — keep in sync with backend rule
 const MIN_PASSWORD_LENGTH = 8;
 
-function Register() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
-
-  // ── Client-side validation ──────────────────────────────────────────────────
-  const validate = () => {
-    const errors = {};
-
-    // Name required
-    if (!name.trim()) {
-      errors.name = 'Name is required.';
-    }
-
-    // Email format
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      errors.email = 'Enter a valid email address.';
-    }
-
-    // Password length
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
-    }
-
-    // Confirm match
-    if (password !== confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match.';
-    }
-
-    return errors;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setFieldErrors({});
-
-    const errors = validate();
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      return;
-    }
-
-    try {
-      await axios.post('http://localhost:3000/auth/register', {
-        name: name.trim(),
-        email: email.trim(),
-        password,
-      });
-
-      // Registration successful — send to onboarding to create/join a team
-      navigate('/onboarding');
-    } catch (err) {
-      // Surface backend validation messages if present
-      const data = err.response?.data;
-      if (data?.errors && typeof data.errors === 'object') {
-        // Backend returned field-level errors (e.g. { email: '...' })
-        setFieldErrors(data.errors);
-      } else {
-        setError(data?.error || data?.message || 'Registration failed. Please try again.');
-      }
-    }
-  };
-
-  // ── Shared input class ──────────────────────────────────────────────────────
-  const inputClass = (hasError) =>
-    `w-full h-10 px-3 bg-[#ffffff] text-[#171717] border rounded-[6px] outline-none transition-colors placeholder:text-[#888888] focus:ring-2 focus:ring-[#171717]/5 ${
-      hasError
-        ? 'border-[#ee0000] focus:border-[#ee0000]'
-        : 'border-[#ebebeb] focus:border-[#a1a1a1]'
-    }`;
-
+function Logo({ dark = false }) {
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center px-4">
-
-      {/* Wordmark */}
-      <div className="mb-8 flex items-center gap-2">
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] bg-[#171717]">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path
-              d="M2 11 L7 3 L12 11"
-              stroke="white"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-        <span
-          className="text-[#171717] font-semibold tracking-[-0.6px]"
-          style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: '18px' }}
-        >
-          TaskFlow
-        </span>
-      </div>
-
-      {/* Auth card */}
-      <div
-        className="w-full max-w-[400px] bg-[#ffffff] rounded-[12px] p-8"
-        style={{
-          boxShadow:
-            '0 0 0 1px rgba(0,0,0,0.08), 0px 1px 1px rgba(0,0,0,0.03), 0px 2px 2px rgba(0,0,0,0.06)',
-        }}
-      >
-        <h1
-          className="text-[#171717] font-semibold mb-1 tracking-[-0.96px]"
-          style={{ fontSize: '24px', lineHeight: '32px' }}
-        >
-          Create an account
-        </h1>
-        <p className="text-[#888888] mb-6" style={{ fontSize: '14px', lineHeight: '20px' }}>
-          Get started with your TaskFlow workspace.
-        </p>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-
-          {/* Name */}
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="name"
-              className="text-[#171717] font-medium"
-              style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
-            >
-              Name
-            </label>
-            <input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: undefined }));
-              }}
-              required
-              placeholder="Your name"
-              className={inputClass(!!fieldErrors.name)}
-              style={{ fontSize: '14px', lineHeight: '20px' }}
-              autoComplete="name"
-            />
-            {fieldErrors.name && <FieldError message={fieldErrors.name} />}
-          </div>
-
-          {/* Email */}
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="email"
-              className="text-[#171717] font-medium"
-              style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: undefined }));
-              }}
-              required
-              placeholder="you@example.com"
-              className={inputClass(!!fieldErrors.email)}
-              style={{ fontSize: '14px', lineHeight: '20px' }}
-              autoComplete="email"
-            />
-            {fieldErrors.email && (
-              <FieldError message={fieldErrors.email} />
-            )}
-          </div>
-
-          {/* Password */}
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="password"
-              className="text-[#171717] font-medium"
-              style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: undefined }));
-              }}
-              required
-              placeholder="Min. 8 characters"
-              className={inputClass(!!fieldErrors.password)}
-              style={{ fontSize: '14px', lineHeight: '20px' }}
-              autoComplete="new-password"
-            />
-            {fieldErrors.password && (
-              <FieldError message={fieldErrors.password} />
-            )}
-          </div>
-
-          {/* Confirm password */}
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="confirmPassword"
-              className="text-[#171717] font-medium"
-              style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
-            >
-              Confirm password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                if (fieldErrors.confirmPassword)
-                  setFieldErrors((p) => ({ ...p, confirmPassword: undefined }));
-              }}
-              required
-              placeholder="••••••••"
-              className={inputClass(!!fieldErrors.confirmPassword)}
-              style={{ fontSize: '14px', lineHeight: '20px' }}
-              autoComplete="new-password"
-            />
-            {fieldErrors.confirmPassword && (
-              <FieldError message={fieldErrors.confirmPassword} />
-            )}
-          </div>
-
-          {/* Top-level error banner */}
-          {error && (
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-[#f7d4d6] border border-[#ee0000]/20 rounded-[6px]">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                className="shrink-0 text-[#ee0000]"
-                aria-hidden="true"
-              >
-                <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <circle cx="7" cy="10" r="0.75" fill="currentColor" />
-              </svg>
-              <p className="text-[#c50000]" style={{ fontSize: '13px', lineHeight: '20px' }}>
-                {error}
-              </p>
-            </div>
-          )}
-
-          {/* Submit */}
-          <button
-            type="submit"
-            className="w-full h-10 bg-[#171717] text-white font-medium rounded-[100px] transition-opacity hover:opacity-80 active:opacity-70 cursor-pointer mt-1"
-            style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
-          >
-            Create account
-          </button>
-        </form>
-
-        {/* Link to login */}
-        <p
-          className="mt-6 pt-6 border-t border-[#ebebeb] text-center text-[#888888]"
-          style={{ fontSize: '13px', lineHeight: '20px' }}
-        >
-          Already have an account?{' '}
-          <Link
-            to="/"
-            className="text-[#171717] font-medium hover:underline"
-          >
-            Log in
-          </Link>
-        </p>
-      </div>
-
-      {/* Footer hint */}
-      <p className="mt-6 text-[#888888]" style={{ fontSize: '12px' }}>
-        TaskFlow — team task manager
-      </p>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 28, height: 28, borderRadius: 7,
+        background: dark ? 'var(--color-canvas-ink, #0f1011)' : 'var(--color-sidebar-bg-active, #222427)',
+        color: dark ? 'var(--color-canvas-main, #ffffff)' : '#f0f1f3',
+        flexShrink: 0,
+      }}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M2 11L7 3L12 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+      <span style={{ fontWeight: 600, fontSize: 16, letterSpacing: '-0.4px', color: dark ? 'var(--color-canvas-ink, #0f1011)' : '#f0f1f3' }}>
+        TaskFlow
+      </span>
     </div>
   );
 }
 
-// Inline field-level error — red text below the input
 function FieldError({ message }) {
   return (
-    <p
-      className="text-[#ee0000] flex items-center gap-1"
-      style={{ fontSize: '12px', lineHeight: '16px' }}
-      role="alert"
-    >
-      <svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true" className="shrink-0">
-        <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="7" cy="10" r="0.75" fill="currentColor" />
+    <p role="alert" style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-btn-danger-fg, #d93025)', display: 'flex', alignItems: 'center', gap: 4 }}>
+      <svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+        <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M7 4v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <circle cx="7" cy="9.5" r="0.7" fill="currentColor" />
       </svg>
       {message}
     </p>
   );
 }
 
-export default Register;
+function Field({ id, label, type = 'text', value, onChange, placeholder, required, autoComplete, error, autoFocus }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <label htmlFor={id} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #3d4148)' }}>{label}</label>
+      <input
+        id={id} type={type} value={value} onChange={onChange}
+        placeholder={placeholder} required={required} autoComplete={autoComplete} autoFocus={autoFocus}
+        className="field-input"
+        style={{ borderColor: error ? 'var(--color-btn-danger-fg, #d93025)' : undefined }}
+      />
+      {error && <FieldError message={error} />}
+    </div>
+  );
+}
+
+export default function Register() {
+  const [name,            setName]            = useState('');
+  const [email,           setEmail]           = useState('');
+  const [password,        setPassword]        = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fieldErrors,     setFieldErrors]     = useState({});
+  const [error,           setError]           = useState('');
+  const [loading,         setLoading]         = useState(false);
+  const [registered,      setRegistered]      = useState(false);
+  const navigate = useNavigate();
+
+  const clearFieldError = (key) => setFieldErrors(p => ({ ...p, [key]: undefined }));
+
+  const validate = () => {
+    const errors = {};
+    if (!name.trim()) errors.name = 'Name is required.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = 'Enter a valid email.';
+    if (password.length < MIN_PASSWORD_LENGTH) errors.password = `At least ${MIN_PASSWORD_LENGTH} characters.`;
+    if (password !== confirmPassword) errors.confirmPassword = 'Passwords do not match.';
+    return errors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault(); setError(''); setFieldErrors({});
+    const errors = validate();
+    if (Object.keys(errors).length > 0) { setFieldErrors(errors); return; }
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/auth/register`, {
+        name: name.trim(), email: email.trim(), password,
+      });
+      const { token, user } = res.data;
+      if (token) localStorage.setItem('token', token);
+      if (user)  localStorage.setItem('user', JSON.stringify(user));
+      setRegistered(true);
+    } catch (err) {
+      const data = err.response?.data;
+      if (data?.errors && typeof data.errors === 'object') setFieldErrors(data.errors);
+      else setError(data?.error || data?.message || 'Registration failed. Please try again.');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="auth-shell">
+      {/* Dark left panel */}
+      <div className="auth-panel-dark">
+        <div>
+          <Logo />
+          <div style={{ marginTop: 48 }}>
+            <p style={{ margin: '0 0 16px', fontSize: 28, fontWeight: 700, color: '#f0f1f3', letterSpacing: '-0.8px', lineHeight: '36px' }}>
+              Collaborate without<br />the chaos.
+            </p>
+            <p style={{ margin: 0, fontSize: 14, color: '#50545c', lineHeight: '22px' }}>
+              Create your workspace and invite your team in minutes.
+            </p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {['Free to get started', 'No credit card required', 'Invite unlimited teammates', 'Export your data anytime'].map(f => (
+            <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#1c1d1f', border: '1px solid #2a2d31', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2L8 3" stroke="#8a8f98" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </span>
+              <span style={{ fontSize: 13, color: '#8a8f98' }}>{f}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Light/Dark right panel */}
+      <main className="auth-panel-light">
+        {/* Top right theme toggle */}
+        <div style={{ position: 'absolute', top: 20, right: 24 }}>
+          <ThemeToggle variant="icon" size="sm" />
+        </div>
+
+        <div style={{ width: '100%', maxWidth: 380 }}>
+
+          {registered ? (
+            /* ── Check-your-email state ── */
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 10, background: 'var(--color-banner-success-bg, #e8f5ed)',
+                border: '1px solid var(--color-banner-success-border, #a8d5b8)', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', margin: '0 auto 20px',
+              }}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <rect x="2" y="5" width="16" height="11" rx="2" stroke="var(--color-banner-success-fg, #1a7a48)" strokeWidth="1.5" />
+                  <path d="M2 8l8 5 8-5" stroke="var(--color-banner-success-fg, #1a7a48)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <h1 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 700, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.6px' }}>
+                Check your email
+              </h1>
+              <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--color-canvas-body, #50545c)', lineHeight: '20px' }}>
+                We sent a verification link to <strong style={{ color: 'var(--color-canvas-ink, #0f1011)' }}>{email.trim()}</strong>.
+                Click it to activate your account.
+              </p>
+              <button className="btn-primary" style={{ width: '100%', height: 40 }} onClick={() => navigate('/onboarding')}>
+                Continue to onboarding
+              </button>
+              <p style={{ marginTop: 16, fontSize: 12, color: 'var(--color-canvas-mute, #50545c)', lineHeight: '18px' }}>
+                Didn't receive it? Check spam, or resend from your dashboard.
+              </p>
+            </div>
+          ) : (
+            /* ── Registration form ── */
+            <>
+              <h1 style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 700, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.6px' }}>
+                Create your account
+              </h1>
+              <p style={{ margin: '0 0 28px', fontSize: 14, color: 'var(--color-canvas-body, #50545c)' }}>
+                Get started with TaskFlow for free.
+              </p>
+
+              <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                <Field id="name" label="Full name" value={name}
+                  onChange={e => { setName(e.target.value); clearFieldError('name'); }}
+                  placeholder="Your name" required autoComplete="name" autoFocus error={fieldErrors.name}
+                />
+                <Field id="email" label="Email" type="email" value={email}
+                  onChange={e => { setEmail(e.target.value); clearFieldError('email'); }}
+                  placeholder="you@example.com" required autoComplete="email" error={fieldErrors.email}
+                />
+                <Field id="password" label="Password" type="password" value={password}
+                  onChange={e => { setPassword(e.target.value); clearFieldError('password'); }}
+                  placeholder="Min. 8 characters" required autoComplete="new-password" error={fieldErrors.password}
+                />
+                <Field id="confirmPassword" label="Confirm password" type="password" value={confirmPassword}
+                  onChange={e => { setConfirmPassword(e.target.value); clearFieldError('confirmPassword'); }}
+                  placeholder="••••••••" required autoComplete="new-password" error={fieldErrors.confirmPassword}
+                />
+
+                {error && (
+                  <div className="error-banner">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+                      <path d="M7 4v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                      <circle cx="7" cy="9.5" r="0.7" fill="currentColor" />
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                <button type="submit" className="btn-primary" style={{ width: '100%', height: 40, marginTop: 4 }} disabled={loading}>
+                  {loading ? 'Creating account…' : 'Create account'}
+                </button>
+              </form>
+
+              <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--color-canvas-hairline, #f0f1f3)', textAlign: 'center', fontSize: 13, color: 'var(--color-canvas-mute, #50545c)' }}>
+                <p style={{ margin: '0 0 10px' }}>
+                  Already have an account?{' '}
+                  <Link to="/" style={{ color: 'var(--color-canvas-ink, #0f1011)', fontWeight: 500, textDecoration: 'none' }}
+                    onMouseEnter={e => e.target.style.textDecoration = 'underline'}
+                    onMouseLeave={e => e.target.style.textDecoration = 'none'}
+                  >
+                    Sign in
+                  </Link>
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 14, fontSize: 12, color: 'var(--color-canvas-mute, #50545c)' }}>
+                  <Link to="/terms" style={{ color: 'var(--color-canvas-mute, #50545c)', textDecoration: 'none' }}
+                    onMouseEnter={e => e.target.style.color = 'var(--color-canvas-ink, #0f1011)'}
+                    onMouseLeave={e => e.target.style.color = 'var(--color-canvas-mute, #50545c)'}
+                  >
+                    Terms of Service
+                  </Link>
+                  <span>•</span>
+                  <Link to="/privacy" style={{ color: 'var(--color-canvas-mute, #50545c)', textDecoration: 'none' }}
+                    onMouseEnter={e => e.target.style.color = 'var(--color-canvas-ink, #0f1011)'}
+                    onMouseLeave={e => e.target.style.color = 'var(--color-canvas-mute, #50545c)'}
+                  >
+                    Privacy Policy
+                  </Link>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}

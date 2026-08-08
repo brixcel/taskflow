@@ -17,7 +17,10 @@ model User {
   email        String   @unique
   passwordHash String
   name         String
-  createdAt    DateTime @default(now())
+  emailVerified   Boolean   @default(false)
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
 
   tasksCreated        Task[]               @relation("CreatedTasks")
   tasksAssigned       Task[]               @relation("AssignedTasks")
@@ -65,6 +68,7 @@ model Task {
   title       String
   description String?
   status      String   @default("todo")
+  dueDate     DateTime?
   assigneeId  String?
   createdById String
   teamId      String

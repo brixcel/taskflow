@@ -60,11 +60,21 @@ const resetPassword = z.object({
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
+const dueDateSchema = z.preprocess(
+  (val) => (val === '' ? null : val),
+  z.string()
+    .trim()
+    .refine((val) => !isNaN(Date.parse(val)), { message: 'dueDate must be a valid date string' })
+    .optional()
+    .nullable()
+);
+
 const taskCreate = z.object({
   title:       nonBlankString(200, { requiredMsg: 'Title is required', maxMsg: 'Title must be 200 characters or fewer' }),
   // description has no min — trim only, so ordering doesn't matter here
   description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional(),
   assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  dueDate:     dueDateSchema,
 });
 
 const taskUpdate = z.object({
@@ -75,6 +85,7 @@ const taskUpdate = z.object({
     errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
   }).optional(),
   assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  dueDate:     dueDateSchema,
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'At least one field must be provided' },

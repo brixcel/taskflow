@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import ThemeToggle from '../components/ThemeToggle';
+import { API_URL } from '../api/config';
 
 const MIN_PASSWORD_LENGTH = 8;
 
 // Shared field-level error component (same pattern as Register.jsx)
 function FieldError({ message }) {
   return (
-    <p className="text-[#c50000]" style={{ fontSize: '12px', lineHeight: '16px' }}>
+    <p className="text-[var(--color-btn-danger-fg,#c50000)]" style={{ fontSize: '12px', lineHeight: '16px' }}>
       {message}
     </p>
   );
@@ -55,7 +57,7 @@ function ResetPassword() {
     }
 
     try {
-      await axios.post('http://localhost:3000/auth/reset-password', {
+      await axios.post(`${API_URL}/auth/reset-password`, {
         token,
         password,
       });
@@ -70,23 +72,20 @@ function ResetPassword() {
     }
   };
 
-  const inputClass = (hasError) =>
-    `w-full h-10 px-3 bg-[#ffffff] text-[#171717] border rounded-[6px] outline-none transition-colors placeholder:text-[#888888] focus:ring-2 focus:ring-[#171717]/5 ${
-      hasError
-        ? 'border-[#ee0000] focus:border-[#ee0000]'
-        : 'border-[#ebebeb] focus:border-[#a1a1a1]'
-    }`;
-
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-[var(--color-canvas-bg,#fafafa)] flex flex-col items-center justify-center px-4 relative">
+      {/* Top right theme toggle */}
+      <div style={{ position: 'absolute', top: 20, right: 24 }}>
+        <ThemeToggle variant="icon" size="sm" />
+      </div>
 
       {/* Wordmark */}
       <div className="mb-8 flex items-center gap-2">
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] bg-[#171717]">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] bg-[var(--color-canvas-ink,#171717)] text-[var(--color-canvas-main,#ffffff)]">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path
               d="M2 11 L7 3 L12 11"
-              stroke="white"
+              stroke="currentColor"
               strokeWidth="1.75"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -94,7 +93,7 @@ function ResetPassword() {
           </svg>
         </span>
         <span
-          className="text-[#171717] font-semibold tracking-[-0.6px]"
+          className="text-[var(--color-canvas-ink,#171717)] font-semibold tracking-[-0.6px]"
           style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: '18px' }}
         >
           TaskFlow
@@ -103,28 +102,27 @@ function ResetPassword() {
 
       {/* Auth card */}
       <div
-        className="w-full max-w-[400px] bg-[#ffffff] rounded-[12px] p-8"
+        className="w-full max-w-[400px] bg-[var(--color-canvas-card,#ffffff)] rounded-[12px] p-8 border border-[var(--color-canvas-hairline,#ebebeb)]"
         style={{
-          boxShadow:
-            '0 0 0 1px rgba(0,0,0,0.08), 0px 1px 1px rgba(0,0,0,0.03), 0px 2px 2px rgba(0,0,0,0.06)',
+          boxShadow: '0 8px 32px var(--color-modal-backdrop, rgba(0,0,0,0.06))',
         }}
       >
         {/* ── Missing token state ── */}
         {missingToken && (
           <>
             <h1
-              className="text-[#171717] font-semibold mb-1 tracking-[-0.96px]"
+              className="text-[var(--color-canvas-ink,#171717)] font-semibold mb-1 tracking-[-0.96px]"
               style={{ fontSize: '24px', lineHeight: '32px' }}
             >
               Invalid reset link
             </h1>
-            <p className="text-[#888888] mb-6" style={{ fontSize: '14px', lineHeight: '20px' }}>
+            <p className="text-[var(--color-canvas-mute,#888888)] mb-6" style={{ fontSize: '14px', lineHeight: '20px' }}>
               This link is missing a reset token. Please request a new one.
             </p>
             <Link
               to="/forgot-password"
-              className="w-full h-10 bg-[#171717] text-white font-medium rounded-[100px] transition-opacity hover:opacity-80 active:opacity-70 cursor-pointer flex items-center justify-center"
-              style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
+              className="btn-primary"
+              style={{ width: '100%', height: 40, textDecoration: 'none' }}
             >
               Request new link
             </Link>
@@ -135,31 +133,31 @@ function ResetPassword() {
         {!missingToken && success && (
           <>
             <h1
-              className="text-[#171717] font-semibold mb-1 tracking-[-0.96px]"
+              className="text-[var(--color-canvas-ink,#171717)] font-semibold mb-1 tracking-[-0.96px]"
               style={{ fontSize: '24px', lineHeight: '32px' }}
             >
               Password updated
             </h1>
-            <div className="flex items-start gap-2 px-3 py-2.5 bg-[#d4f7e6] border border-[#00aa55]/20 rounded-[6px] mb-4">
+            <div className="success-banner mb-4">
               <svg
                 width="14"
                 height="14"
                 viewBox="0 0 14 14"
                 fill="none"
-                className="shrink-0 text-[#00aa55] mt-0.5"
+                className="shrink-0 mt-0.5"
                 aria-hidden="true"
               >
                 <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M4 7 L6 9 L10 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <p className="text-[#006633]" style={{ fontSize: '13px', lineHeight: '20px' }}>
+              <p style={{ margin: 0, fontSize: '13px', lineHeight: '20px' }}>
                 Your password has been updated. Redirecting you to login&hellip;
               </p>
             </div>
             <Link
               to="/"
-              className="w-full h-10 bg-[#171717] text-white font-medium rounded-[100px] transition-opacity hover:opacity-80 active:opacity-70 cursor-pointer flex items-center justify-center"
-              style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
+              className="btn-primary"
+              style={{ width: '100%', height: 40, textDecoration: 'none' }}
             >
               Go to login
             </Link>
@@ -170,12 +168,12 @@ function ResetPassword() {
         {!missingToken && !success && (
           <>
             <h1
-              className="text-[#171717] font-semibold mb-1 tracking-[-0.96px]"
+              className="text-[var(--color-canvas-ink,#171717)] font-semibold mb-1 tracking-[-0.96px]"
               style={{ fontSize: '24px', lineHeight: '32px' }}
             >
               Choose a new password
             </h1>
-            <p className="text-[#888888] mb-6" style={{ fontSize: '14px', lineHeight: '20px' }}>
+            <p className="text-[var(--color-canvas-mute,#888888)] mb-6" style={{ fontSize: '14px', lineHeight: '20px' }}>
               Enter a new password for your account.
             </p>
 
@@ -184,7 +182,7 @@ function ResetPassword() {
               <div className="flex flex-col gap-1.5">
                 <label
                   htmlFor="password"
-                  className="text-[#171717] font-medium"
+                  className="text-[var(--color-canvas-body,#171717)] font-medium"
                   style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
                 >
                   New password
@@ -196,8 +194,8 @@ function ResetPassword() {
                   onChange={(e) => { setPassword(e.target.value); clearField('password'); }}
                   required
                   placeholder="Min. 8 characters"
-                  className={inputClass(!!fieldErrors.password)}
-                  style={{ fontSize: '14px', lineHeight: '20px' }}
+                  className="field-input"
+                  style={{ fontSize: '14px', lineHeight: '20px', borderColor: fieldErrors.password ? 'var(--color-btn-danger-fg, #ee0000)' : undefined }}
                   autoComplete="new-password"
                 />
                 {fieldErrors.password && <FieldError message={fieldErrors.password} />}
@@ -207,7 +205,7 @@ function ResetPassword() {
               <div className="flex flex-col gap-1.5">
                 <label
                   htmlFor="confirmPassword"
-                  className="text-[#171717] font-medium"
+                  className="text-[var(--color-canvas-body,#171717)] font-medium"
                   style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
                 >
                   Confirm new password
@@ -219,8 +217,8 @@ function ResetPassword() {
                   onChange={(e) => { setConfirmPassword(e.target.value); clearField('confirmPassword'); }}
                   required
                   placeholder="••••••••"
-                  className={inputClass(!!fieldErrors.confirmPassword)}
-                  style={{ fontSize: '14px', lineHeight: '20px' }}
+                  className="field-input"
+                  style={{ fontSize: '14px', lineHeight: '20px', borderColor: fieldErrors.confirmPassword ? 'var(--color-btn-danger-fg, #ee0000)' : undefined }}
                   autoComplete="new-password"
                 />
                 {fieldErrors.confirmPassword && <FieldError message={fieldErrors.confirmPassword} />}
@@ -228,20 +226,20 @@ function ResetPassword() {
 
               {/* Top-level API error */}
               {error && (
-                <div className="flex items-center gap-2 px-3 py-2.5 bg-[#f7d4d6] border border-[#ee0000]/20 rounded-[6px]">
+                <div className="error-banner">
                   <svg
                     width="14"
                     height="14"
                     viewBox="0 0 14 14"
                     fill="none"
-                    className="shrink-0 text-[#ee0000]"
+                    className="shrink-0"
                     aria-hidden="true"
                   >
                     <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
                     <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                     <circle cx="7" cy="10" r="0.75" fill="currentColor" />
                   </svg>
-                  <p className="text-[#c50000]" style={{ fontSize: '13px', lineHeight: '20px' }}>
+                  <p style={{ margin: 0, fontSize: '13px', lineHeight: '20px' }}>
                     {error}
                   </p>
                 </div>
@@ -250,8 +248,8 @@ function ResetPassword() {
               {/* Submit */}
               <button
                 type="submit"
-                className="w-full h-10 bg-[#171717] text-white font-medium rounded-[100px] transition-opacity hover:opacity-80 active:opacity-70 cursor-pointer mt-1"
-                style={{ fontSize: '14px', lineHeight: '20px', letterSpacing: '-0.28px' }}
+                className="btn-primary"
+                style={{ width: '100%', height: 40, marginTop: 4 }}
               >
                 Update password
               </button>
@@ -261,13 +259,13 @@ function ResetPassword() {
 
         {/* Link back to login */}
         <p
-          className="mt-6 pt-6 border-t border-[#ebebeb] text-center text-[#888888]"
+          className="mt-6 pt-6 border-t border-[var(--color-canvas-hairline,#ebebeb)] text-center text-[var(--color-canvas-mute,#888888)]"
           style={{ fontSize: '13px', lineHeight: '20px' }}
         >
           Remember your password?{' '}
           <Link
             to="/"
-            className="text-[#171717] font-medium hover:underline"
+            className="text-[var(--color-canvas-ink,#171717)] font-medium hover:underline"
           >
             Log in
           </Link>
@@ -275,7 +273,7 @@ function ResetPassword() {
       </div>
 
       {/* Footer hint */}
-      <p className="mt-6 text-[#888888]" style={{ fontSize: '12px' }}>
+      <p className="mt-6 text-[var(--color-canvas-mute,#888888)]" style={{ fontSize: '12px' }}>
         TaskFlow — team task manager
       </p>
     </div>

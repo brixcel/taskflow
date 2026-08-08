@@ -18,7 +18,7 @@ router.use(requireAuth, resolveTeam);
 
 router.post('/', validate(schemas.taskCreate), async (req, res) => {
   try {
-    const { title, description, assigneeId } = req.body;
+    const { title, description, assigneeId, dueDate } = req.body;
 
     // If an assignee is specified, verify they are a member of this team.
     if (assigneeId) {
@@ -35,6 +35,7 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
         title:       sanitize(title),
         description: description != null ? sanitize(description) : null,
         assigneeId:  assigneeId  || null,
+        dueDate:     dueDate ? new Date(dueDate) : null,
         createdById: req.userId,
         teamId:      req.teamId,
       },
@@ -109,7 +110,7 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       return res.status(404).json({ error: 'Task not found' });
     }
 
-    const { title, description, status, assigneeId } = req.body;
+    const { title, description, status, assigneeId, dueDate } = req.body;
 
     // Validate assignee belongs to this team if being changed.
     if (assigneeId !== undefined && assigneeId !== null) {
@@ -126,6 +127,7 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
     if (description !== undefined) updateData.description = description != null ? sanitize(description) : null;
     if (status      !== undefined) updateData.status      = status;
     if (assigneeId  !== undefined) updateData.assigneeId  = assigneeId;
+    if (dueDate     !== undefined) updateData.dueDate     = dueDate ? new Date(dueDate) : null;
 
     const task = await prisma.task.update({
       where:   { id },

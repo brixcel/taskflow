@@ -22,7 +22,7 @@ const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 router.post('/register', validate(schemas.register), async (req, res) => {
   try {
-    const { email, password, name, teamName } = req.body;
+    const { email, password, name } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -31,42 +31,18 @@ router.post('/register', validate(schemas.register), async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Use a transaction so the user, team, and membership are all created
-    // atomically — a partial failure leaves nothing behind.
-    const resolvedTeamName = teamName || `${name}'s Team`;
-
-    const { user, team } = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: { email, passwordHash, name },
-      });
-
-      const newTeam = await tx.team.create({
-        data: {
-          name:    resolvedTeamName,
-          ownerId: newUser.id,
-        },
-      });
-
-      await tx.teamMembership.create({
-        data: {
-          userId: newUser.id,
-          teamId: newTeam.id,
-          role:   'owner',
-        },
-      });
-
-      return { user: newUser, team: newTeam };
+    const user = await prisma.user.create({
+      data: { email, passwordHash, name },
     });
 
     const token = jwt.sign(
-      { userId: user.id, teamId: team.id },
+      { userId: user.id },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.status(201).json({
       user:  { id: user.id, email: user.email, name: user.name },
-      team:  { id: team.id, name: team.name },
       token,
     });
   } catch (error) {

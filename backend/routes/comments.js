@@ -6,6 +6,7 @@ const validate    = require('../middleware/validate');
 const { sanitize } = require('../middleware/sanitize');
 const schemas     = require('../validation/schemas');
 const { scopedTaskQuery } = require('../helpers/scopedQuery');
+const logger      = require('../middleware/logger');
 
 const router = express.Router({ mergeParams: true }); // inherit :taskId from parent
 
@@ -59,7 +60,7 @@ router.post('/', validate(schemas.commentCreate), async (req, res) => {
 
     res.status(201).json({ comment });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'POST /tasks/:taskId/comments failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -81,7 +82,7 @@ router.get('/', async (req, res) => {
 
     res.json({ comments });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'GET /tasks/:taskId/comments failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });

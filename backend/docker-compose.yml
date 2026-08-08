@@ -1,0 +1,70 @@
+# docker-compose.yml — brings up the TaskFlow API and its Postgres DB
+# with a single `docker-compose up` from a clean clone.
+#
+# Usage:
+#   docker-compose up          # start both services
+#   docker-compose up --build  # rebuild the API image after code changes
+#   docker-compose down -v     # stop and remove containers + the db volume
+
+version: "3.9"
+
+services:
+
+  # ── Postgres ─────────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     taskflow
+      POSTGRES_PASSWORD: taskflow_dev_password
+      POSTGRES_DB:       taskflow
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      # Expose 5432 on localhost so you can connect with psql or a GUI tool
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow"]
+      interval: 5s
+      timeout:  5s
+      retries:  10
+
+  # ── API ───────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context:    .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV:    production
+      PORT:        3000
+      # Database — points at the `db` service by its compose service name
+      DATABASE_URL: postgresql://taskflow:taskflow_dev_password@db:5432/taskflow
+
+      # ── Secrets — override these with real values for production ──────────
+      # Either pass them via a .env file or set them in your deployment env.
+      JWT_SECRET:   ${JWT_SECRET:-change_me_in_production}
+      CORS_ORIGIN:  ${CORS_ORIGIN:-http://localhost:5173}
+      APP_URL:      ${APP_URL:-http://localhost:3000}
+
+      # ── Email (SMTP) ──────────────────────────────────────────────────────
+      SMTP_HOST:    ${SMTP_HOST:-smtp.example.com}
+      SMTP_PORT:    ${SMTP_PORT:-587}
+      SMTP_USER:    ${SMTP_USER:-}
+      SMTP_PASS:    ${SMTP_PASS:-}
+      EMAIL_FROM:   ${EMAIL_FROM:-noreply@example.com}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout:   5s
+      retries:   3
+      start_period: 15s
+
+volumes:
+  db_data:
+    driver: local

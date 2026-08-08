@@ -13,19 +13,23 @@ datasource db {
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  createdAt    DateTime @default(now())
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String
+  name            String
+  emailVerified   Boolean   @default(false)
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
 
-  tasksCreated        Task[]               @relation("CreatedTasks")
-  tasksAssigned       Task[]               @relation("AssignedTasks")
-  comments            Comment[]
-  activities          Activity[]
-  teamMemberships     TeamMembership[]
-  teamsOwned          Team[]               @relation("OwnedTeams")
-  passwordResetTokens PasswordResetToken[]
+  tasksCreated             Task[]                  @relation("CreatedTasks")
+  tasksAssigned            Task[]                  @relation("AssignedTasks")
+  comments                 Comment[]
+  activities               Activity[]
+  teamMemberships          TeamMembership[]
+  teamsOwned               Team[]                  @relation("OwnedTeams")
+  passwordResetTokens      PasswordResetToken[]
+  emailVerificationTokens  EmailVerificationToken[]
 
   @@map("users")
 }
@@ -65,6 +69,7 @@ model Task {
   title       String
   description String?
   status      String   @default("todo")
+  dueDate     DateTime?
   assigneeId  String?
   createdById String
   teamId      String
@@ -121,4 +126,18 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
+}
+
+// ─── Email Verification ───────────────────────────────────────────────────────
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique   // SHA-256 hash of the raw token sent by email
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?          // null = unused; set when verification succeeds
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verification_tokens")
 }

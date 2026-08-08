@@ -2,6 +2,7 @@ const express     = require('express');
 const prisma      = require('../prisma');
 const requireAuth = require('../middleware/auth');
 const resolveTeam = require('../middleware/resolveTeam');
+const logger      = require('../middleware/logger');
 const { scopedTaskQuery } = require('../helpers/scopedQuery');
 
 const router = express.Router({ mergeParams: true }); // inherit :taskId from parent
@@ -25,23 +26,50 @@ async function requireTaskInTeam(req, res) {
 }
 
 // ─── GET /tasks/:taskId/activities — list activity log ────────────────────────
+//
+// Pagination params:
+//   page     — 1-based page number (default: 1)
+//   pageSize — items per page (default: 20, max: 100)
+//
+// Response includes a `pagination` envelope:
+//   { total, page, pageSize, totalPages }
 
 router.get('/', async (req, res) => {
   try {
     const task = await requireTaskInTeam(req, res);
     if (!task) return;
 
-    const activities = await prisma.activity.findMany({
-      where:   { taskId: task.id },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
+    // ── Pagination ────────────────────────────────────────────────────────────
+    const page     = Math.max(1, parseInt(req.query.page,     10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 20));
+    const skip     = (page - 1) * pageSize;
+
+    const where = { taskId: task.id };
+
+    const [total, activities] = await Promise.all([
+      prisma.activity.count({ where }),
+      prisma.activity.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      }),
+    ]);
+
+    res.json({
+      activities,
+      pagination: {
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
       },
     });
-
-    res.json({ activities });
   } catch (error) {
-    console.error(error);
+    logger.error({ err: error }, 'GET /tasks/:taskId/activities failed');
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
