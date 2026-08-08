@@ -60,11 +60,32 @@ app.use(logger.httpLogger);
 app.use(helmet());
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
-// Only allow requests from the configured frontend origin.
-// CORS_ORIGIN should match APP_URL in .env (e.g. http://localhost:5173).
-// A wildcard origin is never acceptable for an API that uses credentials.
+// Allow configured origins (comma-separated or single) and all *.vercel.app deployments.
+const configuredOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN,
+  origin: (origin, callback) => {
+    // Allow server-to-server requests, mobile apps, or curl with no Origin header
+    if (!origin) return callback(null, true);
+    const normalized = origin.replace(/\/$/, '');
+    try {
+      const parsed = new URL(origin);
+      if (
+        configuredOrigins.includes(normalized) ||
+        configuredOrigins.includes('*') ||
+        parsed.hostname.endsWith('.vercel.app')
+      ) {
+        return callback(null, true);
+      }
+    } catch {
+      // Fallback string matching if URL parsing fails
+      if (configuredOrigins.includes(normalized)) return callback(null, true);
+    }
+    callback(null, false);
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Team-Id'],
   credentials: true,
