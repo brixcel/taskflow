@@ -187,15 +187,21 @@ export default function TaskDetailDrawer({
               <select
                 value={task.status}
                 onChange={(e) => onStatusChange?.(task.id, e.target.value)}
+                className={`badge ${task.status === 'done' ? 'badge-done' : task.status === 'in_progress' ? 'badge-progress' : 'badge-todo'}`}
                 style={{
-                  padding: '3px 8px', fontSize: 12, borderRadius: 5,
-                  border: '1px solid var(--color-canvas-hairline, #ebebeb)', background: 'var(--color-canvas-card, #fff)', fontWeight: 500,
-                  color: 'var(--color-canvas-ink, #171717)', cursor: 'pointer', outline: 'none',
+                  height: 26,
+                  padding: '0 8px',
+                  fontSize: 12,
+                  borderRadius: 5,
+                  border: '1px solid',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  outline: 'none',
                 }}
               >
-                <option value="todo">Todo</option>
-                <option value="in_progress">In Progress</option>
-                <option value="done">Done</option>
+                <option value="todo" style={{ background: 'var(--color-canvas-card, #fff)', color: 'var(--color-canvas-ink, #171717)' }}>Todo</option>
+                <option value="in_progress" style={{ background: 'var(--color-canvas-card, #fff)', color: 'var(--color-canvas-ink, #171717)' }}>In Progress</option>
+                <option value="done" style={{ background: 'var(--color-canvas-card, #fff)', color: 'var(--color-canvas-ink, #171717)' }}>Done</option>
               </select>
             </div>
 
