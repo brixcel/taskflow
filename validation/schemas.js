@@ -37,25 +37,35 @@ function nonBlankString(maxLen, { requiredMsg, maxMsg } = {}) {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
+const emailSchema = z.string().trim().toLowerCase().email('Must be a valid email address');
+
 const register = z.object({
-  email:    z.string().email('Must be a valid email address'),
+  email:    emailSchema,
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name:     nonBlankString(100, { requiredMsg: 'Name is required', maxMsg: 'Name must be 100 characters or fewer' }),
   teamName: nonBlankString(100).optional(),
 });
 
 const login = z.object({
-  email:    z.string().email('Must be a valid email address'),
+  email:    emailSchema,
   password: z.string().min(1, 'Password is required'),
 });
 
 const forgotPassword = z.object({
-  email: z.string().email('Must be a valid email address'),
+  email: emailSchema,
 });
 
 const resetPassword = z.object({
   token:    z.string().min(1, 'Reset token is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+const verifyEmail = z.object({
+  token: z.string().min(1, 'Verification token is required'),
+});
+
+const resendVerification = z.object({
+  email: emailSchema,
 });
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────

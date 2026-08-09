@@ -20,10 +20,12 @@ services:
         sync: false
       - key: APP_URL
         sync: false
+      - key: BREVO_API_KEY
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
-        value: TaskFlow <onboarding@resend.dev>
+        value: TaskFlow <brexcel14@gmail.com>
 
 databases:
   # ── PostgreSQL Managed Database ─────────────────────────────────────────────

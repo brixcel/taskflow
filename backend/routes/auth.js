@@ -186,6 +186,7 @@ router.post('/forgot-password', validate(schemas.forgotPassword), async (req, re
 
     // Respond 200 even when no user found — prevents email enumeration
     if (!user) {
+      logger.info({ email }, 'Forgot-password requested for unregistered email — no reset email sent');
       return res.json({ message: 'If that email is registered, a reset link has been sent.' });
     }
 
