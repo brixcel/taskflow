@@ -1,17 +1,20 @@
 /**
- * Email service — supports Resend API, Nodemailer SMTP, and dev fallback logging.
+ * Email service — supports Brevo REST API, Resend API, Nodemailer SMTP, and dev fallback logging.
  *
  * Delivery strategy (evaluated in order):
  *   1. NODE_ENV=test → always console-log (never send), preserving Jest isolation.
- *   2. RESEND_API_KEY or EMAIL_API_KEY present → sends via Resend REST API (https://api.resend.com/emails).
- *   3. SMTP_HOST + SMTP_USER + SMTP_PASS present → sends via Nodemailer SMTP.
- *   4. Otherwise → falls back to console-logging the link (local dev mode).
+ *   2. BREVO_API_KEY / SENDINBLUE_API_KEY present → sends via Brevo REST API (https://api.brevo.com/v3/smtp/email).
+ *      (Recommended for Render — works over port 443 HTTPS, delivers to any recipient inbox).
+ *   3. RESEND_API_KEY / EMAIL_API_KEY present → sends via Resend REST API (https://api.resend.com/emails).
+ *   4. SMTP_HOST + SMTP_USER + SMTP_PASS present → sends via Nodemailer SMTP.
+ *   5. Otherwise → falls back to console-logging the link (local dev mode).
  *
  * Env vars:
- *   RESEND_API_KEY / EMAIL_API_KEY - API key for Resend transactional email API
+ *   BREVO_API_KEY / SENDINBLUE_API_KEY - API key for Brevo transactional email API
+ *   RESEND_API_KEY / EMAIL_API_KEY     - API key for Resend transactional email API
  *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS - Standard SMTP credentials
- *   EMAIL_FROM - Sender header, e.g. "TaskFlow <onboarding@resend.dev>" or "TaskFlow <no-reply@taskflow.app>"
- *   APP_URL - Base frontend URL, e.g. http://localhost:5173
+ *   EMAIL_FROM                         - Sender header, e.g. "TaskFlow <brexcel14@gmail.com>"
+ *   APP_URL                            - Base frontend URL, e.g. http://localhost:5173
  *
  * Exports:
  *   sendPasswordResetEmail(to, resetToken)  → Promise<void>
@@ -23,7 +26,12 @@
 const nodemailer = require('nodemailer');
 const https = require('https');
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Provider Configuration Checks ────────────────────────────────────────────
+
+/** Returns true when Brevo API key is present in environment. */
+function brevoConfigured() {
+  return Boolean(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY);
+}
 
 /** Returns true when Resend API key is present in environment. */
 function resendConfigured() {
@@ -38,17 +46,24 @@ function smtpConfigured() {
   return true;
 }
 
+// ─── SMTP Transporter ─────────────────────────────────────────────────────────
+
 /** Build a Nodemailer transporter from env vars. */
 function createTransporter() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   const port = parseInt(SMTP_PORT || '587', 10);
   const cleanPass = (SMTP_PASS || '').replace(/\s+/g, '');
+  const isGmail = SMTP_HOST === 'smtp.gmail.com' || (SMTP_USER && SMTP_USER.endsWith('@gmail.com'));
 
-  // Gmail-specific built-in transporter for optimal TLS and connection pooling
-  if (SMTP_HOST === 'smtp.gmail.com' || (SMTP_USER && SMTP_USER.endsWith('@gmail.com'))) {
+  if (isGmail) {
     return nodemailer.createTransport({
       service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: { user: SMTP_USER, pass: cleanPass },
+      family: 4,
+      connectionTimeout: 15000,
     });
   }
 
@@ -57,8 +72,112 @@ function createTransporter() {
     port,
     secure: port === 465,
     auth: { user: SMTP_USER, pass: cleanPass },
+    family: 4,
+    connectionTimeout: 10000,
   });
 }
+
+// ─── Brevo HTTP API Provider ──────────────────────────────────────────────────
+
+/**
+ * Send email via Brevo REST API (HTTPS POST to api.brevo.com/v3/smtp/email).
+ * Delivers to any external email address using Brevo transactional email infrastructure.
+ */
+async function sendViaBrevo({ from, to, subject, text, html }) {
+  const apiKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
+
+  // Extract name and email from "TaskFlow <email@domain.com>" or fallback
+  let senderName = 'TaskFlow';
+  let senderEmail = 'brexcel14@gmail.com';
+
+  if (from) {
+    const match = from.match(/^([^<]+)<([^>]+)>$/);
+    if (match) {
+      senderName = match[1].trim();
+      senderEmail = match[2].trim();
+    } else if (from.includes('@')) {
+      senderEmail = from.trim();
+    }
+  }
+
+  // Safety fallback: if configured sender is the default unverified resend sandbox, use verified Brevo account email
+  if (senderEmail.includes('resend.dev')) {
+    senderEmail = process.env.BREVO_SENDER_EMAIL || 'brexcel14@gmail.com';
+  }
+
+  const recipientList = (Array.isArray(to) ? to : [to]).map((addr) => ({ email: addr }));
+
+  const payload = JSON.stringify({
+    sender: { name: senderName, email: senderEmail },
+    to: recipientList,
+    subject,
+    htmlContent: html,
+    textContent: text,
+  });
+
+  if (typeof fetch === 'function') {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+      },
+      body: payload,
+    });
+
+    const responseBody = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const errMsg = responseBody.message || res.statusText || 'Unknown Brevo API error';
+      const errCode = responseBody.code || res.status;
+      throw new Error(`Brevo API error [${errCode}]: ${errMsg} (Status: ${res.status})`);
+    }
+
+    return responseBody;
+  }
+
+  // Node HTTPS fallback
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: 'api.brevo.com',
+        path: '/v3/smtp/email',
+        method: 'POST',
+        headers: {
+          'api-key': apiKey,
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let rawData = '';
+        res.on('data', (chunk) => { rawData += chunk; });
+        res.on('end', () => {
+          let parsed;
+          try {
+            parsed = JSON.parse(rawData);
+          } catch {
+            parsed = { raw: rawData };
+          }
+
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(parsed);
+          } else {
+            const msg = parsed.message || rawData || res.statusMessage;
+            reject(new Error(`Brevo API error (${res.statusCode}): ${msg}`));
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+// ─── Resend HTTP API Provider ─────────────────────────────────────────────────
 
 /**
  * Send email via Resend API (HTTP POST to api.resend.com/emails).
@@ -86,39 +205,44 @@ async function sendViaResend({ from, to, subject, text, html }) {
       const errJson = await res.json().catch(() => ({}));
       throw new Error(`Resend API error (${res.status}): ${errJson.message || res.statusText}`);
     }
-    return;
+    return await res.json().catch(() => ({}));
   }
 
-  // Node HTTPS fallback if global fetch is unavailable
+  // Node HTTPS fallback
   return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: 'api.resend.com',
-      path: '/emails',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload),
+    const req = https.request(
+      {
+        hostname: 'api.resend.com',
+        path: '/emails',
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
       },
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => { data += chunk; });
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve();
-        } else {
-          reject(new Error(`Resend API error (${res.statusCode}): ${data}`));
-        }
-      });
-    });
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Resend API error (${res.statusCode}): ${data}`));
+          }
+        });
+      }
+    );
     req.on('error', reject);
     req.write(payload);
     req.end();
   });
 }
 
+// ─── Dispatch Engine ──────────────────────────────────────────────────────────
+
 /**
- * Dispatch email using configured provider (Resend API -> SMTP -> Dev fallback).
+ * Dispatch email using configured provider (Brevo API -> Resend API -> SMTP -> Dev fallback).
  */
 async function dispatchEmail({ from, to, subject, text, html, linkType, link }) {
   if (process.env.NODE_ENV === 'test') {
@@ -126,14 +250,31 @@ async function dispatchEmail({ from, to, subject, text, html, linkType, link }) 
     return;
   }
 
+  // 1. Brevo HTTP API (Primary provider — reliable HTTPS port 443 delivery to all recipients)
+  if (brevoConfigured()) {
+    try {
+      const result = await sendViaBrevo({ from, to, subject, text, html });
+      console.log(`\n📧 [Email Service] Successfully delivered ${linkType} to ${to} via Brevo API (Message ID: ${result?.messageId || 'ok'})\n`);
+      return;
+    } catch (err) {
+      console.error(`\n❌ [Email Service] Brevo API error delivering to ${to}: ${err.message}`);
+      if (!resendConfigured() && !smtpConfigured()) {
+        logFallback(linkType, to, link);
+        return;
+      }
+    }
+  }
+
+  // 2. Resend API
   if (resendConfigured()) {
     try {
       await sendViaResend({ from, to, subject, text, html });
+      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via Resend API\n`);
       return;
     } catch (err) {
       console.warn(`\n⚠️  [Email Service] Resend API could not deliver email to ${to}: ${err.message}`);
       console.warn(`    (Note: Resend onboarding@resend.dev only allows sending to the account owner's email).`);
-      console.warn(`    To deliver to all users, verify your domain in Resend or configure Gmail SMTP.\n`);
+      console.warn(`    To deliver to all users, verify your domain in Resend or configure Brevo.\n`);
       if (!smtpConfigured()) {
         logFallback(linkType, to, link);
         return;
@@ -141,10 +282,12 @@ async function dispatchEmail({ from, to, subject, text, html, linkType, link }) 
     }
   }
 
+  // 3. SMTP
   if (smtpConfigured()) {
     try {
       const transporter = createTransporter();
-      await transporter.sendMail({ from, to, subject, text, html });
+      const info = await transporter.sendMail({ from, to, subject, text, html });
+      console.log(`\n📧 [Email Service] Successfully sent ${linkType} to ${to} via SMTP (Message ID: ${info?.messageId || 'ok'})\n`);
       return;
     } catch (err) {
       console.warn(`\n⚠️  [Email Service] SMTP delivery failed to ${to}: ${err.message}`);
@@ -177,7 +320,7 @@ function logFallback(type, to, link) {
 async function sendPasswordResetEmail(to, resetToken) {
   const appUrl = process.env.APP_URL || 'http://localhost:5173';
   const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
-  const from = process.env.EMAIL_FROM || 'TaskFlow <onboarding@resend.dev>';
+  const from = process.env.EMAIL_FROM || 'TaskFlow <brexcel14@gmail.com>';
 
   await dispatchEmail({
     from,
@@ -226,7 +369,7 @@ async function sendPasswordResetEmail(to, resetToken) {
 async function sendVerificationEmail(to, verifyToken) {
   const appUrl = process.env.APP_URL || 'http://localhost:5173';
   const verifyLink = `${appUrl}/verify-email?token=${verifyToken}`;
-  const from = process.env.EMAIL_FROM || 'TaskFlow <onboarding@resend.dev>';
+  const from = process.env.EMAIL_FROM || 'TaskFlow <brexcel14@gmail.com>';
 
   await dispatchEmail({
     from,
@@ -265,4 +408,3 @@ async function sendVerificationEmail(to, verifyToken) {
 }
 
 module.exports = { sendPasswordResetEmail, sendVerificationEmail };
-
