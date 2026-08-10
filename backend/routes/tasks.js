@@ -239,6 +239,151 @@ router.patch('/:id/order', validate(schemas.taskOrder), async (req, res) => {
   }
 });
 
+// ─── GET /:id — get a single task details ────────────────────────────────────
+
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const task = await prisma.task.findFirst({
+      where: scopedTaskQuery(req, { id }),
+      include: {
+        assignee:  { select: { id: true, name: true, email: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            author: { select: { id: true, name: true, email: true } },
+          },
+        },
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+        watchers: {
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+            activities: true,
+            watchers: true,
+          },
+        },
+      },
+    });
+
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    res.json({ task });
+  } catch (error) {
+    logger.error({ err: error }, 'GET /tasks/:id failed');
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
+// ─── POST /:id/watch — watch a task ──────────────────────────────────────────
+
+router.post('/:id/watch', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const task = await prisma.task.findFirst({
+      where: scopedTaskQuery(req, { id }),
+    });
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    await prisma.taskWatcher.upsert({
+      where:  { taskId_userId: { taskId: id, userId: req.userId } },
+      create: { taskId: id, userId: req.userId },
+      update: {},
+    });
+
+    await prisma.activity.create({
+      data: {
+        taskId:  task.id,
+        userId:  req.userId,
+        action:  'watched',
+        details: 'Started watching this task',
+      },
+    });
+
+    res.json({ watching: true, taskId: id });
+  } catch (error) {
+    logger.error({ err: error }, 'POST /tasks/:id/watch failed');
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
+// ─── DELETE /:id/watch — unwatch a task ──────────────────────────────────────
+
+router.delete('/:id/watch', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const task = await prisma.task.findFirst({
+      where: scopedTaskQuery(req, { id }),
+    });
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    await prisma.taskWatcher.deleteMany({
+      where: { taskId: id, userId: req.userId },
+    });
+
+    await prisma.activity.create({
+      data: {
+        taskId:  task.id,
+        userId:  req.userId,
+        action:  'unwatched',
+        details: 'Stopped watching this task',
+      },
+    });
+
+    res.json({ watching: false, taskId: id });
+  } catch (error) {
+    logger.error({ err: error }, 'DELETE /tasks/:id/watch failed');
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
+// ─── GET /:id/watchers — list watchers ───────────────────────────────────────
+
+router.get('/:id/watchers', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const task = await prisma.task.findFirst({
+      where: scopedTaskQuery(req, { id }),
+    });
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const watchers = await prisma.taskWatcher.findMany({
+      where: { taskId: id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    res.json({ watchers: watchers.map(w => w.user) });
+  } catch (error) {
+    logger.error({ err: error }, 'GET /tasks/:id/watchers failed');
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
 // ─── PATCH /:id — update a task ───────────────────────────────────────────────
 
 router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
@@ -284,20 +429,50 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       where:   { id },
       data:    updateData,
       include: {
-        assignee:  { select: { id: true, name: true } },
-        createdBy: { select: { id: true, name: true } },
+        assignee:  { select: { id: true, name: true, email: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+        watchers: {
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+            activities: true,
+            watchers: true,
+          },
+        },
       },
     });
 
-    const isStatusChange = status !== undefined && status !== existingTask.status;
+    // Granular activity tracking
+    let action = 'updated';
+    let details = 'Task details updated';
+
+    if (status !== undefined && status !== existingTask.status) {
+      action = 'status_changed';
+      details = `${existingTask.status} → ${status}`;
+    } else if (priority !== undefined && priority !== existingTask.priority) {
+      action = 'priority_changed';
+      details = `${existingTask.priority} → ${priority}`;
+    } else if (title !== undefined && title !== existingTask.title) {
+      action = 'title_changed';
+      details = `Renamed to "${title}"`;
+    } else if (assigneeId !== undefined && assigneeId !== existingTask.assigneeId) {
+      action = 'assignee_changed';
+      details = assigneeId ? 'Reassigned task' : 'Unassigned task';
+    } else if (dueDate !== undefined) {
+      action = 'due_date_changed';
+      details = dueDate ? `Due date set to ${new Date(dueDate).toISOString().split('T')[0]}` : 'Due date removed';
+    }
+
     await prisma.activity.create({
       data: {
         taskId:  task.id,
         userId:  req.userId,
-        action:  isStatusChange ? 'status_changed' : 'updated',
-        details: isStatusChange
-          ? `${existingTask.status} → ${status}`
-          : 'Task details updated',
+        action,
+        details,
       },
     });
 

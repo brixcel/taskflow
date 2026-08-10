@@ -144,6 +144,10 @@ const commentCreate = z.object({
   content: nonBlankString(2000, { requiredMsg: 'Comment content is required', maxMsg: 'Comment must be 2000 characters or fewer' }),
 });
 
+const commentUpdate = z.object({
+  content: nonBlankString(2000, { requiredMsg: 'Comment content is required', maxMsg: 'Comment must be 2000 characters or fewer' }),
+});
+
 // ─── Teams ────────────────────────────────────────────────────────────────────
 
 const teamCreate = z.object({
@@ -186,6 +190,7 @@ module.exports = {
   taskOrder,
   tasksBatchReorder,
   commentCreate,
+  commentUpdate,
   teamCreate,
   teamJoin,
   memberAdd,

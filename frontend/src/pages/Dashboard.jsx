@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import * as Sentry from '@sentry/react';
@@ -523,6 +523,8 @@ export default function Dashboard() {
   const [tasksLoading,    setTasksLoading]    = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [isDrawerEditRequested, setIsDrawerEditRequested] = useState(false);
+  const searchInputRef = useRef(null);
 
   // ── Kanban view mode & Undo state ─────────────────────────────────────────
   const [viewMode, setViewMode] = useState(() => {
@@ -556,8 +558,65 @@ export default function Dashboard() {
   const currentUserId   = getCurrentUserId();
   const currentUser     = getCurrentUser();
   const currentUserEmail = getCurrentUserEmail();
+  const currentMember   = members.find(m => m.id === currentUserId);
+  const userRole        = currentMember?.role || 'member';
 
   const debouncedSearch = useDebounce(searchInput, 350);
+
+  // ── Global Keyboard Shortcuts (C, /, Esc, E) ─────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.tagName === 'SELECT' ||
+        activeEl.isContentEditable
+      );
+
+      // Close drawer or modal on Escape
+      if (e.key === 'Escape') {
+        if (selectedTask) {
+          setSelectedTask(null);
+          setIsDrawerEditRequested(false);
+          return;
+        }
+        if (showModal) {
+          setShowModal(false);
+          return;
+        }
+      }
+
+      // Never trigger shortcut actions when typing in a form field
+      if (isInput) return;
+
+      // 'C' / 'c' -> Create task
+      if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        setModalDefaultStatus('todo');
+        setShowModal(true);
+        return;
+      }
+
+      // '/' -> Search
+      if (e.key === '/') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // 'E' / 'e' -> Edit task when drawer is open
+      if (e.key === 'e' || e.key === 'E') {
+        if (selectedTask) {
+          e.preventDefault();
+          setIsDrawerEditRequested(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTask, showModal]);
 
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -894,9 +953,10 @@ export default function Dashboard() {
                 <SearchIcon />
               </span>
               <input
+                ref={searchInputRef}
                 id="search-tasks-input"
                 type="search"
-                placeholder="Search…"
+                placeholder="Search… (Press /)"
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
                 className="field-input"
@@ -1137,13 +1197,23 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Task Detail & Comments Drawer */}
+      {/* Task Detail & Collaboration Workspace Drawer */}
       {selectedTask && (
         <TaskDetailDrawer
           task={selectedTask}
           headers={headers}
           members={members}
-          onClose={() => setSelectedTask(null)}
+          currentUserId={currentUserId}
+          userRole={userRole}
+          isEditRequested={isDrawerEditRequested}
+          onClose={() => {
+            setSelectedTask(null);
+            setIsDrawerEditRequested(false);
+          }}
+          onTaskUpdated={(updatedTask) => {
+            setTasks(prev => prev.map(t => t.id === updatedTask.id ? { ...t, ...updatedTask } : t));
+            setSelectedTask(prev => prev ? { ...prev, ...updatedTask } : null);
+          }}
           onStatusChange={handleStatusChange}
           onDelete={handleDelete}
         />

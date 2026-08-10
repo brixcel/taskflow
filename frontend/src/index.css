@@ -829,6 +829,17 @@ a, button, input, select, textarea {
   }
 }
 
+@keyframes slideLeft {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 .view-switcher-pill {
   display: inline-flex;
   align-items: center;

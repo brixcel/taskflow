@@ -164,6 +164,7 @@ app.use('/teams', teamRoutes);
 // Comments and activities are nested under tasks
 app.use('/tasks/:taskId/comments', commentRoutes);
 app.use('/tasks/:taskId/activities', activityRoutes);
+app.use('/tasks/:taskId/activity', activityRoutes);
 
 // ─── Test-error endpoint (non-production only) ───────────────────────────────
 // Hitting GET /debug/sentry-test deliberately throws so you can verify that

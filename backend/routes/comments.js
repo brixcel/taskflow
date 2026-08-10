@@ -87,4 +87,72 @@ router.get('/', async (req, res) => {
   }
 });
 
+// ─── PATCH /tasks/:taskId/comments/:commentId — edit comment ──────────────────
+
+router.patch('/:commentId', validate(schemas.commentUpdate), async (req, res) => {
+  try {
+    const task = await requireTaskInTeam(req, res);
+    if (!task) return;
+
+    const { commentId } = req.params;
+    const existingComment = await prisma.comment.findFirst({
+      where: { id: commentId, taskId: task.id },
+    });
+
+    if (!existingComment) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    if (existingComment.authorId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden — only the comment author can edit this comment' });
+    }
+
+    const { content } = req.body;
+    const comment = await prisma.comment.update({
+      where: { id: commentId },
+      data:  { content: sanitize(content) },
+      include: {
+        author: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    res.json({ comment });
+  } catch (error) {
+    logger.error({ err: error }, 'PATCH /tasks/:taskId/comments/:commentId failed');
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
+// ─── DELETE /tasks/:taskId/comments/:commentId — delete comment ────────────────
+
+router.delete('/:commentId', async (req, res) => {
+  try {
+    const task = await requireTaskInTeam(req, res);
+    if (!task) return;
+
+    const { commentId } = req.params;
+    const existingComment = await prisma.comment.findFirst({
+      where: { id: commentId, taskId: task.id },
+    });
+
+    if (!existingComment) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    const isAuthor   = existingComment.authorId === req.userId;
+    const isElevated = ['admin', 'owner'].includes(req.teamRole);
+
+    if (!isAuthor && !isElevated) {
+      return res.status(403).json({ error: 'Forbidden — only the comment author or an admin/owner can delete this comment' });
+    }
+
+    await prisma.comment.delete({ where: { id: commentId } });
+
+    res.status(204).send();
+  } catch (error) {
+    logger.error({ err: error }, 'DELETE /tasks/:taskId/comments/:commentId failed');
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
 module.exports = router;
