@@ -130,6 +130,13 @@ const memberRoleUpdate = z.object({
   }),
 });
 
+const analyticsQuery = z.object({
+  range: z.enum(['7d', '30d', '90d', 'all'], {
+    errorMap: () => ({ message: 'range must be 7d, 30d, 90d, or all' }),
+  }).optional().default('30d'),
+  userId: z.string().uuid('userId must be a valid UUID').optional(),
+});
+
 module.exports = {
   register,
   login,
@@ -144,4 +151,5 @@ module.exports = {
   teamJoin,
   memberAdd,
   memberRoleUpdate,
+  analyticsQuery,
 };

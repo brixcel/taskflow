@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/react';
 import Sidebar from '../components/Sidebar';
 import TaskSkeleton from '../components/TaskSkeleton';
 import TaskDetailDrawer from '../components/TaskDetailDrawer';
+import AnalyticsOverview from '../components/AnalyticsOverview';
 import ThemeToggle from '../components/ThemeToggle';
 import { API_URL } from '../api/config';
 
@@ -44,16 +45,6 @@ function isOverdue(dueDateStr, status) {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
-
-function StatusBadge({ status }) {
-  const map = {
-    todo:        { label: 'Todo',        cls: 'badge badge-todo' },
-    in_progress: { label: 'In Progress', cls: 'badge badge-progress' },
-    done:        { label: 'Done',        cls: 'badge badge-done' },
-  };
-  const cfg = map[status] || map.todo;
-  return <span className={cfg.cls}>{cfg.label}</span>;
-}
 
 function AssigneeAvatar({ name }) {
   if (!name) return null;
@@ -384,6 +375,13 @@ export default function Dashboard() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
+  // ── Analytics state ────────────────────────────────────────────────────────
+  const [analytics,         setAnalytics]         = useState(null);
+  const [analyticsLoading,  setAnalyticsLoading]  = useState(false);
+  const [analyticsRange,    setAnalyticsRange]    = useState('30d');
+  const [analyticsScope,    setAnalyticsScope]    = useState('team');
+  const [drillDownFilter,   setDrillDownFilter]   = useState(null);
+
   const handleTabChange = (tab) => {
     setSearchParams(tab === 'mine' ? { tab: 'mine' } : {});
   };
@@ -457,6 +455,23 @@ export default function Dashboard() {
     }
   }, [teamId, token, activeTab, currentUserId, debouncedSearch, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const fetchAnalytics = useCallback(async () => {
+    if (!teamId || !token) return;
+    setAnalyticsLoading(true);
+    try {
+      const params = { range: analyticsRange };
+      if (analyticsScope === 'mine' && currentUserId) {
+        params.userId = currentUserId;
+      }
+      const res = await axios.get(`${API}/teams/${teamId}/analytics`, { headers, params });
+      setAnalytics(res.data.analytics ?? null);
+    } catch {
+      /* non-fatal */
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [teamId, token, analyticsRange, analyticsScope, currentUserId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!token)  { navigate('/'); return; }
     if (!teamId) { navigate('/onboarding'); return; }
@@ -468,6 +483,8 @@ export default function Dashboard() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
 
   // ── Task CRUD ────────────────────────────────────────────────────────────
   const handleCreate = async ({ title, assigneeId, dueDate }) => {
@@ -475,6 +492,7 @@ export default function Dashboard() {
       await axios.post(`${API}/tasks`, { title, assigneeId, dueDate }, { headers });
       setShowModal(false);
       fetchTasks();
+      fetchAnalytics();
     } catch (err) { setError(err.response?.data?.error || 'Failed to create task.'); }
   };
 
@@ -482,6 +500,7 @@ export default function Dashboard() {
     try {
       await axios.patch(`${API}/tasks/${id}`, { status: newStatus }, { headers });
       fetchTasks();
+      fetchAnalytics();
     } catch { setError('Failed to update task.'); }
   };
 
@@ -489,6 +508,7 @@ export default function Dashboard() {
     try {
       await axios.delete(`${API}/tasks/${id}`, { headers });
       fetchTasks();
+      fetchAnalytics();
     } catch (err) { setError(err.response?.data?.error || 'Failed to delete task.'); }
   };
 
@@ -513,8 +533,33 @@ export default function Dashboard() {
     } catch { setResendStatus('error'); }
   };
 
-  const doneCount  = tasks.filter(t => t.status === 'done').length;
-  const totalCount = tasks.length;
+  const handleDrillDown = (filterObj) => {
+    setDrillDownFilter(filterObj);
+  };
+
+  const handleClearFilter = () => {
+    setDrillDownFilter(null);
+  };
+
+  const displayedTasks = tasks.filter((task) => {
+    if (!drillDownFilter) return true;
+    if (drillDownFilter.type === 'status') {
+      return task.status === drillDownFilter.value;
+    }
+    if (drillDownFilter.type === 'assignee') {
+      if (drillDownFilter.value === 'unassigned') {
+        return !task.assigneeId;
+      }
+      return task.assigneeId === drillDownFilter.value;
+    }
+    if (drillDownFilter.type === 'overdue') {
+      return isOverdue(task.dueDate, task.status);
+    }
+    return true;
+  });
+
+  const doneCount  = displayedTasks.filter(t => t.status === 'done').length;
+  const totalCount = displayedTasks.length;
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -695,22 +740,48 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Analytics & Productivity Overview */}
+          <AnalyticsOverview
+            analytics={analytics}
+            loading={analyticsLoading}
+            range={analyticsRange}
+            onRangeChange={setAnalyticsRange}
+            scope={analyticsScope}
+            onScopeChange={setAnalyticsScope}
+            activeFilter={drillDownFilter}
+            onDrillDown={handleDrillDown}
+            onClearFilter={handleClearFilter}
+            onRefresh={fetchAnalytics}
+          />
+
           {/* Page header */}
-          <div style={{ marginBottom: 16 }}>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.5px', lineHeight: '28px' }}>
-              {activeTab === 'mine' ? 'My Tasks' : 'All Tasks'}
-            </h1>
-            {totalCount > 0 && (
-              <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--color-canvas-body, #50545c)' }}>
-                {doneCount} of {totalCount} completed
-              </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.5px', lineHeight: '28px' }}>
+                {drillDownFilter ? `Tasks: ${drillDownFilter.label}` : activeTab === 'mine' ? 'My Tasks' : 'All Tasks'}
+              </h1>
+              {totalCount > 0 && (
+                <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--color-canvas-body, #50545c)' }}>
+                  {doneCount} of {totalCount} completed
+                </p>
+              )}
+            </div>
+
+            {drillDownFilter && (
+              <button
+                className="btn-secondary"
+                onClick={handleClearFilter}
+                style={{ height: 30, fontSize: 12, padding: '0 10px' }}
+              >
+                Clear filter
+              </button>
             )}
           </div>
 
           {/* Task list, skeleton, or empty state */}
           {tasksLoading ? (
             <TaskSkeleton count={3} />
-          ) : tasks.length === 0 && !error ? (
+          ) : displayedTasks.length === 0 && !error ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               justifyContent: 'center', padding: '64px 24px',
@@ -729,20 +800,32 @@ export default function Dashboard() {
                 </svg>
               </div>
               <p style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.3px' }}>
-                {debouncedSearch.trim()
+                {drillDownFilter
+                  ? 'No tasks match the active filter'
+                  : debouncedSearch.trim()
                   ? 'No matching tasks'
                   : activeTab === 'mine'
                   ? 'No tasks assigned to you'
                   : 'No tasks yet'}
               </p>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--color-canvas-body, #50545c)', maxWidth: 260, lineHeight: '18px' }}>
-                {debouncedSearch.trim()
+                {drillDownFilter
+                  ? 'Try clearing the filter to see all team tasks.'
+                  : debouncedSearch.trim()
                   ? 'Try a different search term.'
                   : activeTab === 'mine'
                   ? 'Tasks assigned to you will show here.'
                   : 'Click "New task" to create your first one.'}
               </p>
-              {activeTab === 'all' && !debouncedSearch.trim() && (
+              {drillDownFilter ? (
+                <button
+                  className="btn-secondary"
+                  onClick={handleClearFilter}
+                  style={{ marginTop: 16, fontSize: 13 }}
+                >
+                  Clear filter
+                </button>
+              ) : activeTab === 'all' && !debouncedSearch.trim() && (
                 <button
                   className="btn-primary"
                   onClick={() => setShowModal(true)}
@@ -757,14 +840,14 @@ export default function Dashboard() {
               background: 'var(--color-canvas-card, #fff)', border: '1px solid var(--color-canvas-hairline, #e8eaec)', borderRadius: 8,
               overflow: 'hidden',
             }}>
-              {tasks.map((task, i) => (
+              {displayedTasks.map((task, i) => (
                 <TaskRow
                   key={task.id}
                   task={task}
                   onStatusChange={handleStatusChange}
                   onDelete={handleDelete}
                   onSelect={(t) => setSelectedTask(t)}
-                  isLast={i === tasks.length - 1}
+                  isLast={i === displayedTasks.length - 1}
                 />
               ))}
             </div>

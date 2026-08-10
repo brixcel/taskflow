@@ -82,6 +82,10 @@ model Task {
   comments   Comment[]
   activities Activity[]
 
+  @@index([teamId, status])
+  @@index([teamId, dueDate])
+  @@index([teamId, assigneeId])
+  @@index([teamId, createdAt])
   @@map("tasks")
 }
 
@@ -111,6 +115,7 @@ model Activity {
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id])
 
+  @@index([taskId, createdAt])
   @@map("activities")
 }
 

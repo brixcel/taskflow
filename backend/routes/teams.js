@@ -175,6 +175,197 @@ router.get('/:id/members', async (req, res) => {
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
+
+// ─── GET /teams/:id/analytics — productivity & workload analytics ───────────
+//
+// Query params:
+//   range  — '7d' | '30d' | '90d' | 'all' (default: '30d')
+//   userId — optional user UUID for filtering personal productivity
+router.get('/:id/analytics', validate(schemas.analyticsQuery, 'query'), async (req, res) => {
+  try {
+    const { id: teamId } = req.params;
+    const { range = '30d', userId } = req.query;
+
+    // Verify requester is a member of this team.
+    const requesterMembership = await prisma.teamMembership.findUnique({
+      where: { userId_teamId: { userId: req.userId, teamId } },
+    });
+    if (!requesterMembership) {
+      return res.status(403).json({ error: 'You are not a member of this team' });
+    }
+
+    const now = new Date();
+
+    // Calculate range boundaries
+    let rangeStartDate = null;
+    if (range === '7d') {
+      rangeStartDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (range === '30d') {
+      rangeStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (range === '90d') {
+      rangeStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    }
+
+    // Start of current week (Monday)
+    const startOfWeek = new Date(now);
+    const day = startOfWeek.getDay();
+    const diffToMonday = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+    startOfWeek.setDate(diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    // Start of current month (1st)
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+    // Build task query
+    const taskWhere = { teamId };
+    if (userId) {
+      taskWhere.assigneeId = userId;
+    }
+
+    // Execute queries in parallel
+    const [allTeamTasks, teamMemberships, recentActivities] = await Promise.all([
+      prisma.task.findMany({
+        where: taskWhere,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          dueDate: true,
+          assigneeId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.teamMembership.findMany({
+        where: { teamId },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { joinedAt: 'asc' },
+      }),
+      prisma.activity.findMany({
+        where: {
+          task: { teamId },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          task: { select: { id: true, title: true } },
+        },
+      }),
+    ]);
+
+    const totalTasks       = allTeamTasks.length;
+    const completedTasks   = allTeamTasks.filter((t) => t.status === 'done').length;
+    const inProgressTasks  = allTeamTasks.filter((t) => t.status === 'in_progress').length;
+    const todoTasks        = allTeamTasks.filter((t) => t.status === 'todo').length;
+    const overdueTasks     = allTeamTasks.filter((t) => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now).length;
+    const completionRate   = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    const completedThisWeek  = allTeamTasks.filter((t) => t.status === 'done' && new Date(t.updatedAt) >= startOfWeek).length;
+    const completedThisMonth = allTeamTasks.filter((t) => t.status === 'done' && new Date(t.updatedAt) >= startOfMonth).length;
+
+    const createdInRange   = rangeStartDate ? allTeamTasks.filter((t) => new Date(t.createdAt) >= rangeStartDate).length : totalTasks;
+    const completedInRange = rangeStartDate ? allTeamTasks.filter((t) => t.status === 'done' && new Date(t.updatedAt) >= rangeStartDate).length : completedTasks;
+
+    const statusBreakdown = [
+      { status: 'todo',        label: 'Todo',        count: todoTasks,       percentage: totalTasks > 0 ? Math.round((todoTasks / totalTasks) * 100) : 0 },
+      { status: 'in_progress', label: 'In Progress', count: inProgressTasks,  percentage: totalTasks > 0 ? Math.round((inProgressTasks / totalTasks) * 100) : 0 },
+      { status: 'done',        label: 'Done',        count: completedTasks,   percentage: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0 },
+    ];
+
+    const workloadDistribution = teamMemberships.map((m) => {
+      const memberTasks          = allTeamTasks.filter((t) => t.assigneeId === m.user.id);
+      const memberTotal          = memberTasks.length;
+      const memberDone           = memberTasks.filter((t) => t.status === 'done').length;
+      const memberInProgress     = memberTasks.filter((t) => t.status === 'in_progress').length;
+      const memberTodo           = memberTasks.filter((t) => t.status === 'todo').length;
+      const memberOverdue        = memberTasks.filter((t) => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now).length;
+      const memberCompletionRate = memberTotal > 0 ? Math.round((memberDone / memberTotal) * 100) : 0;
+
+      return {
+        userId:         m.user.id,
+        name:           m.user.name,
+        email:          m.user.email,
+        role:           m.role,
+        totalTasks:     memberTotal,
+        completedTasks: memberDone,
+        inProgressTasks: memberInProgress,
+        todoTasks:      memberTodo,
+        overdueTasks:   memberOverdue,
+        completionRate: memberCompletionRate,
+      };
+    });
+
+    const unassignedTasks = allTeamTasks.filter((t) => !t.assigneeId);
+    const unassignedSummary = {
+      totalTasks:      unassignedTasks.length,
+      completedTasks:  unassignedTasks.filter((t) => t.status === 'done').length,
+      inProgressTasks: unassignedTasks.filter((t) => t.status === 'in_progress').length,
+      todoTasks:       unassignedTasks.filter((t) => t.status === 'todo').length,
+      overdueTasks:    unassignedTasks.filter((t) => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now).length,
+    };
+
+    // Calculate daily completion & creation trends for charting
+    const numDays = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 14;
+    const dailyTrends = [];
+    for (let i = numDays - 1; i >= 0; i--) {
+      const dayStart = new Date(now);
+      dayStart.setDate(dayStart.getDate() - i);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const dateStr = dayStart.toISOString().split('T')[0];
+      const completedCount = allTeamTasks.filter((t) => t.status === 'done' && new Date(t.updatedAt) >= dayStart && new Date(t.updatedAt) <= dayEnd).length;
+      const createdCount   = allTeamTasks.filter((t) => new Date(t.createdAt) >= dayStart && new Date(t.createdAt) <= dayEnd).length;
+
+      dailyTrends.push({
+        date: dateStr,
+        completed: completedCount,
+        created: createdCount,
+      });
+    }
+
+    res.json({
+      analytics: {
+        teamId,
+        range,
+        filterUserId: userId || null,
+        overview: {
+          totalTasks,
+          completedTasks,
+          inProgressTasks,
+          todoTasks,
+          overdueTasks,
+          completionRate,
+          completedThisWeek,
+          completedThisMonth,
+          createdInRange,
+          completedInRange,
+        },
+        statusBreakdown,
+        workloadDistribution,
+        unassigned: unassignedSummary,
+        dailyTrends,
+        recentActivities: recentActivities.map((a) => ({
+          id:        a.id,
+          action:    a.action,
+          details:   a.details,
+          createdAt: a.createdAt,
+          user:      a.user,
+          task:      a.task,
+        })),
+      },
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Route handler failed');
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
 // ─── resolveTeamFromParam — inline helper for member-management routes ────────
 //
 // Unlike resolveTeam (which uses the X-Team-Id header), these routes always
