@@ -6,6 +6,8 @@ import Sidebar from '../components/Sidebar';
 import TaskSkeleton from '../components/TaskSkeleton';
 import TaskDetailDrawer from '../components/TaskDetailDrawer';
 import AnalyticsOverview from '../components/AnalyticsOverview';
+import KanbanBoard from '../components/KanbanBoard';
+import UndoToast from '../components/UndoToast';
 import ThemeToggle from '../components/ThemeToggle';
 import { API_URL } from '../api/config';
 
@@ -13,11 +15,11 @@ import { API_URL } from '../api/config';
 const API = API_URL;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function getActiveTeam()     { try { return JSON.parse(localStorage.getItem('team')); }   catch { return null; } }
-function getCurrentUser()    { try { return JSON.parse(localStorage.getItem('user')); }   catch { return null; } }
-function getCurrentUserId()  { return getCurrentUser()?.id ?? null; }
+function getActiveTeam()       { try { return JSON.parse(localStorage.getItem('team')); }   catch { return null; } }
+function getCurrentUser()      { try { return JSON.parse(localStorage.getItem('user')); }   catch { return null; } }
+function getCurrentUserId()    { return getCurrentUser()?.id ?? null; }
 function getCurrentUserEmail() { return getCurrentUser()?.email ?? null; }
-function isEmailVerified()   { try { return JSON.parse(localStorage.getItem('user'))?.emailVerified === true; } catch { return true; } }
+function isEmailVerified()     { try { return JSON.parse(localStorage.getItem('user'))?.emailVerified === true; } catch { return true; } }
 
 function useDebounce(value, delay = 350) {
   const [debounced, setDebounced] = useState(value);
@@ -44,7 +46,7 @@ function isOverdue(dueDateStr, status) {
   return endOfDueDay < now;
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────
+// ── Sub-components & Icons ──────────────────────────────────────────────────
 
 function AssigneeAvatar({ name }) {
   if (!name) return null;
@@ -56,12 +58,46 @@ function AssigneeAvatar({ name }) {
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 24, height: 24, borderRadius: '50%',
-        background: '#f0f1f3', border: '1.5px solid #e8eaec',
-        fontSize: 10, fontWeight: 600, color: '#3d4148',
+        background: 'var(--color-canvas-hover, #f0f1f3)', border: '1.5px solid var(--color-canvas-hairline, #e8eaec)',
+        fontSize: 10, fontWeight: 600, color: 'var(--color-canvas-ink, #3d4148)',
         fontFamily: "'JetBrains Mono', monospace", flexShrink: 0,
       }}
     >
       {initials}
+    </span>
+  );
+}
+
+function PriorityBadge({ priority }) {
+  const p = priority?.toLowerCase() || 'medium';
+
+  const config = {
+    urgent: { label: 'Urgent', color: '#e5484d', bg: 'rgba(229, 72, 77, 0.12)', border: 'rgba(229, 72, 77, 0.3)' },
+    high:   { label: 'High',   color: '#f76808', bg: 'rgba(247, 104, 8, 0.12)', border: 'rgba(247, 104, 8, 0.3)' },
+    medium: { label: 'Med',    color: '#0070f3', bg: 'rgba(0, 112, 243, 0.10)', border: 'rgba(0, 112, 243, 0.25)' },
+    low:    { label: 'Low',    color: '#8a8f98', bg: 'rgba(138, 143, 152, 0.10)', border: 'rgba(138, 143, 152, 0.2)' },
+  }[p] || { label: 'Med', color: '#0070f3', bg: 'rgba(0, 112, 243, 0.10)', border: 'rgba(0, 112, 243, 0.25)' };
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 3,
+        padding: '2px 5px',
+        borderRadius: 4,
+        fontSize: 10,
+        fontWeight: 600,
+        color: config.color,
+        background: config.bg,
+        border: `1px solid ${config.border}`,
+        lineHeight: 1,
+        letterSpacing: '0.01em',
+        textTransform: 'uppercase',
+      }}
+    >
+      <span style={{ width: 4, height: 4, borderRadius: '50%', background: config.color }} />
+      {config.label}
     </span>
   );
 }
@@ -83,19 +119,53 @@ function PlusIcon() {
   );
 }
 
+function IconList() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <line x1="2" y1="4" x2="12" y2="4" />
+      <line x1="2" y1="7" x2="12" y2="7" />
+      <line x1="2" y1="10" x2="12" y2="10" />
+    </svg>
+  );
+}
+
+function IconBoard() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="2" width="3" height="10" rx="0.8" />
+      <rect x="5.5" y="2" width="3" height="6" rx="0.8" />
+      <rect x="9" y="2" width="3" height="8" rx="0.8" />
+    </svg>
+  );
+}
+
 // ── New Task Modal ─────────────────────────────────────────────────────────
-function NewTaskModal({ members, currentUserId, onSubmit, onClose }) {
-  const [title,      setTitle]      = useState('');
-  const [assigneeId, setAssigneeId] = useState('');
-  const [dueDate,    setDueDate]    = useState('');
-  const [loading,    setLoading]    = useState(false);
+function NewTaskModal({ members, currentUserId, defaultStatus = 'todo', onSubmit, onClose }) {
+  const [title,       setTitle]       = useState('');
+  const [description, setDescription] = useState('');
+  const [status,      setStatus]      = useState(defaultStatus);
+  const [priority,    setPriority]    = useState('medium');
+  const [labelsStr,   setLabelsStr]   = useState('');
+  const [assigneeId,  setAssigneeId]  = useState('');
+  const [dueDate,     setDueDate]     = useState('');
+  const [loading,     setLoading]     = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
     setLoading(true);
+
+    const labels = labelsStr
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
     await onSubmit({
       title: title.trim(),
+      description: description.trim() || undefined,
+      status,
+      priority,
+      labels: labels.length > 0 ? labels : undefined,
       assigneeId: assigneeId || undefined,
       dueDate: dueDate || undefined,
     });
@@ -122,18 +192,18 @@ function NewTaskModal({ members, currentUserId, onSubmit, onClose }) {
       aria-labelledby="modal-title"
     >
       <div style={{
-        background: 'var(--color-modal-bg, #fff)', borderRadius: 12, width: '100%', maxWidth: 460,
+        background: 'var(--color-modal-bg, #fff)', borderRadius: 12, width: '100%', maxWidth: 480,
         border: '1px solid var(--color-modal-border, #ebebeb)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-        padding: 28,
+        padding: 24,
       }}>
-        <h2 id="modal-title" style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #171717)', letterSpacing: '-0.4px' }}>
+        <h2 id="modal-title" style={{ margin: '0 0 18px', fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #171717)', letterSpacing: '-0.4px' }}>
           New task
         </h2>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Title */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <label htmlFor="modal-task-title" style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Title</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label htmlFor="modal-task-title" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Title</label>
             <input
               id="modal-task-title"
               className="field-input"
@@ -146,41 +216,100 @@ function NewTaskModal({ members, currentUserId, onSubmit, onClose }) {
             />
           </div>
 
-          {/* Due Date */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <label htmlFor="modal-task-duedate" style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Due date</label>
-            <input
-              id="modal-task-duedate"
+          {/* Description */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label htmlFor="modal-task-desc" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Description (optional)</label>
+            <textarea
+              id="modal-task-desc"
               className="field-input"
-              type="date"
-              value={dueDate}
-              onChange={e => setDueDate(e.target.value)}
+              placeholder="Add details, notes, or sub-tasks…"
+              rows={2}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              style={{ resize: 'vertical' }}
             />
           </div>
 
-          {/* Assignee */}
-          {members.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <label htmlFor="modal-task-assignee" style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Assign to</label>
+          {/* Status & Priority row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label htmlFor="modal-task-status" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Status</label>
               <select
-                id="modal-task-assignee"
+                id="modal-task-status"
                 className="field-input"
-                value={assigneeId}
-                onChange={e => setAssigneeId(e.target.value)}
-                style={{ cursor: 'pointer' }}
+                value={status}
+                onChange={e => setStatus(e.target.value)}
               >
-                <option value="">Unassigned</option>
-                {members.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}{m.id === currentUserId ? ' (you)' : ''}
-                  </option>
-                ))}
+                <option value="todo">Todo</option>
+                <option value="in_progress">In Progress</option>
+                <option value="done">Done</option>
               </select>
             </div>
-          )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label htmlFor="modal-task-priority" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Priority</label>
+              <select
+                id="modal-task-priority"
+                className="field-input"
+                value={priority}
+                onChange={e => setPriority(e.target.value)}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Labels */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label htmlFor="modal-task-labels" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Labels (comma-separated)</label>
+            <input
+              id="modal-task-labels"
+              className="field-input"
+              type="text"
+              placeholder="e.g. frontend, bug, design"
+              value={labelsStr}
+              onChange={e => setLabelsStr(e.target.value)}
+            />
+          </div>
+
+          {/* Due Date & Assignee row */}
+          <div style={{ display: 'grid', gridTemplateColumns: members.length > 0 ? '1fr 1fr' : '1fr', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label htmlFor="modal-task-duedate" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Due date</label>
+              <input
+                id="modal-task-duedate"
+                className="field-input"
+                type="date"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+              />
+            </div>
+
+            {members.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label htmlFor="modal-task-assignee" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Assign to</label>
+                <select
+                  id="modal-task-assignee"
+                  className="field-input"
+                  value={assigneeId}
+                  onChange={e => setAssigneeId(e.target.value)}
+                >
+                  <option value="">Unassigned</option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}{m.id === currentUserId ? ' (you)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
             <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>
               Cancel
             </button>
@@ -194,7 +323,7 @@ function NewTaskModal({ members, currentUserId, onSubmit, onClose }) {
   );
 }
 
-// ── Task Row ───────────────────────────────────────────────────────────────
+// ── Task Row (List View) ───────────────────────────────────────────────────
 function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
   const [hovered, setHovered] = useState(false);
 
@@ -235,6 +364,9 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
         )}
       </button>
 
+      {/* Priority Pill */}
+      <PriorityBadge priority={task.priority} />
+
       {/* Task info - Clickable to open task details & comments */}
       <div
         onClick={() => onSelect?.(task)}
@@ -259,6 +391,32 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
           </p>
         )}
       </div>
+
+      {/* Label chips in list row */}
+      {Array.isArray(task.labels) && task.labels.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          {task.labels.slice(0, 2).map((lbl, idx) => (
+            <span
+              key={idx}
+              className="label-chip"
+              style={{
+                fontSize: 10,
+                padding: '1px 5px',
+                borderRadius: 4,
+                background: 'var(--color-canvas-subtle, #f5f6f8)',
+                border: '1px solid var(--color-canvas-hairline, #e8eaec)',
+                color: 'var(--color-canvas-body, #4d4d4d)',
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              #{lbl}
+            </span>
+          ))}
+          {task.labels.length > 2 && (
+            <span style={{ fontSize: 10, color: 'var(--color-canvas-mute, #888888)' }}>+{task.labels.length - 2}</span>
+          )}
+        </div>
+      )}
 
       {/* Right: assignee + due date + status + actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -359,11 +517,18 @@ export default function Dashboard() {
   const activeTab = searchParams.get('tab') === 'mine' ? 'mine' : 'all';
   const [searchInput, setSearchInput] = useState('');
   const [showModal,   setShowModal]   = useState(false);
+  const [modalDefaultStatus, setModalDefaultStatus] = useState('todo');
   const [emailVerified,   setEmailVerified]   = useState(isEmailVerified);
   const [resendStatus,    setResendStatus]    = useState('idle');
   const [tasksLoading,    setTasksLoading]    = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+
+  // ── Kanban view mode & Undo state ─────────────────────────────────────────
+  const [viewMode, setViewMode] = useState(() => {
+    return searchParams.get('view') || localStorage.getItem('taskflow_view') || 'board';
+  });
+  const [undoToast, setUndoToast] = useState(null);
 
   // ── Analytics state ────────────────────────────────────────────────────────
   const [analytics,         setAnalytics]         = useState(null);
@@ -373,7 +538,19 @@ export default function Dashboard() {
   const [drillDownFilter,   setDrillDownFilter]   = useState(null);
 
   const handleTabChange = (tab) => {
-    setSearchParams(tab === 'mine' ? { tab: 'mine' } : {});
+    const nextParams = new URLSearchParams(searchParams);
+    if (tab === 'mine') nextParams.set('tab', 'mine');
+    else nextParams.delete('tab');
+    setSearchParams(nextParams);
+  };
+
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem('taskflow_view', mode);
+    const nextParams = new URLSearchParams(searchParams);
+    if (mode === 'list') nextParams.set('view', 'list');
+    else nextParams.delete('view');
+    setSearchParams(nextParams);
   };
 
   const currentUserId   = getCurrentUserId();
@@ -476,14 +653,14 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
 
-  // ── Task CRUD ────────────────────────────────────────────────────────────
-  const handleCreate = async ({ title, assigneeId, dueDate }) => {
+  // ── Task CRUD & Kanban Operations ────────────────────────────────────────
+  const handleCreate = async ({ title, description, status, priority, labels, assigneeId, dueDate }) => {
     try {
-      await axios.post(`${API}/tasks`, { title, assigneeId, dueDate }, { headers });
+      await axios.post(`${API}/tasks`, { title, description, status, priority, labels, assigneeId, dueDate }, { headers });
       setShowModal(false);
       fetchTasks();
       fetchAnalytics();
-    } catch (err) { setError(err.response?.data?.error || 'Failed to create task.'); }
+    } catch (err) { setError(err.response?.data?.error || err.response?.data?.errors?.[0]?.message || 'Failed to create task.'); }
   };
 
   const handleStatusChange = async (id, newStatus) => {
@@ -497,9 +674,72 @@ export default function Dashboard() {
   const handleDelete = async (id) => {
     try {
       await axios.delete(`${API}/tasks/${id}`, { headers });
+      if (selectedTask?.id === id) setSelectedTask(null);
       fetchTasks();
       fetchAnalytics();
     } catch (err) { setError(err.response?.data?.error || 'Failed to delete task.'); }
+  };
+
+  // ── Optimistic Kanban Drag & Drop with Rollback & Undo ───────────────────
+  const handleKanbanTaskMove = async (taskId, { status, order, previousState }) => {
+    const prevTasks = [...tasks];
+
+    // Optimistically update local tasks
+    setTasks(current =>
+      current.map(t => (t.id === taskId ? { ...t, status, order } : t))
+    );
+
+    const statusNames = { todo: 'Todo', in_progress: 'In Progress', done: 'Done' };
+    setUndoToast({
+      id: Date.now(),
+      taskId,
+      message: `Moved "${previousState.title}" to ${statusNames[status] || status}`,
+      previousState,
+    });
+
+    try {
+      await axios.patch(`${API}/tasks/${taskId}/order`, { status, order }, { headers });
+      fetchAnalytics();
+    } catch (err) {
+      // Rollback on network/server error
+      setTasks(prevTasks);
+      setUndoToast(null);
+      setError(err.response?.data?.error || 'Failed to move task. Reverted changes.');
+    }
+  };
+
+  const handleUndoMove = async (toastItem) => {
+    setUndoToast(null);
+    if (!toastItem?.previousState) return;
+
+    const { taskId, previousState } = toastItem;
+    const prevTasks = [...tasks];
+
+    // Revert local state
+    setTasks(current =>
+      current.map(t =>
+        t.id === taskId
+          ? { ...t, status: previousState.status, order: previousState.order }
+          : t
+      )
+    );
+
+    try {
+      await axios.patch(
+        `${API}/tasks/${taskId}/order`,
+        { status: previousState.status, order: previousState.order },
+        { headers }
+      );
+      fetchAnalytics();
+    } catch {
+      setTasks(prevTasks);
+      setError('Failed to undo task move.');
+    }
+  };
+
+  const handleQuickAdd = (columnStatus) => {
+    setModalDefaultStatus(columnStatus || 'todo');
+    setShowModal(true);
   };
 
   const handleTeamSwitch = (team) => {
@@ -575,8 +815,8 @@ export default function Dashboard() {
           background: 'var(--color-header-bg, #fff)', position: 'sticky', top: 0, zIndex: 20,
           flexWrap: 'wrap', gap: 12,
         }}>
-          {/* Left: Mobile hamburger toggle + Tabs */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Left: Mobile hamburger toggle + Tabs + View Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <button
               onClick={() => setMobileSidebarOpen(v => !v)}
               aria-expanded={mobileSidebarOpen}
@@ -619,6 +859,32 @@ export default function Dashboard() {
                 </button>
               ))}
             </div>
+
+            {/* View Switcher: List vs Board */}
+            <div className="view-switcher-pill" role="radiogroup" aria-label="Task view mode">
+              <button
+                type="button"
+                onClick={() => handleViewModeChange('board')}
+                className={`view-switcher-btn ${viewMode === 'board' ? 'active' : ''}`}
+                aria-checked={viewMode === 'board'}
+                role="radio"
+                title="Kanban Board View"
+              >
+                <IconBoard />
+                Board
+              </button>
+              <button
+                type="button"
+                onClick={() => handleViewModeChange('list')}
+                className={`view-switcher-btn ${viewMode === 'list' ? 'active' : ''}`}
+                aria-checked={viewMode === 'list'}
+                role="radio"
+                title="List View"
+              >
+                <IconList />
+                List
+              </button>
+            </div>
           </div>
 
           {/* Search + ThemeToggle + New task */}
@@ -644,7 +910,10 @@ export default function Dashboard() {
 
             <button
               className="btn-primary"
-              onClick={() => setShowModal(true)}
+              onClick={() => {
+                setModalDefaultStatus('todo');
+                setShowModal(true);
+              }}
               style={{ height: 32, fontSize: 13, gap: 5 }}
             >
               <PlusIcon />
@@ -768,9 +1037,18 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Task list, skeleton, or empty state */}
+          {/* Main workspace view: Kanban Board vs List View */}
           {tasksLoading ? (
             <TaskSkeleton count={3} />
+          ) : viewMode === 'board' ? (
+            <KanbanBoard
+              tasks={displayedTasks}
+              onTaskMove={handleKanbanTaskMove}
+              onSelectTask={(t) => setSelectedTask(t)}
+              onStatusChange={handleStatusChange}
+              onDeleteTask={handleDelete}
+              onQuickAdd={handleQuickAdd}
+            />
           ) : displayedTasks.length === 0 && !error ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -818,7 +1096,10 @@ export default function Dashboard() {
               ) : activeTab === 'all' && !debouncedSearch.trim() && (
                 <button
                   className="btn-primary"
-                  onClick={() => setShowModal(true)}
+                  onClick={() => {
+                    setModalDefaultStatus('todo');
+                    setShowModal(true);
+                  }}
                   style={{ marginTop: 16, fontSize: 13 }}
                 >
                   <PlusIcon /> New task
@@ -850,6 +1131,7 @@ export default function Dashboard() {
         <NewTaskModal
           members={members}
           currentUserId={currentUserId}
+          defaultStatus={modalDefaultStatus}
           onSubmit={handleCreate}
           onClose={() => setShowModal(false)}
         />
@@ -866,6 +1148,13 @@ export default function Dashboard() {
           onDelete={handleDelete}
         />
       )}
+
+      {/* Interactive Undo Notification Toast */}
+      <UndoToast
+        toast={undoToast}
+        onUndo={handleUndoMove}
+        onDismiss={() => setUndoToast(null)}
+      />
     </div>
   );
 }

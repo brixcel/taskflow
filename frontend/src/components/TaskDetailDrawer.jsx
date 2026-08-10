@@ -182,6 +182,7 @@ export default function TaskDetailDrawer({
 
           {/* Quick Properties */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '12px', background: 'var(--color-canvas-subtle, #fafafa)', borderRadius: 8, border: '1px solid var(--color-canvas-hairline, #ebebeb)', marginBottom: 20 }}>
+            {/* Status */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
               <span style={{ color: 'var(--color-canvas-mute, #888888)' }}>Status</span>
               <select
@@ -205,6 +206,34 @@ export default function TaskDetailDrawer({
               </select>
             </div>
 
+            {/* Priority */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+              <span style={{ color: 'var(--color-canvas-mute, #888888)' }}>Priority</span>
+              <span
+                className={`priority-badge priority-${task.priority || 'medium'}`}
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {task.priority || 'medium'}
+              </span>
+            </div>
+
+            {/* Due date */}
+            {task.dueDate && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: 'var(--color-canvas-mute, #888888)' }}>Due date</span>
+                <span style={{ fontFamily: 'var(--font-mono, monospace)', color: 'var(--color-canvas-ink, #171717)' }}>
+                  {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
+            )}
+
+            {/* Assignee */}
             {task.assignee && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: 'var(--color-canvas-mute, #888888)' }}>Assignee</span>
@@ -212,6 +241,31 @@ export default function TaskDetailDrawer({
                   <UserAvatar name={task.assignee.name} />
                   {task.assignee.name}
                 </span>
+              </div>
+            )}
+
+            {/* Labels */}
+            {Array.isArray(task.labels) && task.labels.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', fontSize: 13, gap: 8 }}>
+                <span style={{ color: 'var(--color-canvas-mute, #888888)' }}>Labels</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'flex-end' }}>
+                  {task.labels.map((lbl, idx) => (
+                    <span
+                      key={idx}
+                      className="label-chip"
+                      style={{
+                        fontSize: 10.5,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        background: 'var(--color-canvas-card, #ffffff)',
+                        border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                    >
+                      #{lbl}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>

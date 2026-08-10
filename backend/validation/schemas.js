@@ -79,27 +79,64 @@ const dueDateSchema = z.preprocess(
     .nullable()
 );
 
+const prioritySchema = z.enum(['low', 'medium', 'high', 'urgent'], {
+  errorMap: () => ({ message: 'priority must be low, medium, high, or urgent' }),
+});
+
+const labelsSchema = z.array(
+  z.string().trim().min(1, 'Label cannot be empty').max(30, 'Label must be 30 characters or fewer')
+).max(15, 'Maximum 15 labels allowed');
+
 const taskCreate = z.object({
   title:       nonBlankString(200, { requiredMsg: 'Title is required', maxMsg: 'Title must be 200 characters or fewer' }),
-  // description has no min — trim only, so ordering doesn't matter here
   description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional(),
+  status:      z.enum(['todo', 'in_progress', 'done'], {
+    errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
+  }).optional(),
+  priority:    prioritySchema.optional(),
+  labels:      labelsSchema.optional(),
+  order:       z.number().optional(),
+  position:    z.number().optional(),
   assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
   dueDate:     dueDateSchema,
 });
 
 const taskUpdate = z.object({
   title:       nonBlankString(200, { requiredMsg: 'Title cannot be blank', maxMsg: 'Title must be 200 characters or fewer' }).optional(),
-  // description has no min — trim only
   description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional().nullable(),
   status:      z.enum(['todo', 'in_progress', 'done'], {
     errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
   }).optional(),
+  priority:    prioritySchema.optional(),
+  labels:      labelsSchema.optional(),
+  order:       z.number().optional(),
+  position:    z.number().optional(),
   assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
   dueDate:     dueDateSchema,
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'At least one field must be provided' },
 );
+
+const taskOrder = z.object({
+  position: z.number().optional(),
+  order:    z.number().optional(),
+  status:   z.enum(['todo', 'in_progress', 'done'], {
+    errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
+  }).optional(),
+}).refine(
+  (data) => data.position !== undefined || data.order !== undefined || data.status !== undefined,
+  { message: 'position, order, or status must be provided' },
+);
+
+const tasksBatchReorder = z.object({
+  tasks: z.array(z.object({
+    id:       z.string().uuid('id must be a valid UUID'),
+    order:    z.number().optional(),
+    position: z.number().optional(),
+    status:   z.enum(['todo', 'in_progress', 'done']).optional(),
+  })).min(1, 'At least one task update must be provided').max(200, 'Maximum 200 updates allowed'),
+});
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
@@ -146,6 +183,8 @@ module.exports = {
   resendVerification,
   taskCreate,
   taskUpdate,
+  taskOrder,
+  tasksBatchReorder,
   commentCreate,
   teamCreate,
   teamJoin,
