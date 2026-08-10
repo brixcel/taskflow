@@ -207,27 +207,30 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 16px',
+        padding: '9px 16px',
         borderBottom: isLast ? 'none' : '1px solid var(--color-canvas-hairline, #ebebeb)',
-        background: hovered ? 'var(--color-canvas-hover, #fafafa)' : 'var(--color-canvas-card, #fff)',
-        transition: 'background 100ms',
+        background: hovered ? 'var(--color-canvas-hover, #fafafa)' : 'var(--color-canvas-card, #ffffff)',
+        transition: 'background 100ms ease',
       }}
     >
       {/* Checkbox-style circle */}
       <button
-        onClick={() => onStatusChange(task.id, task.status === 'done' ? 'todo' : 'done')}
+        onClick={(e) => {
+          e.stopPropagation();
+          onStatusChange(task.id, task.status === 'done' ? 'todo' : 'done');
+        }}
         aria-label={task.status === 'done' ? 'Mark incomplete' : 'Mark complete'}
         style={{
           width: 16, height: 16, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
-          border: `1.5px solid ${task.status === 'done' ? '#0761d1' : '#a1a1a1'}`,
+          border: `1.5px solid ${task.status === 'done' ? '#0070f3' : 'var(--color-canvas-hairline-strong, #a1a1a1)'}`,
           background: task.status === 'done' ? '#d3e5ff' : 'transparent',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'all 120ms', padding: 0,
+          transition: 'all 120ms ease', padding: 0,
         }}
       >
         {task.status === 'done' && (
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-            <path d="M1.5 4L3 5.5L6.5 2" stroke="#0761d1" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M1.5 4L3 5.5L6.5 2" stroke="#0070f3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
       </button>
@@ -236,23 +239,21 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
       <div
         onClick={() => onSelect?.(task)}
         style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
-        title="Click to view comments & details"
+        title="View details & comments"
       >
         <p style={{
-          margin: 0, fontSize: 14, fontWeight: 500,
-          letterSpacing: '-0.2px', lineHeight: '20px',
+          margin: 0, fontSize: 13.5, fontWeight: 500,
+          letterSpacing: '-0.015em', lineHeight: '20px',
           textDecoration: task.status === 'done' ? 'line-through' : 'none',
-          color: task.status === 'done' ? 'var(--color-canvas-mute, #8a8f98)' : 'var(--color-canvas-ink, #0f1011)',
+          color: task.status === 'done' ? 'var(--color-canvas-mute, #888888)' : 'var(--color-canvas-ink, #171717)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {task.title}
         </p>
         {task.description && (
           <p style={{
-            margin: 0, fontSize: 12, color: 'var(--color-canvas-mute, #adb2ba)', lineHeight: '16px',
-            fontFamily: "'JetBrains Mono', monospace",
+            margin: '1px 0 0', fontSize: 12, color: 'var(--color-canvas-mute, #888888)', lineHeight: '16px',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            marginTop: 1,
           }}>
             {task.description}
           </p>
@@ -267,7 +268,7 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
               Overdue
             </span>
           ) : (
-            <span style={{ fontSize: 11, color: task.status === 'done' ? 'var(--color-canvas-mute, #8a8f98)' : 'var(--color-canvas-body, #70757e)', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: 11, color: task.status === 'done' ? 'var(--color-canvas-mute, #888888)' : 'var(--color-canvas-body, #4d4d4d)', fontFamily: 'var(--font-mono, monospace)' }}>
               {formattedDate}
             </span>
           )
@@ -275,78 +276,67 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
 
         <AssigneeAvatar name={task.assignee?.name} />
 
-        {/* Status dropdown — always visible & interactive */}
+        {/* Status dropdown */}
         <select
           value={task.status}
           onChange={e => onStatusChange(task.id, e.target.value)}
           aria-label={`Change status of ${task.title}`}
           className={`badge ${task.status === 'done' ? 'badge-done' : task.status === 'in_progress' ? 'badge-progress' : 'badge-todo'}`}
           style={{
-            height: 26,
-            padding: '0 8px',
-            fontSize: 12,
+            height: 24,
+            padding: '0 6px',
+            fontSize: 11,
             fontWeight: 500,
-            borderRadius: 5,
-            border: '1px solid',
+            borderRadius: 4,
             cursor: 'pointer',
             outline: 'none',
             fontFamily: 'inherit',
           }}
         >
-          <option value="todo" style={{ background: 'var(--color-canvas-card, #fff)', color: 'var(--color-canvas-ink, #171717)' }}>Todo</option>
-          <option value="in_progress" style={{ background: 'var(--color-canvas-card, #fff)', color: 'var(--color-canvas-ink, #171717)' }}>In Progress</option>
-          <option value="done" style={{ background: 'var(--color-canvas-card, #fff)', color: 'var(--color-canvas-ink, #171717)' }}>Done</option>
+          <option value="todo" style={{ background: 'var(--color-canvas-card, #ffffff)', color: 'var(--color-canvas-ink, #171717)' }}>Todo</option>
+          <option value="in_progress" style={{ background: 'var(--color-canvas-card, #ffffff)', color: 'var(--color-canvas-ink, #171717)' }}>In Progress</option>
+          <option value="done" style={{ background: 'var(--color-canvas-card, #ffffff)', color: 'var(--color-canvas-ink, #171717)' }}>Done</option>
         </select>
 
-        {/* Comments button */}
+        {/* Details & Comments button */}
         <button
           onClick={() => onSelect?.(task)}
           aria-label={`Open details and comments for ${task.title}`}
+          className="btn-secondary"
           style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            height: 26, padding: '0 8px', fontSize: 11, fontWeight: 500,
-            borderRadius: 5, border: '1px solid var(--color-canvas-hairline, #e8eaec)', background: 'var(--color-canvas-card, #fff)',
-            color: 'var(--color-canvas-body, #50545c)', cursor: 'pointer', outline: 'none',
-            fontFamily: 'inherit',
+            height: 24, padding: '0 8px', fontSize: 11, fontWeight: 500,
+            borderRadius: 4, gap: 4,
           }}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <path d="M1.5 8.5V2.5A1 1 0 012.5 1.5H9.5A1 1 0 0110.5 2.5V7.5A1 1 0 019.5 8.5H3.5L1.5 10.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
-          Comments
+          Details
         </button>
 
-        {/* Delete — always visible */}
+        {/* Delete — sleek icon button */}
         <button
           onClick={() => onDelete(task.id)}
           aria-label={`Delete ${task.title}`}
           title="Delete task"
+          className="btn-secondary"
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 26, height: 26, borderRadius: 5,
-            border: '1px solid var(--color-canvas-hairline, #e8eaec)',
-            background: 'var(--color-canvas-card, #fff)',
-            cursor: 'pointer',
-            color: 'var(--color-canvas-mute, #8a8f98)',
-            transition: 'background 120ms, color 120ms, border-color 120ms',
-            padding: 0,
+            width: 24, height: 24, padding: 0, borderRadius: 4,
+            opacity: hovered ? 1 : 0.4,
+            transition: 'opacity 120ms ease, color 120ms ease, background 120ms ease',
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.background = 'var(--color-btn-danger-bg, #fce8e6)';
-            e.currentTarget.style.color = 'var(--color-btn-danger-fg, #d93025)';
-            e.currentTarget.style.borderColor = 'var(--color-btn-danger-border, #f2bbb7)';
+            e.currentTarget.style.color = '#c50000';
+            e.currentTarget.style.borderColor = 'rgba(238, 0, 0, 0.3)';
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.background = 'var(--color-canvas-card, #fff)';
-            e.currentTarget.style.color = 'var(--color-canvas-mute, #8a8f98)';
-            e.currentTarget.style.borderColor = 'var(--color-canvas-hairline, #e8eaec)';
+            e.currentTarget.style.color = '';
+            e.currentTarget.style.borderColor = '';
           }}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="3 6 5 6 21 6" />
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            <line x1="10" y1="11" x2="10" y2="17" />
-            <line x1="14" y1="11" x2="14" y2="17" />
           </svg>
         </button>
       </div>
