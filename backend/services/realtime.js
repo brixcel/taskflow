@@ -98,97 +98,124 @@ function initSocketServer(httpServer, options = {}) {
   // ─── Connection & Event Handlers ─────────────────────────────────────────────
   io.on('connection', (socket) => {
     const user = socket.user;
-
-    // Join personal user room for targeted notifications
+    // Auto-join personal user room for direct notifications
     socket.join(`user:${user.id}`);
 
-    // Join team rooms (client emits team:join with teamId)
-    socket.on('team:join', async ({ teamId }) => {
-      if (!teamId) return;
+    // Join a team room (supports both join:team and team:join)
+    const handleJoinTeam = async ({ teamId }, callback) => {
+      try {
+        if (!teamId) {
+          if (callback) callback({ error: 'teamId is required' });
+          return;
+        }
 
-      // Verify user is actually a member of the team
-      const membership = await prisma.teamMembership.findUnique({
-        where: {
-          userId_teamId: {
-            userId: user.id,
-            teamId,
-          },
-        },
-      });
+        // Verify membership in database
+        const membership = await prisma.teamMembership.findUnique({
+          where: { userId_teamId: { userId: user.id, teamId } },
+        });
 
-      if (membership) {
+        if (!membership) {
+          socket.emit('error', { message: 'Unauthorized to join team room' });
+          if (callback) callback({ error: 'Forbidden: not a member of this team' });
+          return;
+        }
+
         socket.join(`team:${teamId}`);
         socket.emit('team:joined', { teamId });
-      } else {
-        socket.emit('error', { message: 'Unauthorized to join team room' });
+        if (callback) callback({ success: true, teamId });
+      } catch (err) {
+        console.error('Error in join:team:', err);
+        if (callback) callback({ error: 'Failed to join team room' });
       }
-    });
+    };
 
-    // Leave team room
-    socket.on('team:leave', ({ teamId }) => {
+    socket.on('join:team', handleJoinTeam);
+    socket.on('team:join', handleJoinTeam);
+
+    // Leave a team room (supports both leave:team and team:leave)
+    const handleLeaveTeam = ({ teamId }, callback) => {
       if (teamId) {
         socket.leave(`team:${teamId}`);
       }
-    });
+      if (callback) callback({ success: true });
+    };
 
-    // Join task room (for detailed task presence & real-time updates)
-    socket.on('task:view', async ({ taskId }) => {
-      if (!taskId) return;
+    socket.on('leave:team', handleLeaveTeam);
+    socket.on('team:leave', handleLeaveTeam);
 
-      // Verify task belongs to a team the user is part of
-      const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: { teamId: true },
-      });
-
-      if (!task) return;
-
-      const membership = await prisma.teamMembership.findUnique({
-        where: {
-          userId_teamId: {
-            userId: user.id,
-            teamId: task.teamId,
-          },
-        },
-      });
-
-      if (!membership) {
-        socket.emit('error', { message: 'Unauthorized to view task' });
-        return;
-      }
-
-      socket.join(`task:${taskId}`);
-
-      // Track active viewer presence
-      if (!taskViewers.has(taskId)) {
-        taskViewers.set(taskId, new Map());
-      }
-      taskViewers.get(taskId).set(socket.id, {
-        id:    user.id,
-        name:  user.name,
-        email: user.email,
-      });
-
-      const viewers = getUniqueViewers(taskId);
-      io.to(`task:${taskId}`).emit('presence:viewers', { taskId, viewers });
-    });
-
-    // Leave task room
-    socket.on('task:leave', ({ taskId }) => {
-      if (!taskId) return;
-      socket.leave(`task:${taskId}`);
-
-      const viewersMap = taskViewers.get(taskId);
-      if (viewersMap) {
-        viewersMap.delete(socket.id);
-        if (viewersMap.size === 0) {
-          taskViewers.delete(taskId);
+    // Join a task room (supports both join:task and task:view)
+    const handleJoinTask = async ({ taskId }, callback) => {
+      try {
+        if (!taskId) {
+          if (callback) callback({ error: 'taskId is required' });
+          return;
         }
-      }
 
-      const viewers = getUniqueViewers(taskId);
-      io.to(`task:${taskId}`).emit('presence:viewers', { taskId, viewers });
-    });
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+          select: { id: true, teamId: true },
+        });
+
+        if (!task) {
+          if (callback) callback({ error: 'Task not found' });
+          return;
+        }
+
+        // Verify user is a member of the task's team
+        const membership = await prisma.teamMembership.findUnique({
+          where: { userId_teamId: { userId: user.id, teamId: task.teamId } },
+        });
+
+        if (!membership) {
+          socket.emit('error', { message: 'Unauthorized to view task' });
+          if (callback) callback({ error: 'Forbidden: cannot view task in another team' });
+          return;
+        }
+
+        socket.join(`task:${taskId}`);
+
+        // Register viewer presence
+        if (!taskViewers.has(taskId)) {
+          taskViewers.set(taskId, new Map());
+        }
+        taskViewers.get(taskId).set(socket.id, {
+          id:    user.id,
+          name:  user.name,
+          email: user.email,
+        });
+
+        const viewers = getUniqueViewers(taskId);
+        // Broadcast updated viewers to the task room
+        io.to(`task:${taskId}`).emit('presence:viewers', { taskId, viewers });
+
+        if (callback) callback({ success: true, taskId, viewers });
+      } catch (err) {
+        console.error('Error in join:task:', err);
+        if (callback) callback({ error: 'Failed to join task room' });
+      }
+    };
+
+    socket.on('join:task', handleJoinTask);
+    socket.on('task:view', handleJoinTask);
+
+    // Leave a task room (supports both leave:task and task:leave)
+    const handleLeaveTask = ({ taskId }, callback) => {
+      if (taskId) {
+        socket.leave(`task:${taskId}`);
+        if (taskViewers.has(taskId)) {
+          taskViewers.get(taskId).delete(socket.id);
+          if (taskViewers.get(taskId).size === 0) {
+            taskViewers.delete(taskId);
+          }
+        }
+        const viewers = getUniqueViewers(taskId);
+        io.to(`task:${taskId}`).emit('presence:viewers', { taskId, viewers });
+      }
+      if (callback) callback({ success: true });
+    };
+
+    socket.on('leave:task', handleLeaveTask);
+    socket.on('task:leave', handleLeaveTask);
 
     // Typing start indicator in task comment section
     socket.on('typing:start', ({ taskId }) => {
@@ -246,41 +273,53 @@ function emitToUser(userId, event, data) {
 
 function emitTaskCreated(teamId, task) {
   emitToTeam(teamId, 'task.created', { task });
+  emitToTeam(teamId, 'task:created', { task });
 }
 
 function emitTaskUpdated(teamId, task) {
   emitToTeam(teamId, 'task.updated', { task });
+  emitToTeam(teamId, 'task:updated', { task });
   if (task && task.id) {
     emitToTask(task.id, 'task.updated', { task });
+    emitToTask(task.id, 'task:updated', { task });
   }
 }
 
 function emitTaskDeleted(teamId, taskId) {
   emitToTeam(teamId, 'task.deleted', { id: taskId, taskId });
+  emitToTeam(teamId, 'task:deleted', { id: taskId, taskId });
   emitToTask(taskId, 'task.deleted', { id: taskId, taskId });
+  emitToTask(taskId, 'task:deleted', { id: taskId, taskId });
 }
 
 function emitTaskAssigned(teamId, task, previousAssigneeId) {
   emitToTeam(teamId, 'task.assigned', { task, previousAssigneeId });
+  emitToTeam(teamId, 'task:assigned', { task, previousAssigneeId });
   if (task.assigneeId) {
     emitToUser(task.assigneeId, 'task.assigned', { task });
+    emitToUser(task.assigneeId, 'task:assigned', { task });
   }
 }
 
 function emitTaskCompleted(teamId, task) {
   emitToTeam(teamId, 'task.completed', { task });
+  emitToTeam(teamId, 'task:completed', { task });
   if (task && task.id) {
     emitToTask(task.id, 'task.completed', { task });
+    emitToTask(task.id, 'task:completed', { task });
   }
 }
 
 function emitCommentCreated(teamId, taskId, comment) {
   emitToTeam(teamId, 'comment.created', { taskId, comment });
+  emitToTeam(teamId, 'comment:created', { taskId, comment });
   emitToTask(taskId, 'comment.created', { taskId, comment });
+  emitToTask(taskId, 'comment:created', { taskId, comment });
 }
 
 function emitNotification(userId, notification) {
   emitToUser(userId, 'notification.created', { notification });
+  emitToUser(userId, 'notification:created', { notification });
 }
 
 function emitProjectCreated(teamId, project) {

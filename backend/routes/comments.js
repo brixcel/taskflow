@@ -8,6 +8,7 @@ const schemas     = require('../validation/schemas');
 const { scopedTaskQuery } = require('../helpers/scopedQuery');
 const logger      = require('../middleware/logger');
 const { createNotification, parseMentions } = require('../services/notifications');
+const { emitCommentCreated } = require('../services/realtime');
 
 const router = express.Router({ mergeParams: true }); // inherit :taskId from parent
 
@@ -101,6 +102,9 @@ router.post('/', validate(schemas.commentCreate), async (req, res) => {
         data:    { taskId: task.id, taskTitle: task.title, commentId: comment.id },
       });
     }
+
+    // Emit real-time comment event to team and task rooms
+    emitCommentCreated(req.teamId, task.id, comment);
 
     res.status(201).json({ comment });
   } catch (error) {

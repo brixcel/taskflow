@@ -9,6 +9,13 @@ const schemas    = require('../validation/schemas');
 const { scopedTaskQuery } = require('../helpers/scopedQuery');
 const logger     = require('../middleware/logger');
 const { createNotification } = require('../services/notifications');
+const {
+  emitTaskCreated,
+  emitTaskUpdated,
+  emitTaskDeleted,
+  emitTaskAssigned,
+  emitTaskCompleted,
+} = require('../services/realtime');
 
 const router = express.Router();
 
@@ -100,6 +107,12 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
         message: `You were assigned to task "${task.title}"`,
         data:    { taskId: task.id, taskTitle: task.title, status: task.status, priority: task.priority },
       });
+    }
+
+    // Real-time broadcasts
+    emitTaskCreated(req.teamId, task);
+    if (task.assigneeId) {
+      emitTaskAssigned(req.teamId, task, null);
     }
 
     res.status(201).json({ task });
@@ -252,6 +265,7 @@ router.patch('/:id/order', validate(schemas.taskOrder), async (req, res) => {
       include: {
         assignee:  { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
+        project:   { select: { id: true, name: true, color: true, icon: true } },
       },
     });
 
@@ -292,7 +306,13 @@ router.patch('/:id/order', validate(schemas.taskOrder), async (req, res) => {
           data:    { taskId: task.id, taskTitle: task.title, oldStatus: existingTask.status, newStatus: status },
         });
       }
+
+      if (status === 'done') {
+        emitTaskCompleted(req.teamId, task);
+      }
     }
+
+    emitTaskUpdated(req.teamId, task);
 
     res.json({ task });
   } catch (error) {
@@ -590,6 +610,7 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
         message: `You were assigned to task "${task.title}"`,
         data:    { taskId: task.id, taskTitle: task.title, status: task.status, priority: task.priority },
       });
+      emitTaskAssigned(req.teamId, task, existingTask.assigneeId);
     }
 
     if (status !== undefined && status !== existingTask.status) {
@@ -619,7 +640,13 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
           data:    { taskId: task.id, taskTitle: task.title, oldStatus: existingTask.status, newStatus: status },
         });
       }
+
+      if (status === 'done') {
+        emitTaskCompleted(req.teamId, task);
+      }
     }
+
+    emitTaskUpdated(req.teamId, task);
 
     res.json({ task });
   } catch (error) {
@@ -656,6 +683,8 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.task.delete({ where: { id } });
+
+    emitTaskDeleted(req.teamId, id);
 
     res.status(204).send();
   } catch (error) {

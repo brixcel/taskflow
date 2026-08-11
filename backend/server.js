@@ -54,8 +54,12 @@ const subtaskRoutes = require('./routes/subtasks');
 const activityRoutes = require('./routes/activities');
 const notificationRoutes = require('./routes/notifications');
 const projectRoutes = require('./routes/projects');
+const http = require('http');
+const { initSocketServer } = require('./services/realtime');
 
 const app = express();
+const server = http.createServer(app);
+const io = initSocketServer(server);
 const PORT = process.env.PORT || 3000;
 
 // ─── Structured HTTP request logging ─────────────────────────────────────────
@@ -203,9 +207,12 @@ app.use((err, req, res, _next) => {
 // Only bind the port when this file is run directly (node server.js / nodemon).
 // When required by tests, skip listen so supertest can manage its own port.
 if (require.main === module) {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     logger.info({ port: PORT }, `Server running on port ${PORT}`);
   });
 }
 
 module.exports = app;
+module.exports.app = app;
+module.exports.server = server;
+module.exports.io = io;

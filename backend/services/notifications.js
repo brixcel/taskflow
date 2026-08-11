@@ -121,6 +121,14 @@ async function createNotification({ userId, actorId = null, teamId = null, taskI
       },
     });
 
+    // Real-time broadcast to user's private channel
+    try {
+      const { emitNotification } = require('./realtime');
+      emitNotification(userId, notification);
+    } catch (realtimeErr) {
+      // Non-blocking if realtime service is offline or in mock
+    }
+
     return notification;
   } catch (err) {
     console.error('Failed to create notification:', err);
