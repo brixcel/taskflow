@@ -7,6 +7,9 @@ const { sanitize } = require('../middleware/sanitize');
 const schemas     = require('../validation/schemas');
 const { scopedTaskQuery } = require('../helpers/scopedQuery');
 
+const { createNotification, parseMentions } = require('../services/notifications');
+const { emitCommentCreated } = require('../services/realtime');
+
 const router = express.Router({ mergeParams: true }); // inherit :taskId from parent
 
 // Apply auth + team resolution to all comment routes.
@@ -56,6 +59,47 @@ router.post('/', validate(schemas.commentCreate), async (req, res) => {
         details: `Added a comment`,
       },
     });
+
+    // 1. Process mentions
+    const mentionedUsers = await parseMentions(content, req.teamId);
+    const notifiedUserIds = new Set();
+
+    for (const mentioned of mentionedUsers) {
+      if (mentioned.id !== req.userId) {
+        notifiedUserIds.add(mentioned.id);
+        await createNotification({
+          userId:  mentioned.id,
+          actorId: req.userId,
+          teamId:  req.teamId,
+          taskId:  task.id,
+          type:    'mention',
+          title:   'Mentioned in a comment',
+          message: `${comment.author?.name || 'Someone'} mentioned you in a comment on "${task.title}"`,
+          data:    { taskId: task.id, commentId: comment.id },
+        });
+      }
+    }
+
+    // 2. Notify task creator and assignee for new comments (if not already notified by mention)
+    const candidates = [task.createdById, task.assigneeId].filter(Boolean);
+    for (const candidateId of candidates) {
+      if (candidateId !== req.userId && !notifiedUserIds.has(candidateId)) {
+        notifiedUserIds.add(candidateId);
+        await createNotification({
+          userId:  candidateId,
+          actorId: req.userId,
+          teamId:  req.teamId,
+          taskId:  task.id,
+          type:    'comment_created',
+          title:   'New comment on task',
+          message: `New comment on task "${task.title}"`,
+          data:    { taskId: task.id, commentId: comment.id },
+        });
+      }
+    }
+
+    // 3. Emit real-time comment event to team and task rooms
+    emitCommentCreated(req.teamId, task.id, comment);
 
     res.status(201).json({ comment });
   } catch (error) {

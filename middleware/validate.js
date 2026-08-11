@@ -11,24 +11,24 @@
 
 const { ZodError } = require('zod');
 
-function validate(schema) {
+function validate(schema, source = 'body') {
   return (req, res, next) => {
-    const result = schema.safeParse(req.body);
+    const dataToValidate = req[source] || {};
+    const result = schema.safeParse(dataToValidate);
 
     if (!result.success) {
       // Zod v4 uses .issues; v3 used .errors — support both
       const issues = result.error.issues ?? result.error.errors ?? [];
       const errors = issues.map((e) => ({
-        field:   e.path.join('.') || 'body',
+        field:   e.path.join('.') || source,
         message: e.message,
       }));
 
       return res.status(400).json({ errors });
     }
 
-    // Replace req.body with the parsed (and coerced/stripped) data so routes
-    // always see clean, typed values.
-    req.body = result.data;
+    // Replace the request source property with parsed/coerced data
+    req[source] = result.data;
     next();
   };
 }

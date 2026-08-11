@@ -10,6 +10,7 @@ import KanbanBoard from '../components/KanbanBoard';
 import UndoToast from '../components/UndoToast';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
+import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -509,6 +510,7 @@ export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const token   = localStorage.getItem('token');
   const teamId  = localStorage.getItem('teamId');
+  const { joinTeam, subscribe } = useRealtime();
 
   const [teams,       setTeams]       = useState([]);
   const [activeTeam,  setActiveTeam]  = useState(getActiveTeam);
@@ -739,6 +741,57 @@ export default function Dashboard() {
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
+
+  // ── Real-Time Collaboration Subscription ──────────────────────────────────
+  useEffect(() => {
+    if (!teamId) return;
+    joinTeam(teamId);
+
+    const unsubCreated = subscribe('task.created', ({ task }) => {
+      if (!task) return;
+      setTasks((prev) => {
+        if (prev.some((t) => t.id === task.id)) return prev;
+        return [task, ...prev];
+      });
+      fetchAnalytics();
+    });
+
+    const unsubUpdated = subscribe('task.updated', ({ task }) => {
+      if (!task) return;
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, ...task } : t)));
+      setSelectedTask((prev) => (prev && prev.id === task.id ? { ...prev, ...task } : prev));
+      fetchAnalytics();
+    });
+
+    const unsubDeleted = subscribe('task.deleted', ({ id, taskId }) => {
+      const targetId = id || taskId;
+      if (!targetId) return;
+      setTasks((prev) => prev.filter((t) => t.id !== targetId));
+      setSelectedTask((prev) => (prev && prev.id === targetId ? null : prev));
+      fetchAnalytics();
+    });
+
+    const unsubAssigned = subscribe('task.assigned', ({ task }) => {
+      if (!task) return;
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, ...task } : t)));
+      setSelectedTask((prev) => (prev && prev.id === task.id ? { ...prev, ...task } : prev));
+    });
+
+    const unsubCompleted = subscribe('task.completed', ({ task }) => {
+      if (!task) return;
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, ...task, status: 'done' } : t)));
+      setSelectedTask((prev) => (prev && prev.id === task.id ? { ...prev, ...task, status: 'done' } : prev));
+      fetchAnalytics();
+    });
+
+    return () => {
+      unsubCreated?.();
+      unsubUpdated?.();
+      unsubDeleted?.();
+      unsubAssigned?.();
+      unsubCompleted?.();
+    };
+  }, [teamId, joinTeam, subscribe, fetchAnalytics]);
 
   // ── Task CRUD & Kanban Operations ────────────────────────────────────────
   const handleCreate = async ({ title, description, status, priority, labels, assigneeId, dueDate }) => {

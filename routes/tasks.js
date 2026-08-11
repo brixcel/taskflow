@@ -7,6 +7,14 @@ const validate   = require('../middleware/validate');
 const { sanitize } = require('../middleware/sanitize');
 const schemas    = require('../validation/schemas');
 const { scopedTaskQuery } = require('../helpers/scopedQuery');
+const { createNotification } = require('../services/notifications');
+const {
+  emitTaskCreated,
+  emitTaskUpdated,
+  emitTaskDeleted,
+  emitTaskAssigned,
+  emitTaskCompleted,
+} = require('../services/realtime');
 
 const router = express.Router();
 
@@ -53,6 +61,26 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
         details: `Task "${task.title}" created`,
       },
     });
+
+    // Notify assignee if assigned to someone else
+    if (task.assigneeId && task.assigneeId !== req.userId) {
+      await createNotification({
+        userId:  task.assigneeId,
+        actorId: req.userId,
+        teamId:  req.teamId,
+        taskId:  task.id,
+        type:    'task_assigned',
+        title:   'Task assigned',
+        message: `You were assigned to task "${task.title}"`,
+        data:    { taskId: task.id, title: task.title },
+      });
+    }
+
+    // Real-time broadcasts
+    emitTaskCreated(req.teamId, task);
+    if (task.assigneeId) {
+      emitTaskAssigned(req.teamId, task, null);
+    }
 
     res.status(201).json({ task });
   } catch (error) {
@@ -150,6 +178,63 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       },
     });
 
+    // Handle assignee change notification & real-time event
+    if (assigneeId !== undefined && assigneeId !== existingTask.assigneeId) {
+      if (assigneeId && assigneeId !== req.userId) {
+        const isReassign = Boolean(existingTask.assigneeId);
+        await createNotification({
+          userId:  assigneeId,
+          actorId: req.userId,
+          teamId:  req.teamId,
+          taskId:  task.id,
+          type:    isReassign ? 'task_reassigned' : 'task_assigned',
+          title:   isReassign ? 'Task reassigned' : 'Task assigned',
+          message: `You were assigned to task "${task.title}"`,
+          data:    { taskId: task.id, title: task.title },
+        });
+      }
+      emitTaskAssigned(req.teamId, task, existingTask.assigneeId);
+    }
+
+    // Handle status change notification & real-time event
+    if (isStatusChange) {
+      const targets = new Set();
+      if (task.assigneeId && task.assigneeId !== req.userId) targets.add(task.assigneeId);
+      if (task.createdById && task.createdById !== req.userId) targets.add(task.createdById);
+
+      if (status === 'done') {
+        for (const recipientId of targets) {
+          await createNotification({
+            userId:  recipientId,
+            actorId: req.userId,
+            teamId:  req.teamId,
+            taskId:  task.id,
+            type:    'task_completed',
+            title:   'Task completed',
+            message: `Task "${task.title}" was completed`,
+            data:    { taskId: task.id, title: task.title },
+          });
+        }
+        emitTaskCompleted(req.teamId, task);
+      } else {
+        for (const recipientId of targets) {
+          await createNotification({
+            userId:  recipientId,
+            actorId: req.userId,
+            teamId:  req.teamId,
+            taskId:  task.id,
+            type:    'status_changed',
+            title:   'Task status updated',
+            message: `Task "${task.title}" status changed to ${status}`,
+            data:    { taskId: task.id, title: task.title, oldStatus: existingTask.status, newStatus: status },
+          });
+        }
+      }
+    }
+
+    // Emit real-time task update to team and task room
+    emitTaskUpdated(req.teamId, task);
+
     res.json({ task });
   } catch (error) {
     console.error(error);
@@ -185,6 +270,9 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.task.delete({ where: { id } });
+
+    // Emit real-time task deletion
+    emitTaskDeleted(req.teamId, id);
 
     res.status(204).send();
   } catch (error) {

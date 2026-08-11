@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 
 const API = API_URL;
@@ -167,6 +168,49 @@ export default function TaskDetailDrawer({
 
   const titleInputRef = useRef(null);
   const subtaskInputRef = useRef(null);
+  const typingTimerRef = useRef(null);
+
+  const {
+    joinTask,
+    leaveTask,
+    startTyping,
+    stopTyping,
+    viewersByTask,
+    typingUsersByTask,
+    subscribe,
+  } = useRealtime();
+
+  const currentTaskId = initialTask?.id;
+  const currentViewers = (currentTaskId ? viewersByTask[currentTaskId] || [] : []).filter(v => v.id !== currentUserId);
+  const currentTypingUsers = (currentTaskId ? typingUsersByTask[currentTaskId] || [] : []).filter(u => u.id !== currentUserId);
+
+  // Real-time task room join/leave and event listeners
+  useEffect(() => {
+    if (!currentTaskId) return;
+
+    joinTask(currentTaskId);
+
+    const unsubComment = subscribe('comment.created', ({ taskId, comment }) => {
+      if (taskId === currentTaskId && comment) {
+        setComments((prev) => (prev.some((c) => c.id === comment.id) ? prev : [...prev, comment]));
+      }
+    });
+
+    const unsubTask = subscribe('task.updated', ({ task: updatedTask }) => {
+      if (updatedTask && updatedTask.id === currentTaskId) {
+        setTask((prev) => ({ ...prev, ...updatedTask }));
+        setTitleDraft(updatedTask.title || '');
+        setDescDraft(updatedTask.description || '');
+      }
+    });
+
+    return () => {
+      leaveTask(currentTaskId);
+      unsubComment?.();
+      unsubTask?.();
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    };
+  }, [currentTaskId, joinTask, leaveTask, subscribe]);
 
   // Fetch full task graph
   const reloadTaskDetails = async () => {
@@ -478,16 +522,32 @@ export default function TaskDetailDrawer({
   };
 
   // Comments CRUD
+  const handleCommentInput = (e) => {
+    const val = e.target.value;
+    setNewComment(val);
+    if (task?.id) {
+      startTyping(task.id);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => {
+        stopTyping(task.id);
+      }, 2500);
+    }
+  };
+
   const handleAddComment = async (e) => {
     e?.preventDefault();
     const content = newComment.trim();
     if (!content || submitting) return;
 
+    if (task?.id) {
+      stopTyping(task.id);
+    }
+
     setSubmitting(true);
     setError('');
     try {
       const res = await axios.post(`${API}/tasks/${task.id}/comments`, { content }, { headers });
-      setComments(prev => [...prev, res.data.comment]);
+      setComments(prev => (prev.some(c => c.id === res.data.comment.id) ? prev : [...prev, res.data.comment]));
       setNewComment('');
       reloadTaskDetails();
     } catch (err) {
@@ -879,7 +939,7 @@ export default function TaskDetailDrawer({
             gap: 12, background: 'var(--color-canvas-main, #ffffff)',
           }}
         >
-          {/* Left: Task ID & Copy link */}
+          {/* Left: Task ID & Copy link + Live Viewers */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-canvas-mute, #888888)', fontFamily: "'JetBrains Mono', monospace" }}>
               TASK-{task.id.slice(0, 6).toUpperCase()}
@@ -898,6 +958,37 @@ export default function TaskDetailDrawer({
               </svg>
               {copySuccess ? 'Copied!' : 'Copy link'}
             </button>
+
+            {currentViewers.length > 0 && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  background: 'rgba(0, 112, 243, 0.1)',
+                  color: '#0070f3',
+                  border: '1px solid rgba(0, 112, 243, 0.2)',
+                }}
+                title={currentViewers.map(v => `${v.name} (${v.email})`).join(', ')}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: '#0070f3',
+                    animation: 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                  }}
+                />
+                {currentViewers.length === 1
+                  ? `${currentViewers[0].name} is viewing`
+                  : `${currentViewers.length} active viewers`}
+              </span>
+            )}
           </div>
 
           {/* Right: Watch button + Delete + Close */}
@@ -1382,7 +1473,7 @@ export default function TaskDetailDrawer({
                       <textarea
                         rows={3}
                         value={newComment}
-                        onChange={e => setNewComment(e.target.value)}
+                        onChange={handleCommentInput}
                         onKeyDown={e => {
                           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleAddComment(e);
                         }}
@@ -1390,6 +1481,16 @@ export default function TaskDetailDrawer({
                         placeholder="Write a comment… (Cmd + Enter to send)"
                         style={{ fontSize: 13, resize: 'vertical' }}
                       />
+
+                      {currentTypingUsers.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#0070f3', fontStyle: 'italic', padding: '2px 0' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#0070f3', animation: 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+                          <span>
+                            {currentTypingUsers.map(u => u.name).join(', ')} {currentTypingUsers.length === 1 ? 'is' : 'are'} typing…
+                          </span>
+                        </div>
+                      )}
+
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: 11, color: 'var(--color-canvas-mute, #888888)' }}>
                           Press <kbd style={{ fontFamily: "'JetBrains Mono', monospace", background: 'var(--color-canvas-hover, #f0f1f3)', padding: '1px 4px', borderRadius: 3 }}>⌘↵</kbd> to submit

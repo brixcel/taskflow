@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
+import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 import NotificationCenter from './NotificationCenter';
 
@@ -174,6 +175,7 @@ export default function NotificationBell({ onSelectTask = null }) {
 
   const dropdownRef = useRef(null);
   const token = localStorage.getItem('token');
+  const { subscribe } = useRealtime();
 
   // Fetch unread count lightweight
   const fetchUnreadCount = useCallback(async () => {
@@ -204,6 +206,22 @@ export default function NotificationBell({ onSelectTask = null }) {
       setLoading(false);
     }
   }, [token]);
+
+  // Real-time notification arrival listener
+  useEffect(() => {
+    const unsub = subscribe('notification.created', ({ notification }) => {
+      if (!notification) return;
+      setUnreadCount((c) => c + 1);
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === notification.id)) return prev;
+        return [notification, ...prev];
+      });
+    });
+
+    return () => {
+      unsub?.();
+    };
+  }, [subscribe]);
 
   // Initial load and periodic polling
   useEffect(() => {

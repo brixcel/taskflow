@@ -93,12 +93,27 @@ router.post('/:id/members', validate(schemas.memberAdd), async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+
     // Upsert — idempotent if the user is already a member.
     const membership = await prisma.teamMembership.upsert({
       where:  { userId_teamId: { userId: targetUserId, teamId } },
       create: { userId: targetUserId, teamId, role },
       update: { role },
     });
+
+    if (targetUserId !== req.userId) {
+      const { createNotification } = require('../services/notifications');
+      await createNotification({
+        userId:  targetUserId,
+        actorId: req.userId,
+        teamId,
+        type:    'team_invitation',
+        title:   'Added to team',
+        message: `You were added to team "${team?.name || 'team'}" as ${role}`,
+        data:    { teamId, teamName: team?.name, role },
+      });
+    }
 
     res.status(201).json({ membership });
   } catch (error) {
@@ -251,6 +266,20 @@ router.patch('/:id/members/:userId/role', resolveTeamFromParam, requireRole('own
       where: { userId_teamId: { userId: targetUserId, teamId } },
       data:  { role },
     });
+
+    if (targetUserId !== req.userId) {
+      const team = await prisma.team.findUnique({ where: { id: teamId } });
+      const { createNotification } = require('../services/notifications');
+      await createNotification({
+        userId:  targetUserId,
+        actorId: req.userId,
+        teamId,
+        type:    'role_changed',
+        title:   'Team role updated',
+        message: `Your role in team "${team?.name || 'team'}" was updated to ${role}`,
+        data:    { teamId, teamName: team?.name, role },
+      });
+    }
 
     res.json({ membership: updated });
   } catch (error) {

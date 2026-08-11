@@ -8,7 +8,12 @@ const commentRoutes      = require('./routes/comments');
 const activityRoutes     = require('./routes/activities');
 const notificationRoutes = require('./routes/notifications');
 
+const http = require('http');
+const { initSocketServer } = require('./services/realtime');
+
 const app  = express();
+const server = http.createServer(app);
+const io = initSocketServer(server);
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -27,6 +32,10 @@ app.use('/notifications', notificationRoutes);
 app.use('/tasks/:taskId/comments',   commentRoutes);
 app.use('/tasks/:taskId/activities', activityRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+module.exports = { app, server, io };

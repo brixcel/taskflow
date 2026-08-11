@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
+import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 import { formatRelativeTime, getNotificationTypeMeta } from './NotificationBell';
 
@@ -40,6 +41,7 @@ export default function NotificationCenter({
   const [prefSaveSuccess, setPrefSaveSuccess] = useState(false);
 
   const token = localStorage.getItem('token');
+  const { subscribe } = useRealtime();
 
   // Load preferences
   const fetchPreferences = useCallback(async () => {
@@ -84,6 +86,23 @@ export default function NotificationCenter({
       setLoading(false);
     }
   }, [token, activeTab]);
+
+  // Live real-time notification receiver in center
+  useEffect(() => {
+    const unsub = subscribe('notification.created', ({ notification }) => {
+      if (!notification) return;
+      setUnreadCount((c) => c + 1);
+      setTotal((t) => t + 1);
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === notification.id)) return prev;
+        return [notification, ...prev];
+      });
+    });
+
+    return () => {
+      unsub?.();
+    };
+  }, [subscribe]);
 
   useEffect(() => {
     if (isOpen) {

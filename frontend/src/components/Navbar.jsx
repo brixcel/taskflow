@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import NotificationBell from './NotificationBell';
+import { useRealtime } from '../context/RealtimeContext';
 
 // ── Logo mark ──────────────────────────────────────────────────────────────────
 function LogoMark() {
@@ -45,6 +46,7 @@ const NAV_ITEMS = [
 export default function Navbar({ teams = [], activeTeam = null, onTeamSwitch, onLogout }) {
   const navigate  = useNavigate();
   const location  = useLocation();
+  const { status, isConnected } = useRealtime();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -192,8 +194,26 @@ export default function Navbar({ teams = [], activeTeam = null, onTeamSwitch, on
           ))}
         </nav>
 
-        {/* ── Right: NotificationBell + ThemeToggle + logout ────────────────── */}
-        <div className="flex items-center gap-2">
+        {/* ── Right: Live status + NotificationBell + ThemeToggle + logout ────────────────── */}
+        <div className="flex items-center gap-2.5">
+          {status === 'connected' ? (
+            <span
+              className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+              title="Real-time collaboration active"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live
+            </span>
+          ) : status === 'connecting' || status === 'reconnecting' ? (
+            <span
+              className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+              title="Connecting to real-time collaboration server..."
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+              Connecting...
+            </span>
+          ) : null}
+
           <NotificationBell
             onSelectTask={(taskId) => {
               navigate(`/dashboard?taskId=${taskId}`);
