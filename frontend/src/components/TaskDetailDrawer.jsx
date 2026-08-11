@@ -119,6 +119,7 @@ export default function TaskDetailDrawer({
   task: initialTask,
   headers,
   members = [],
+  projects = [],
   currentUserId,
   userRole,
   isEditRequested = false,
@@ -317,6 +318,18 @@ export default function TaskDetailDrawer({
       reloadTaskDetails();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update priority.');
+    }
+  };
+
+  // Save Project
+  const handleProjectChange = async (newProjectId) => {
+    try {
+      const res = await axios.patch(`${API}/tasks/${task.id}`, { projectId: newProjectId || null }, { headers });
+      setTask(prev => ({ ...prev, ...res.data.task }));
+      onTaskUpdated?.(res.data.task);
+      reloadTaskDetails();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update project.');
     }
   };
 
@@ -1583,6 +1596,24 @@ export default function TaskDetailDrawer({
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                   <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              {/* Project */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--color-canvas-mute, #888888)' }}>Project</label>
+                <select
+                  value={task.projectId || ''}
+                  onChange={e => handleProjectChange(e.target.value)}
+                  className="field-input"
+                  style={{ height: 28, padding: '0 8px', fontSize: 12 }}
+                >
+                  <option value="">No Project (Unassigned)</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.icon || '📁'} {p.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 

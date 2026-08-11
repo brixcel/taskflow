@@ -98,6 +98,7 @@ const taskCreate = z.object({
   order:       z.number().optional(),
   position:    z.number().optional(),
   assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  projectId:   z.string().uuid('projectId must be a valid UUID').optional().nullable(),
   dueDate:     dueDateSchema,
 });
 
@@ -112,6 +113,7 @@ const taskUpdate = z.object({
   order:       z.number().optional(),
   position:    z.number().optional(),
   assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  projectId:   z.string().uuid('projectId must be a valid UUID').optional().nullable(),
   dueDate:     dueDateSchema,
 }).refine(
   (data) => Object.keys(data).length > 0,
@@ -136,6 +138,45 @@ const tasksBatchReorder = z.object({
     position: z.number().optional(),
     status:   z.enum(['todo', 'in_progress', 'done']).optional(),
   })).min(1, 'At least one task update must be provided').max(200, 'Maximum 200 updates allowed'),
+});
+
+// ─── Projects ────────────────────────────────────────────────────────────────
+
+const projectCreate = z.object({
+  name:        nonBlankString(100, { requiredMsg: 'Project name is required', maxMsg: 'Project name must be 100 characters or fewer' }),
+  description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional().nullable(),
+  icon:        z.string().trim().max(50, 'Icon must be 50 characters or fewer').optional().nullable(),
+  color:       z.string().trim().max(50, 'Color must be 50 characters or fewer').optional().nullable(),
+  status:      z.enum(['active', 'planning', 'in_progress', 'completed', 'on_hold', 'archived'], {
+    errorMap: () => ({ message: 'status must be active, planning, in_progress, completed, on_hold, or archived' }),
+  }).optional(),
+  startDate:   dueDateSchema,
+  targetDate:  dueDateSchema,
+  memberIds:   z.array(z.string().uuid('memberId must be a valid UUID')).optional(),
+});
+
+const projectUpdate = z.object({
+  name:        nonBlankString(100, { requiredMsg: 'Project name cannot be blank', maxMsg: 'Project name must be 100 characters or fewer' }).optional(),
+  description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional().nullable(),
+  icon:        z.string().trim().max(50, 'Icon must be 50 characters or fewer').optional().nullable(),
+  color:       z.string().trim().max(50, 'Color must be 50 characters or fewer').optional().nullable(),
+  status:      z.enum(['active', 'planning', 'in_progress', 'completed', 'on_hold', 'archived'], {
+    errorMap: () => ({ message: 'status must be active, planning, in_progress, completed, on_hold, or archived' }),
+  }).optional(),
+  startDate:   dueDateSchema,
+  targetDate:  dueDateSchema,
+  order:       z.number().optional(),
+  isArchived:  z.boolean().optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field must be provided' },
+);
+
+const projectMemberAdd = z.object({
+  userId: z.string().uuid('userId must be a valid UUID'),
+  role:   z.enum(['lead', 'member', 'viewer'], {
+    errorMap: () => ({ message: 'role must be lead, member, or viewer' }),
+  }).optional().default('member'),
 });
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
@@ -244,6 +285,9 @@ module.exports = {
   taskUpdate,
   taskOrder,
   tasksBatchReorder,
+  projectCreate,
+  projectUpdate,
+  projectMemberAdd,
   subtaskCreate,
   subtaskUpdate,
   subtasksBatchReorder,

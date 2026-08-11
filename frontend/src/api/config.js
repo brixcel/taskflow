@@ -6,3 +6,4 @@
  * pointing to your live backend (e.g. https://taskflow-api.onrender.com).
  */
 export const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+export const API_BASE = API_URL;

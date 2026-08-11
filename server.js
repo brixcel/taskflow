@@ -7,6 +7,7 @@ const teamRoutes     = require('./routes/teams');
 const commentRoutes      = require('./routes/comments');
 const activityRoutes     = require('./routes/activities');
 const notificationRoutes = require('./routes/notifications');
+const projectRoutes      = require('./routes/projects');
 
 const http = require('http');
 const { initSocketServer } = require('./services/realtime');
@@ -23,10 +24,12 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.use('/auth',          authRoutes);
-app.use('/tasks',         taskRoutes);
-app.use('/teams',         teamRoutes);
-app.use('/notifications', notificationRoutes);
+app.use('/auth',                   authRoutes);
+app.use('/tasks',                  taskRoutes);
+app.use('/teams',                  teamRoutes);
+app.use('/teams/:teamId/projects', projectRoutes);
+app.use('/projects',               projectRoutes);
+app.use('/notifications',          notificationRoutes);
 
 // Comments and activities are nested under tasks
 app.use('/tasks/:taskId/comments',   commentRoutes);

@@ -20,7 +20,7 @@ router.use(requireAuth, resolveTeam);
 
 router.post('/', validate(schemas.taskCreate), async (req, res) => {
   try {
-    const { title, description, assigneeId, dueDate, status, priority, labels, order, position } = req.body;
+    const { title, description, assigneeId, projectId, dueDate, status, priority, labels, order, position } = req.body;
 
     // If an assignee is specified, verify they are a member of this team.
     if (assigneeId) {
@@ -29,6 +29,16 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
       });
       if (!assigneeMembership) {
         return res.status(400).json({ error: 'Assignee is not a member of this team' });
+      }
+    }
+
+    // If a project is specified, verify it belongs to this team.
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, teamId: req.teamId },
+      });
+      if (!project) {
+        return res.status(400).json({ error: 'Project not found in this team' });
       }
     }
 
@@ -58,6 +68,7 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
         labels:      cleanLabels,
         order:       taskOrder,
         assigneeId:  assigneeId  || null,
+        projectId:   projectId   || null,
         dueDate:     dueDate ? new Date(dueDate) : null,
         createdById: req.userId,
         teamId:      req.teamId,
@@ -65,6 +76,7 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
       include: {
         assignee:  { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
+        project:   { select: { id: true, name: true, color: true, icon: true } },
       },
     });
 
@@ -104,11 +116,11 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
 //   pageSize — items per page (default: 20, max: 100)
 //
 // Filters:
-//   status, assigneeId, priority, label, search
+//   status, assigneeId, projectId, priority, label, search
 
 router.get('/', async (req, res) => {
   try {
-    const { status, assigneeId, priority, label, search } = req.query;
+    const { status, assigneeId, projectId, priority, label, search } = req.query;
 
     // ── Pagination ────────────────────────────────────────────────────────────
     const page     = Math.max(1, parseInt(req.query.page,     10) || 1);
@@ -118,6 +130,13 @@ router.get('/', async (req, res) => {
     const where = scopedTaskQuery(req);
     if (status)     where.status     = status;
     if (assigneeId) where.assigneeId = assigneeId;
+    if (projectId) {
+      if (projectId === 'unassigned' || projectId === 'null') {
+        where.projectId = null;
+      } else {
+        where.projectId = projectId;
+      }
+    }
     if (priority)   where.priority   = priority;
     if (label)      where.labels     = { has: label.trim() };
     if (search) {
@@ -144,6 +163,7 @@ router.get('/', async (req, res) => {
         include: {
           assignee:  { select: { id: true, name: true } },
           createdBy: { select: { id: true, name: true } },
+          project:   { select: { id: true, name: true, color: true, icon: true } },
           subtasks:  { select: { id: true, completed: true } },
         },
       }),
@@ -292,6 +312,7 @@ router.get('/:id', async (req, res) => {
       include: {
         assignee:  { select: { id: true, name: true, email: true } },
         createdBy: { select: { id: true, name: true, email: true } },
+        project:   { select: { id: true, name: true, color: true, icon: true } },
         comments: {
           orderBy: { createdAt: 'asc' },
           include: {
@@ -453,7 +474,7 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       return res.status(404).json({ error: 'Task not found' });
     }
 
-    const { title, description, status, priority, labels, order, position, assigneeId, dueDate } = req.body;
+    const { title, description, status, priority, labels, order, position, assigneeId, projectId, dueDate } = req.body;
 
     // Validate assignee belongs to this team if being changed.
     if (assigneeId !== undefined && assigneeId !== null) {
@@ -462,6 +483,16 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       });
       if (!assigneeMembership) {
         return res.status(400).json({ error: 'Assignee is not a member of this team' });
+      }
+    }
+
+    // Validate project belongs to this team if being changed.
+    if (projectId !== undefined && projectId !== null) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, teamId: req.teamId },
+      });
+      if (!project) {
+        return res.status(400).json({ error: 'Project not found in this team' });
       }
     }
 
@@ -478,6 +509,7 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
     if (order       !== undefined) updateData.order       = order;
     if (position    !== undefined) updateData.order       = position;
     if (assigneeId  !== undefined) updateData.assigneeId  = assigneeId;
+    if (projectId   !== undefined) updateData.projectId   = projectId;
     if (dueDate     !== undefined) updateData.dueDate     = dueDate ? new Date(dueDate) : null;
 
     const task = await prisma.task.update({
@@ -486,6 +518,7 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       include: {
         assignee:  { select: { id: true, name: true, email: true } },
         createdBy: { select: { id: true, name: true, email: true } },
+        project:   { select: { id: true, name: true, color: true, icon: true } },
         watchers: {
           include: {
             user: { select: { id: true, name: true, email: true } },

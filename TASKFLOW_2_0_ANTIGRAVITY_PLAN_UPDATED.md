@@ -10,6 +10,38 @@
 
 ---
 
+## 📊 Master Plan Phase Progress Matrix
+
+| Milestone | Phase | Title | Status | Automated Test Suite |
+| :--- | :--- | :--- | :--- | :--- |
+| **Foundation** | **Phase 0–15** | Production Foundation, Teams, RBAC, Validation, Auth, Sentry, Backups, GDPR, Due Dates, CI/CD | ✅ **COMPLETE** | `rbac.test.js`, `validation.test.js`, `team-isolation.test.js`, etc. |
+| **Milestone H** | **Phase 17** | Dashboard & Productivity Analytics | ✅ **COMPLETE** | `phase17-analytics.test.js` |
+| **Milestone H** | **Phase 18** | Kanban Workspace | ✅ **COMPLETE** | `phase18-kanban.test.js` |
+| **Milestone H** | **Phase 19** | Task Detail Workspace | ✅ **COMPLETE** | `phase19-task-detail.test.js` |
+| **Milestone H** | **Phase 20** | Subtasks & Checklists | ✅ **COMPLETE** | `phase20-subtasks.test.js` |
+| **Milestone H** | **Phase 21** | Notifications Center | ✅ **COMPLETE** | `phase21-notifications.test.js` |
+| **Milestone H** | **Phase 22** | Real-Time Collaboration | ✅ **COMPLETE** | `phase22-realtime.test.js` |
+| **Milestone H2** | **Phase 23** | Projects / Workspaces | ✅ **COMPLETE** | `phase23-projects.test.js` (22/22 passed) |
+| **Milestone H2** | **Phase 24** | Calendar View | ⏳ Ready / Next | `phase24-calendar.test.js` |
+| **Milestone H2** | **Phase 25** | Advanced Search | ⏳ Pending | `phase25-search.test.js` |
+| **Milestone I** | **Phase 26** | AI Task Assistant | ⏳ Pending | `phase26-ai-assistant.test.js` |
+| **Milestone I** | **Phase 27** | AI Task Breakdown | ⏳ Pending | `phase27-ai-breakdown.test.js` |
+| **Milestone I** | **Phase 28** | AI Project Planner | ⏳ Pending | `phase28-ai-planner.test.js` |
+| **Milestone I** | **Phase 29** | AI Productivity Insights | ⏳ Pending | `phase29-ai-insights.test.js` |
+| **Milestone I** | **Phase 30** | Natural-Language Search | ⏳ Pending | `phase30-ai-search.test.js` |
+| **Milestone J** | **Phase 31** | Webhooks & API Keys | ⏳ Pending | `phase31-webhooks.test.js` |
+| **Milestone J** | **Phase 32** | GitHub Integration | ⏳ Pending | `phase32-github.test.js` |
+| **Milestone J** | **Phase 33** | Slack / Discord Integration | ⏳ Pending | `phase33-integrations.test.js` |
+| **Milestone K** | **Phase 34** | Infrastructure as Code | ⏳ Pending | `phase34-iac.test.js` |
+| **Milestone K** | **Phase 35** | Production Observability | ⏳ Pending | `phase35-observability.test.js` |
+| **Milestone K** | **Phase 36** | Performance Engineering | ⏳ Pending | `phase36-performance.test.js` |
+| **Milestone L** | **Phase 37** | Command Palette | ⏳ Pending | `phase37-command-palette.test.js` |
+| **Milestone L** | **Phase 38** | Custom Views | ⏳ Pending | `phase38-custom-views.test.js` |
+| **Milestone L** | **Phase 39** | Task Templates | ⏳ Pending | `phase39-templates.test.js` |
+| **Milestone L** | **Phase 40** | Demo Mode | ⏳ Pending | `phase40-demo.test.js` |
+
+---
+
 # 1. How You Must Work
 
 You are the dedicated senior software engineer for TaskFlow.
@@ -261,7 +293,9 @@ Before starting a phase:
 
 # Milestone H — Core Product Experience
 
-# Phase 17 — Dashboard & Productivity Analytics
+# Phase 17 — Dashboard & Productivity Analytics [✅ COMPLETE]
+
+> **Status:** ✅ **Complete** — Server-side analytics aggregation, metric cards, drill-down filters, weekly productivity breakdown, charts, team isolation tested in `phase17-analytics.test.js`.
 
 ## Goal
 
@@ -321,7 +355,9 @@ Test:
 
 ---
 
-# Phase 18 — Kanban Workspace
+# Phase 18 — Kanban Workspace [✅ COMPLETE]
+
+> **Status:** ✅ **Complete** — Interactive Kanban board (`KanbanBoard.jsx`, `KanbanCard.jsx`), persistent fractional ordering (`order` field), drag & drop with optimistic UI and rollback/undo toast, test suite in `phase18-kanban.test.js`.
 
 ## Goal
 
@@ -378,7 +414,9 @@ Test:
 
 ---
 
-# Phase 19 — Task Detail Workspace
+# Phase 19 — Task Detail Workspace [✅ COMPLETE]
+
+> **Status:** ✅ **Complete** — Rich slide-over task detail drawer (`TaskDetailDrawer.jsx`), real-time field editing, activity audit trail, comments stream, keyboard shortcuts (`C`, `/`, `Esc`, `E`), test suite in `phase19-task-detail.test.js`.
 
 ## Goal
 
@@ -429,7 +467,9 @@ Do not make shortcuts interfere with text inputs.
 
 ---
 
-# Phase 20 — Subtasks & Checklists
+# Phase 20 — Subtasks & Checklists [✅ COMPLETE]
+
+> **Status:** ✅ **Complete** — Subtasks backend model with nested hierarchy support (`subtasks` table), progress % rollups on parent tasks, reordering, inline checklist UI, test suite in `phase20-subtasks.test.js`.
 
 ## Goal
 
@@ -466,7 +506,9 @@ Do not create recursive data structures unless they are genuinely necessary.
 
 ---
 
-# Phase 21 — Notifications Center
+# Phase 21 — Notifications Center [✅ COMPLETE]
+
+> **Status:** ✅ **Complete** — In-app notification system with bell dropdown and full notification center, unread counters, notification preferences, event triggers (assignments, mentions, due dates, team events), test suite in `phase21-notifications.test.js`.
 
 ## Goal
 
@@ -509,7 +551,9 @@ Notifications must respect team permissions and privacy.
 
 ---
 
-# Phase 22 — Real-Time Collaboration
+# Phase 22 — Real-Time Collaboration [✅ COMPLETE]
+
+> **Status:** ✅ **Complete** — Socket.io WebSocket server (`services/realtime.js`) with JWT auth and team-room isolation, client-side `RealtimeContext`, auto-reconnect, live task / comment / notification event broadcasts, test suite in `phase22-realtime.test.js`.
 
 ## Goal
 
@@ -561,7 +605,9 @@ Implement proper:
 
 # Milestone H2 — Project Management
 
-# Phase 23 — Projects / Workspaces
+# Phase 23 — Projects / Workspaces [✅ COMPLETE]
+
+> **Status:** ✅ **Complete** — Successfully implemented Project & ProjectMember schema, full CRUD routes, role-based project authorizations, real-time broadcasts, project-level stats and workload computation, Sidebar project navigation, Create/Edit ProjectModal with color/icon pickers, ProjectDashboardHeader, ProjectAnalytics dashboard, TaskDetailDrawer project picker, and 22/22 passing automated tests in `phase23-projects.test.js`.
 
 ## Goal
 

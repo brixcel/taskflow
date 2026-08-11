@@ -200,6 +200,10 @@ function UserChip({ name, email, onLogout }) {
 export default function Sidebar({
   teams = [],
   activeTeam = null,
+  projects = [],
+  activeProjectId = null,
+  onSelectProject = () => {},
+  onNewProject = () => {},
   onTeamSwitch,
   onLogout,
   userName,
@@ -214,7 +218,18 @@ export default function Sidebar({
 
   const handleNav = (tab) => {
     onTabChange(tab);
+    onSelectProject(null);
     navigate(`/dashboard?tab=${tab}`);
+    onClose();
+  };
+
+  const handleProjectClick = (projId) => {
+    onSelectProject(projId);
+    if (projId) {
+      navigate(`/dashboard?projectId=${projId}`);
+    } else {
+      navigate('/dashboard');
+    }
     onClose();
   };
 
@@ -254,7 +269,7 @@ export default function Sidebar({
         <div style={{ margin: '0 12px 8px', borderTop: '1px solid #1f2123' }} />
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '0 12px' }} aria-label="Main navigation">
+        <nav style={{ flex: 1, padding: '0 12px', overflowY: 'auto' }} aria-label="Main navigation">
           <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: '#50545c', padding: '0 8px', marginBottom: 4, textTransform: 'uppercase' }}>
             Workspace
           </p>
@@ -262,7 +277,7 @@ export default function Sidebar({
           <button
             type="button"
             onClick={() => handleNav('mine')}
-            className={`sidebar-item${isDashboard && activeTab === 'mine' ? ' active' : ''}`}
+            className={`sidebar-item${isDashboard && activeTab === 'mine' && !activeProjectId ? ' active' : ''}`}
             style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
           >
             <IconMyTasks />
@@ -272,22 +287,150 @@ export default function Sidebar({
           <button
             type="button"
             onClick={() => handleNav('all')}
-            className={`sidebar-item${isDashboard && activeTab === 'all' ? ' active' : ''}`}
+            className={`sidebar-item${isDashboard && activeTab === 'all' && !activeProjectId ? ' active' : ''}`}
             style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
           >
             <IconTasks />
             All Tasks
           </button>
 
-          <NavLink
-            to="/settings"
-            end
-            onClick={onClose}
-            className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
-          >
-            <IconSettings />
-            Settings
-          </NavLink>
+          {/* ─── Projects Section ─────────────────────────────────────────── */}
+          <div style={{ marginTop: 16, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px', marginBottom: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: '#50545c', textTransform: 'uppercase' }}>
+                Projects
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNewProject();
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#8a8f98',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                  borderRadius: 4,
+                  fontSize: 14,
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Create Project"
+                aria-label="Create Project"
+              >
+                +
+              </button>
+            </div>
+
+            {projects.length === 0 ? (
+              <button
+                type="button"
+                onClick={onNewProject}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  border: '1px dashed #2a2d31',
+                  background: 'transparent',
+                  color: '#8a8f98',
+                  fontSize: 12,
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span>+</span> New Project
+              </button>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {projects.map((p) => {
+                  const isProjActive = isDashboard && activeProjectId === p.id;
+                  const taskCount = p.stats?.totalTasks ?? (p.tasks ? p.tasks.length : 0);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleProjectClick(p.id)}
+                      className={`sidebar-item${isProjActive ? ' active' : ''}`}
+                      style={{
+                        width: '100%',
+                        border: 'none',
+                        background: isProjActive ? 'var(--color-sidebar-bg-active, #222427)' : 'transparent',
+                        textAlign: 'left',
+                        font: 'inherit',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span
+                          style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: 4,
+                            backgroundColor: p.color || '#6366f1',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 10,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {p.icon || '📁'}
+                        </span>
+                        <span
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            fontSize: 13,
+                            color: isProjActive ? 'var(--color-sidebar-fg-active, #ffffff)' : 'var(--color-sidebar-fg, #888888)',
+                          }}
+                        >
+                          {p.name}
+                        </span>
+                      </div>
+                      {taskCount > 0 && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: '1px 5px',
+                            borderRadius: 10,
+                            backgroundColor: '#26282d',
+                            color: '#8a8f98',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {taskCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <NavLink
+              to="/settings"
+              end
+              onClick={onClose}
+              className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
+            >
+              <IconSettings />
+              Settings
+            </NavLink>
+          </div>
         </nav>
 
         {/* User chip */}

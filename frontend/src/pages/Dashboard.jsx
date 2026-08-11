@@ -10,6 +10,9 @@ import KanbanBoard from '../components/KanbanBoard';
 import UndoToast from '../components/UndoToast';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
+import ProjectModal from '../components/ProjectModal';
+import ProjectDashboardHeader from '../components/ProjectDashboardHeader';
+import ProjectAnalytics from '../components/ProjectAnalytics';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 
@@ -142,13 +145,22 @@ function IconBoard() {
 }
 
 // ── New Task Modal ─────────────────────────────────────────────────────────
-function NewTaskModal({ members, currentUserId, defaultStatus = 'todo', onSubmit, onClose }) {
+function NewTaskModal({
+  members,
+  projects = [],
+  currentUserId,
+  defaultStatus = 'todo',
+  defaultProjectId = '',
+  onSubmit,
+  onClose,
+}) {
   const [title,       setTitle]       = useState('');
   const [description, setDescription] = useState('');
   const [status,      setStatus]      = useState(defaultStatus);
   const [priority,    setPriority]    = useState('medium');
   const [labelsStr,   setLabelsStr]   = useState('');
   const [assigneeId,  setAssigneeId]  = useState('');
+  const [projectId,   setProjectId]   = useState(defaultProjectId || '');
   const [dueDate,     setDueDate]     = useState('');
   const [loading,     setLoading]     = useState(false);
 
@@ -169,6 +181,7 @@ function NewTaskModal({ members, currentUserId, defaultStatus = 'todo', onSubmit
       priority,
       labels: labels.length > 0 ? labels : undefined,
       assigneeId: assigneeId || undefined,
+      projectId: projectId || undefined,
       dueDate: dueDate || undefined,
     });
     setLoading(false);
@@ -277,18 +290,26 @@ function NewTaskModal({ members, currentUserId, defaultStatus = 'todo', onSubmit
             />
           </div>
 
-          {/* Due Date & Assignee row */}
-          <div style={{ display: 'grid', gridTemplateColumns: members.length > 0 ? '1fr 1fr' : '1fr', gap: 10 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label htmlFor="modal-task-duedate" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Due date</label>
-              <input
-                id="modal-task-duedate"
-                className="field-input"
-                type="date"
-                value={dueDate}
-                onChange={e => setDueDate(e.target.value)}
-              />
-            </div>
+          {/* Project & Assignee row */}
+          <div style={{ display: 'grid', gridTemplateColumns: projects.length > 0 ? '1fr 1fr' : '1fr', gap: 10 }}>
+            {projects.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label htmlFor="modal-task-project" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Project</label>
+                <select
+                  id="modal-task-project"
+                  className="field-input"
+                  value={projectId}
+                  onChange={e => setProjectId(e.target.value)}
+                >
+                  <option value="">No Project (Unassigned)</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.icon || '📁'} {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {members.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -308,6 +329,18 @@ function NewTaskModal({ members, currentUserId, defaultStatus = 'todo', onSubmit
                 </select>
               </div>
             )}
+          </div>
+
+          {/* Due date */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label htmlFor="modal-task-duedate" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-canvas-body, #4d4d4d)' }}>Due date</label>
+            <input
+              id="modal-task-duedate"
+              className="field-input"
+              type="date"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+            />
           </div>
 
           {/* Actions */}
@@ -514,10 +547,14 @@ export default function Dashboard() {
 
   const [teams,       setTeams]       = useState([]);
   const [activeTeam,  setActiveTeam]  = useState(getActiveTeam);
+  const [projects,    setProjects]    = useState([]);
   const [tasks,       setTasks]       = useState([]);
   const [members,     setMembers]     = useState([]);
   const [error,       setError]       = useState('');
   const activeTab = searchParams.get('tab') === 'mine' ? 'mine' : 'all';
+  const activeProjectId = searchParams.get('projectId') || null;
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [editingProject,   setEditingProject]   = useState(null);
   const [searchInput, setSearchInput] = useState('');
   const [showModal,   setShowModal]   = useState(false);
   const [modalDefaultStatus, setModalDefaultStatus] = useState('todo');
@@ -528,6 +565,8 @@ export default function Dashboard() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDrawerEditRequested, setIsDrawerEditRequested] = useState(false);
   const searchInputRef = useRef(null);
+
+  const activeProject = projects.find(p => p.id === activeProjectId) || null;
 
   // ── Kanban view mode & Undo state ─────────────────────────────────────────
   const [viewMode, setViewMode] = useState(() => {
@@ -653,6 +692,14 @@ export default function Dashboard() {
     } catch { /* non-fatal */ }
   }, [token, navigate]);
 
+  const fetchProjects = useCallback(async () => {
+    if (!teamId || !token) return;
+    try {
+      const res = await axios.get(`${API}/projects`, { headers });
+      setProjects(res.data.projects ?? []);
+    } catch { /* non-fatal */ }
+  }, [teamId, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fetchMembers = useCallback(async () => {
     if (!teamId) return;
     try {
@@ -667,6 +714,7 @@ export default function Dashboard() {
     try {
       const params = {};
       if (activeTab === 'mine' && currentUserId) params.assigneeId = currentUserId;
+      if (activeProjectId) params.projectId = activeProjectId;
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       const res = await axios.get(`${API}/tasks`, { headers, params });
       setTasks(res.data.tasks ?? []);
@@ -682,7 +730,7 @@ export default function Dashboard() {
     } finally {
       setTasksLoading(false);
     }
-  }, [teamId, token, activeTab, currentUserId, debouncedSearch, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [teamId, token, activeTab, activeProjectId, currentUserId, debouncedSearch, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOpenTaskById = useCallback(async (taskId) => {
     if (!taskId) return;
@@ -733,6 +781,7 @@ export default function Dashboard() {
     if (!teamId) { navigate('/onboarding'); return; }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTeams();
+    fetchProjects();
     fetchMembers();
     fetchUserProfile();
   }, [teamId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -746,6 +795,27 @@ export default function Dashboard() {
   useEffect(() => {
     if (!teamId) return;
     joinTeam(teamId);
+
+    const unsubProjectCreated = subscribe('project.created', ({ project }) => {
+      if (!project) return;
+      setProjects((prev) => (prev.some((p) => p.id === project.id) ? prev : [project, ...prev]));
+    });
+
+    const unsubProjectUpdated = subscribe('project.updated', ({ project }) => {
+      if (!project) return;
+      setProjects((prev) => prev.map((p) => (p.id === project.id ? { ...p, ...project } : p)));
+    });
+
+    const unsubProjectDeleted = subscribe('project.deleted', ({ id, projectId }) => {
+      const targetId = id || projectId;
+      if (!targetId) return;
+      setProjects((prev) => prev.filter((p) => p.id !== targetId));
+      if (activeProjectId === targetId) {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('projectId');
+        setSearchParams(nextParams);
+      }
+    });
 
     const unsubCreated = subscribe('task.created', ({ task }) => {
       if (!task) return;
@@ -785,20 +855,33 @@ export default function Dashboard() {
     });
 
     return () => {
+      unsubProjectCreated?.();
+      unsubProjectUpdated?.();
+      unsubProjectDeleted?.();
       unsubCreated?.();
       unsubUpdated?.();
       unsubDeleted?.();
       unsubAssigned?.();
       unsubCompleted?.();
     };
-  }, [teamId, joinTeam, subscribe, fetchAnalytics]);
+  }, [teamId, joinTeam, subscribe, fetchAnalytics, activeProjectId, searchParams, setSearchParams]);
 
   // ── Task CRUD & Kanban Operations ────────────────────────────────────────
-  const handleCreate = async ({ title, description, status, priority, labels, assigneeId, dueDate }) => {
+  const handleCreate = async ({ title, description, status, priority, labels, assigneeId, projectId, dueDate }) => {
     try {
-      await axios.post(`${API}/tasks`, { title, description, status, priority, labels, assigneeId, dueDate }, { headers });
+      await axios.post(`${API}/tasks`, {
+        title,
+        description,
+        status,
+        priority,
+        labels,
+        assigneeId,
+        projectId: projectId || (activeProjectId || undefined),
+        dueDate,
+      }, { headers });
       setShowModal(false);
       fetchTasks();
+      fetchProjects();
       fetchAnalytics();
     } catch (err) { setError(err.response?.data?.error || err.response?.data?.errors?.[0]?.message || 'Failed to create task.'); }
   };
@@ -931,12 +1014,50 @@ export default function Dashboard() {
   const doneCount  = displayedTasks.filter(t => t.status === 'done').length;
   const totalCount = displayedTasks.length;
 
+  const handleSelectProject = (projId) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (projId) {
+      nextParams.set('projectId', projId);
+    } else {
+      nextParams.delete('projectId');
+    }
+    setSearchParams(nextParams);
+  };
+
+  const handleProjectSaved = (savedProj) => {
+    setProjects((prev) => {
+      const idx = prev.findIndex((p) => p.id === savedProj.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...savedProj };
+        return next;
+      }
+      return [savedProj, ...prev];
+    });
+    fetchTasks();
+  };
+
+  const handleProjectDeleted = (deletedId) => {
+    setProjects((prev) => prev.filter((p) => p.id !== deletedId));
+    if (activeProjectId === deletedId) {
+      handleSelectProject(null);
+    }
+    fetchTasks();
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="app-shell">
       <Sidebar
         teams={teams}
         activeTeam={activeTeam}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onSelectProject={handleSelectProject}
+        onNewProject={() => {
+          setEditingProject(null);
+          setShowProjectModal(true);
+        }}
         onTeamSwitch={handleTeamSwitch}
         onLogout={handleLogout}
         userName={currentUser?.name}
@@ -1143,46 +1264,75 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Analytics & Productivity Overview */}
-          <AnalyticsOverview
-            analytics={analytics}
-            loading={analyticsLoading}
-            range={analyticsRange}
-            onRangeChange={setAnalyticsRange}
-            scope={analyticsScope}
-            onScopeChange={setAnalyticsScope}
-            activeFilter={drillDownFilter}
-            onDrillDown={handleDrillDown}
-            onClearFilter={handleClearFilter}
-            onRefresh={fetchAnalytics}
-          />
+          {/* Project Dashboard Banner (when inside a project workspace) */}
+          {activeProjectId && activeProject && (
+            <ProjectDashboardHeader
+              project={activeProject}
+              viewMode={viewMode}
+              onViewModeChange={handleViewModeChange}
+              onEditProject={(p) => {
+                setEditingProject(p);
+                setShowProjectModal(true);
+              }}
+              onCreateTask={() => {
+                setModalDefaultStatus('todo');
+                setShowModal(true);
+              }}
+              isElevated={['owner', 'admin'].includes(userRole)}
+            />
+          )}
 
-          {/* Page header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.5px', lineHeight: '28px' }}>
-                {drillDownFilter ? `Tasks: ${drillDownFilter.label}` : activeTab === 'mine' ? 'My Tasks' : 'All Tasks'}
-              </h1>
-              {totalCount > 0 && (
-                <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--color-canvas-body, #50545c)' }}>
-                  {doneCount} of {totalCount} completed
-                </p>
+          {/* Analytics & Productivity Overview (Team level) */}
+          {!activeProjectId && (
+            <AnalyticsOverview
+              analytics={analytics}
+              loading={analyticsLoading}
+              range={analyticsRange}
+              onRangeChange={setAnalyticsRange}
+              scope={analyticsScope}
+              onScopeChange={setAnalyticsScope}
+              activeFilter={drillDownFilter}
+              onDrillDown={handleDrillDown}
+              onClearFilter={handleClearFilter}
+              onRefresh={fetchAnalytics}
+            />
+          )}
+
+          {/* Page header (shown if not in project banner mode) */}
+          {!activeProjectId && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.5px', lineHeight: '28px' }}>
+                  {drillDownFilter ? `Tasks: ${drillDownFilter.label}` : activeTab === 'mine' ? 'My Tasks' : 'All Tasks'}
+                </h1>
+                {totalCount > 0 && (
+                  <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--color-canvas-body, #50545c)' }}>
+                    {doneCount} of {totalCount} completed
+                  </p>
+                )}
+              </div>
+
+              {drillDownFilter && (
+                <button
+                  className="btn-secondary"
+                  onClick={handleClearFilter}
+                  style={{ height: 30, fontSize: 12, padding: '0 10px' }}
+                >
+                  Clear filter
+                </button>
               )}
             </div>
+          )}
 
-            {drillDownFilter && (
-              <button
-                className="btn-secondary"
-                onClick={handleClearFilter}
-                style={{ height: 30, fontSize: 12, padding: '0 10px' }}
-              >
-                Clear filter
-              </button>
-            )}
-          </div>
-
-          {/* Main workspace view: Kanban Board vs List View */}
-          {tasksLoading ? (
+          {/* Main workspace view: Project Analytics vs Kanban Board vs List View */}
+          {activeProjectId && viewMode === 'analytics' ? (
+            <ProjectAnalytics
+              projectId={activeProjectId}
+              teamId={teamId}
+              token={token}
+              project={activeProject}
+            />
+          ) : tasksLoading ? (
             <TaskSkeleton count={3} />
           ) : viewMode === 'board' ? (
             <KanbanBoard
@@ -1274,12 +1424,29 @@ export default function Dashboard() {
       {showModal && (
         <NewTaskModal
           members={members}
+          projects={projects}
           currentUserId={currentUserId}
           defaultStatus={modalDefaultStatus}
+          defaultProjectId={activeProjectId}
           onSubmit={handleCreate}
           onClose={() => setShowModal(false)}
         />
       )}
+
+      {/* Project Create / Edit Modal */}
+      <ProjectModal
+        isOpen={showProjectModal}
+        onClose={() => {
+          setShowProjectModal(false);
+          setEditingProject(null);
+        }}
+        project={editingProject}
+        teamId={teamId}
+        token={token}
+        teamMembers={members}
+        onProjectSaved={handleProjectSaved}
+        onProjectDeleted={handleProjectDeleted}
+      />
 
       {/* Task Detail & Collaboration Workspace Drawer */}
       {selectedTask && (
@@ -1287,6 +1454,7 @@ export default function Dashboard() {
           task={selectedTask}
           headers={headers}
           members={members}
+          projects={projects}
           currentUserId={currentUserId}
           userRole={userRole}
           isEditRequested={isDrawerEditRequested}
@@ -1297,6 +1465,7 @@ export default function Dashboard() {
           onTaskUpdated={(updatedTask) => {
             setTasks(prev => prev.map(t => t.id === updatedTask.id ? { ...t, ...updatedTask } : t));
             setSelectedTask(prev => prev ? { ...prev, ...updatedTask } : null);
+            fetchProjects();
           }}
           onStatusChange={handleStatusChange}
           onDelete={handleDelete}

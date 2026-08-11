@@ -98,99 +98,96 @@ function initSocketServer(httpServer, options = {}) {
   // ─── Connection & Event Handlers ─────────────────────────────────────────────
   io.on('connection', (socket) => {
     const user = socket.user;
-    // Auto-join personal user room for direct notifications
+
+    // Join personal user room for targeted notifications
     socket.join(`user:${user.id}`);
 
-    // Join a team room
-    socket.on('join:team', async ({ teamId }, callback) => {
-      try {
-        if (!teamId) {
-          return callback && callback({ error: 'teamId is required' });
-        }
+    // Join team rooms (client emits team:join with teamId)
+    socket.on('team:join', async ({ teamId }) => {
+      if (!teamId) return;
 
-        // Verify membership in database
-        const membership = await prisma.teamMembership.findUnique({
-          where: { userId_teamId: { userId: user.id, teamId } },
-        });
+      // Verify user is actually a member of the team
+      const membership = await prisma.teamMembership.findUnique({
+        where: {
+          userId_teamId: {
+            userId: user.id,
+            teamId,
+          },
+        },
+      });
 
-        if (!membership) {
-          return callback && callback({ error: 'Forbidden: not a member of this team' });
-        }
-
+      if (membership) {
         socket.join(`team:${teamId}`);
-        if (callback) callback({ success: true, teamId });
-      } catch (err) {
-        console.error('Error in join:team:', err);
-        if (callback) callback({ error: 'Failed to join team room' });
+        socket.emit('team:joined', { teamId });
+      } else {
+        socket.emit('error', { message: 'Unauthorized to join team room' });
       }
     });
 
-    // Leave a team room
-    socket.on('leave:team', ({ teamId }, callback) => {
+    // Leave team room
+    socket.on('team:leave', ({ teamId }) => {
       if (teamId) {
         socket.leave(`team:${teamId}`);
       }
-      if (callback) callback({ success: true });
     });
 
-    // Join a task room (for live comments, task updates, active viewers)
-    socket.on('join:task', async ({ taskId }, callback) => {
-      try {
-        if (!taskId) {
-          return callback && callback({ error: 'taskId is required' });
-        }
+    // Join task room (for detailed task presence & real-time updates)
+    socket.on('task:view', async ({ taskId }) => {
+      if (!taskId) return;
 
-        const task = await prisma.task.findUnique({
-          where: { id: taskId },
-          select: { id: true, teamId: true },
-        });
+      // Verify task belongs to a team the user is part of
+      const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { teamId: true },
+      });
 
-        if (!task) {
-          return callback && callback({ error: 'Task not found' });
-        }
+      if (!task) return;
 
-        // Verify user is a member of the task's team
-        const membership = await prisma.teamMembership.findUnique({
-          where: { userId_teamId: { userId: user.id, teamId: task.teamId } },
-        });
+      const membership = await prisma.teamMembership.findUnique({
+        where: {
+          userId_teamId: {
+            userId: user.id,
+            teamId: task.teamId,
+          },
+        },
+      });
 
-        if (!membership) {
-          return callback && callback({ error: 'Forbidden: cannot view task in another team' });
-        }
-
-        socket.join(`task:${taskId}`);
-
-        // Register viewer presence
-        if (!taskViewers.has(taskId)) {
-          taskViewers.set(taskId, new Map());
-        }
-        taskViewers.get(taskId).set(socket.id, user);
-
-        const viewers = getUniqueViewers(taskId);
-        // Broadcast updated viewers to the task room
-        io.to(`task:${taskId}`).emit('presence:viewers', { taskId, viewers });
-
-        if (callback) callback({ success: true, taskId, viewers });
-      } catch (err) {
-        console.error('Error in join:task:', err);
-        if (callback) callback({ error: 'Failed to join task room' });
+      if (!membership) {
+        socket.emit('error', { message: 'Unauthorized to view task' });
+        return;
       }
+
+      socket.join(`task:${taskId}`);
+
+      // Track active viewer presence
+      if (!taskViewers.has(taskId)) {
+        taskViewers.set(taskId, new Map());
+      }
+      taskViewers.get(taskId).set(socket.id, {
+        id:    user.id,
+        name:  user.name,
+        email: user.email,
+      });
+
+      const viewers = getUniqueViewers(taskId);
+      io.to(`task:${taskId}`).emit('presence:viewers', { taskId, viewers });
     });
 
-    // Leave a task room
-    socket.on('leave:task', ({ taskId }, callback) => {
-      if (taskId) {
-        socket.leave(`task:${taskId}`);
-        if (taskViewers.has(taskId)) {
-          taskViewers.get(taskId).delete(socket.id);
-          if (taskViewers.get(taskId).size === 0) {
-            taskViewers.delete(taskId);
-          }
+    // Leave task room
+    socket.on('task:leave', ({ taskId }) => {
+      if (!taskId) return;
+      socket.leave(`task:${taskId}`);
+
+      const viewersMap = taskViewers.get(taskId);
+      if (viewersMap) {
+        viewersMap.delete(socket.id);
+        if (viewersMap.size === 0) {
+          taskViewers.delete(taskId);
         }
-        const viewers = getUniqueViewers(taskId);
-        io.to(`task:${taskId}`).emit('presence:viewers', { taskId, viewers });
       }
-      if (callback) callback({ success: true });
+
+      const viewers = getUniqueViewers(taskId);
+      io.to(`task:${taskId}`).emit('presence:viewers', { taskId, viewers });
     });
 
     // Typing start indicator in task comment section

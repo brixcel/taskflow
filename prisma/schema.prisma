@@ -25,6 +25,8 @@ model User {
   tasksCreated             Task[]                  @relation("CreatedTasks")
   tasksAssigned            Task[]                  @relation("AssignedTasks")
   subtasksAssigned         Subtask[]               @relation("AssignedSubtasks")
+  projectsCreated          Project[]               @relation("CreatedProjects")
+  projectMemberships       ProjectMember[]
   taskWatchers             TaskWatcher[]
   comments                 Comment[]
   activities               Activity[]
@@ -49,6 +51,7 @@ model Team {
 
   owner         User             @relation("OwnedTeams", fields: [ownerId], references: [id])
   memberships   TeamMembership[]
+  projects      Project[]
   tasks         Task[]
   notifications Notification[]
 
@@ -68,6 +71,49 @@ model TeamMembership {
   @@map("team_memberships")
 }
 
+// ─── Projects ────────────────────────────────────────────────────────────────
+
+model Project {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  icon        String?   @default("📁")
+  color       String?   @default("#6366f1")
+  status      String    @default("active") // active | planning | in_progress | completed | on_hold | archived
+  startDate   DateTime?
+  targetDate  DateTime?
+  order       Float     @default(0)
+  isArchived  Boolean   @default(false)
+  teamId      String
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  team      Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy User            @relation("CreatedProjects", fields: [createdById], references: [id])
+  tasks     Task[]
+  members   ProjectMember[]
+
+  @@index([teamId, status])
+  @@index([teamId, isArchived])
+  @@index([teamId, order])
+  @@index([teamId, createdAt])
+  @@map("projects")
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  role      String   @default("member") // lead | member | viewer
+  joinedAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@map("project_members")
+}
+
 // ─── Tasks ───────────────────────────────────────────────────────────────────
 
 model Task {
@@ -82,12 +128,14 @@ model Task {
   assigneeId  String?
   createdById String
   teamId      String
+  projectId   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   assignee      User?          @relation("AssignedTasks", fields: [assigneeId], references: [id])
   createdBy     User           @relation("CreatedTasks", fields: [createdById], references: [id])
   team          Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  project       Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
   comments      Comment[]
   activities    Activity[]
   watchers      TaskWatcher[]
@@ -99,6 +147,8 @@ model Task {
   @@index([teamId, status])
   @@index([teamId, dueDate])
   @@index([teamId, assigneeId])
+  @@index([teamId, projectId])
+  @@index([projectId])
   @@index([teamId, createdAt])
   @@map("tasks")
 }
