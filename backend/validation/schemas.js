@@ -148,6 +148,40 @@ const commentUpdate = z.object({
   content: nonBlankString(2000, { requiredMsg: 'Comment content is required', maxMsg: 'Comment must be 2000 characters or fewer' }),
 });
 
+// ─── Subtasks ─────────────────────────────────────────────────────────────────
+
+const subtaskCreate = z.object({
+  title:      nonBlankString(200, { requiredMsg: 'Subtask title is required', maxMsg: 'Subtask title must be 200 characters or fewer' }),
+  completed:  z.boolean().optional(),
+  order:      z.number().optional(),
+  position:   z.number().optional(),
+  dueDate:    dueDateSchema,
+  assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  parentId:   z.string().uuid('parentId must be a valid UUID').optional().nullable(),
+});
+
+const subtaskUpdate = z.object({
+  title:      nonBlankString(200, { requiredMsg: 'Subtask title cannot be blank', maxMsg: 'Subtask title must be 200 characters or fewer' }).optional(),
+  completed:  z.boolean().optional(),
+  order:      z.number().optional(),
+  position:   z.number().optional(),
+  dueDate:    dueDateSchema,
+  assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  parentId:   z.string().uuid('parentId must be a valid UUID').optional().nullable(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field must be provided' },
+);
+
+const subtasksBatchReorder = z.object({
+  subtasks: z.array(z.object({
+    id:       z.string().uuid('id must be a valid UUID'),
+    order:    z.number().optional(),
+    position: z.number().optional(),
+    parentId: z.string().uuid('parentId must be a valid UUID').optional().nullable(),
+  })).min(1, 'At least one subtask update must be provided').max(200, 'Maximum 200 updates allowed'),
+});
+
 // ─── Teams ────────────────────────────────────────────────────────────────────
 
 const teamCreate = z.object({
@@ -178,6 +212,27 @@ const analyticsQuery = z.object({
   userId: z.string().uuid('userId must be a valid UUID').optional(),
 });
 
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+const notificationPreferencesUpdate = z.object({
+  taskAssigned:        z.boolean().optional(),
+  statusChanged:       z.boolean().optional(),
+  commentsAndMentions: z.boolean().optional(),
+  dueDates:            z.boolean().optional(),
+  teamUpdates:         z.boolean().optional(),
+  emailNotifications:  z.boolean().optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one preference field must be provided' },
+);
+
+const notificationQuery = z.object({
+  unread: z.enum(['true', 'false']).optional(),
+  type:   z.string().trim().optional(),
+  page:   z.string().regex(/^\d+$/).transform(Number).optional(),
+  limit:  z.string().regex(/^\d+$/).transform(Number).optional(),
+});
+
 module.exports = {
   register,
   login,
@@ -189,6 +244,9 @@ module.exports = {
   taskUpdate,
   taskOrder,
   tasksBatchReorder,
+  subtaskCreate,
+  subtaskUpdate,
+  subtasksBatchReorder,
   commentCreate,
   commentUpdate,
   teamCreate,
@@ -196,4 +254,7 @@ module.exports = {
   memberAdd,
   memberRoleUpdate,
   analyticsQuery,
+  notificationPreferencesUpdate,
+  notificationQuery,
 };
+

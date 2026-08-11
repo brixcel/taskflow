@@ -873,6 +873,25 @@ a, button, input, select, textarea {
   font-weight: 600;
 }
 
+/* ── Subtasks & Checklists ──────────────────────────────────────────────── */
+.subtask-row {
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.subtask-row:hover {
+  border-color: var(--color-canvas-hairline-strong, #d0d2d6) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.subtask-checkbox:hover {
+  border-color: #0070f3 !important;
+  transform: scale(1.05);
+}
+
+.subtask-checkbox:active {
+  transform: scale(0.95);
+}
+
 /* ── Responsive adjustments (Mobile viewports <= 768px) ──────────────────── */
 @media (max-width: 768px) {
   .app-main {

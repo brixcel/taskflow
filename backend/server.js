@@ -50,7 +50,9 @@ const userRoutes = require('./routes/users');
 const taskRoutes = require('./routes/tasks');
 const teamRoutes = require('./routes/teams');
 const commentRoutes = require('./routes/comments');
+const subtaskRoutes = require('./routes/subtasks');
 const activityRoutes = require('./routes/activities');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -160,9 +162,12 @@ app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/teams', teamRoutes);
+app.use('/notifications', notificationRoutes);
 
-// Comments and activities are nested under tasks
+// Comments, subtasks and activities are nested under tasks
 app.use('/tasks/:taskId/comments', commentRoutes);
+app.use('/tasks/:taskId/subtasks', subtaskRoutes);
+app.use('/subtasks', subtaskRoutes);
 app.use('/tasks/:taskId/activities', activityRoutes);
 app.use('/tasks/:taskId/activity', activityRoutes);
 

@@ -250,6 +250,49 @@ export default function KanbanCard({
         </div>
       )}
 
+      {/* Subtasks Progress Indicator */}
+      {Array.isArray(task.subtasks) && task.subtasks.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <div
+            style={{
+              flex: 1,
+              height: 4,
+              borderRadius: 99,
+              background: 'var(--color-canvas-hairline, #e2e4e8)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${Math.round((task.subtasks.filter(s => s.completed).length / task.subtasks.length) * 100)}%`,
+                background: task.subtasks.filter(s => s.completed).length === task.subtasks.length ? '#10b981' : '#0070f3',
+                borderRadius: 99,
+                transition: 'width 200ms ease',
+              }}
+            />
+          </div>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: 'var(--color-canvas-mute, #888888)',
+              fontFamily: "'JetBrains Mono', monospace",
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            title={`${task.subtasks.filter(s => s.completed).length} of ${task.subtasks.length} subtasks completed`}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 11 12 14 22 4" />
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
+            {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+          </span>
+        </div>
+      )}
+
       {/* Bottom row: Due Date + Assignee Avatar + Details Button */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--color-canvas-hairline, #f0f1f3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

@@ -8,6 +8,7 @@ const { sanitize } = require('../middleware/sanitize');
 const schemas    = require('../validation/schemas');
 const { scopedTaskQuery } = require('../helpers/scopedQuery');
 const logger     = require('../middleware/logger');
+const { createNotification } = require('../services/notifications');
 
 const router = express.Router();
 
@@ -76,6 +77,19 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
       },
     });
 
+    if (task.assigneeId && task.assigneeId !== req.userId) {
+      await createNotification({
+        userId:  task.assigneeId,
+        actorId: req.userId,
+        teamId:  req.teamId,
+        taskId:  task.id,
+        type:    'task_assigned',
+        title:   'Task assigned',
+        message: `You were assigned to task "${task.title}"`,
+        data:    { taskId: task.id, taskTitle: task.title, status: task.status, priority: task.priority },
+      });
+    }
+
     res.status(201).json({ task });
   } catch (error) {
     logger.error({ err: error }, 'POST /tasks failed');
@@ -130,6 +144,7 @@ router.get('/', async (req, res) => {
         include: {
           assignee:  { select: { id: true, name: true } },
           createdBy: { select: { id: true, name: true } },
+          subtasks:  { select: { id: true, completed: true } },
         },
       }),
     ]);
@@ -230,6 +245,33 @@ router.patch('/:id/order', validate(schemas.taskOrder), async (req, res) => {
           details: `${existingTask.status} → ${status}`,
         },
       });
+
+      const notifyType = status === 'done' ? 'task_completed' : 'status_changed';
+      const notifyTitle = status === 'done' ? 'Task completed' : 'Task status updated';
+      const notifyMsg = status === 'done'
+        ? `Task "${task.title}" was marked as completed`
+        : `Task "${task.title}" status changed to ${status.replace('_', ' ')}`;
+
+      const recipients = new Set();
+      if (existingTask.assigneeId && existingTask.assigneeId !== req.userId) {
+        recipients.add(existingTask.assigneeId);
+      }
+      if (existingTask.createdById && existingTask.createdById !== req.userId) {
+        recipients.add(existingTask.createdById);
+      }
+
+      for (const recipientId of recipients) {
+        await createNotification({
+          userId:  recipientId,
+          actorId: req.userId,
+          teamId:  req.teamId,
+          taskId:  task.id,
+          type:    notifyType,
+          title:   notifyTitle,
+          message: notifyMsg,
+          data:    { taskId: task.id, taskTitle: task.title, oldStatus: existingTask.status, newStatus: status },
+        });
+      }
     }
 
     res.json({ task });
@@ -268,11 +310,24 @@ router.get('/:id', async (req, res) => {
             user: { select: { id: true, name: true, email: true } },
           },
         },
+        subtasks: {
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+          include: {
+            assignee: { select: { id: true, name: true, email: true } },
+            children: {
+              orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+              include: {
+                assignee: { select: { id: true, name: true, email: true } },
+              },
+            },
+          },
+        },
         _count: {
           select: {
             comments: true,
             activities: true,
             watchers: true,
+            subtasks: true,
           },
         },
       },
@@ -436,11 +491,24 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
             user: { select: { id: true, name: true, email: true } },
           },
         },
+        subtasks: {
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+          include: {
+            assignee: { select: { id: true, name: true, email: true } },
+            children: {
+              orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+              include: {
+                assignee: { select: { id: true, name: true, email: true } },
+              },
+            },
+          },
+        },
         _count: {
           select: {
             comments: true,
             activities: true,
             watchers: true,
+            subtasks: true,
           },
         },
       },
@@ -475,6 +543,50 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
         details,
       },
     });
+
+    // ── Notifications ──────────────────────────────────────────────────────────
+    if (assigneeId !== undefined && assigneeId !== existingTask.assigneeId && assigneeId) {
+      const isReassignment = Boolean(existingTask.assigneeId);
+      await createNotification({
+        userId:  assigneeId,
+        actorId: req.userId,
+        teamId:  req.teamId,
+        taskId:  task.id,
+        type:    isReassignment ? 'task_reassigned' : 'task_assigned',
+        title:   isReassignment ? 'Task reassigned' : 'Task assigned',
+        message: `You were assigned to task "${task.title}"`,
+        data:    { taskId: task.id, taskTitle: task.title, status: task.status, priority: task.priority },
+      });
+    }
+
+    if (status !== undefined && status !== existingTask.status) {
+      const notifyType = status === 'done' ? 'task_completed' : 'status_changed';
+      const notifyTitle = status === 'done' ? 'Task completed' : 'Task status updated';
+      const notifyMsg = status === 'done'
+        ? `Task "${task.title}" was marked as completed`
+        : `Task "${task.title}" status changed to ${status.replace('_', ' ')}`;
+
+      const recipients = new Set();
+      if (task.assigneeId && task.assigneeId !== req.userId) {
+        recipients.add(task.assigneeId);
+      }
+      if (task.createdById && task.createdById !== req.userId) {
+        recipients.add(task.createdById);
+      }
+
+      for (const recipientId of recipients) {
+        await createNotification({
+          userId:  recipientId,
+          actorId: req.userId,
+          teamId:  req.teamId,
+          taskId:  task.id,
+          type:    notifyType,
+          title:   notifyTitle,
+          message: notifyMsg,
+          data:    { taskId: task.id, taskTitle: task.title, oldStatus: existingTask.status, newStatus: status },
+        });
+      }
+    }
 
     res.json({ task });
   } catch (error) {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
+import NotificationBell from '../components/NotificationBell';
 import { API_URL } from '../api/config';
 
 const API = API_URL;
@@ -52,10 +53,31 @@ export default function Settings() {
   const [deleting,        setDeleting]        = useState(false);
   const [deleteError,     setDeleteError]     = useState('');
 
+  // ── Notification preferences state ──────────────────────────────────────────
+  const [notificationPreferences, setNotificationPreferences] = useState({
+    taskAssigned: true,
+    statusChanged: true,
+    commentsAndMentions: true,
+    dueDates: true,
+    teamUpdates: true,
+    emailNotifications: false,
+  });
+  const [savingNotifPrefs, setSavingNotifPrefs] = useState(false);
+  const [notifPrefSuccess, setNotifPrefSuccess] = useState(false);
+
   const token = localStorage.getItem('token');
 
   useEffect(() => {
     if (!token || !user) { navigate('/'); return; }
+
+    // Fetch user's notification preferences
+    axios.get(`${API}/notifications/preferences`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => {
+        if (res.data?.preferences) {
+          setNotificationPreferences(res.data.preferences);
+        }
+      })
+      .catch(() => {});
     axios.get(`${API}/teams/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
         const t = res.data.teams ?? [];
@@ -160,7 +182,10 @@ export default function Settings() {
             </h1>
           </div>
 
-          <ThemeToggle variant="icon" size="sm" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <NotificationBell onSelectTask={(taskId) => navigate(`/dashboard?taskId=${taskId}`)} />
+            <ThemeToggle variant="icon" size="sm" />
+          </div>
         </header>
 
         {/* Content */}
@@ -193,6 +218,77 @@ export default function Settings() {
               <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-ink, #0f1011)', textTransform: 'capitalize' }}>
                 {activeTeam?.role || '—'}
               </span>
+            </div>
+          </Card>
+
+          {/* Notification Preferences */}
+          <Card>
+            <SectionTitle>Notification Preferences</SectionTitle>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--color-canvas-body, #50545c)', lineHeight: '18px' }}>
+              Configure which actions and updates trigger in-app notifications and alerts.
+            </p>
+
+            {notifPrefSuccess && (
+              <div className="success-banner" style={{ marginBottom: 14, fontSize: 13 }}>
+                Notification preferences saved!
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                { key: 'taskAssigned', label: 'Task assignments & reassignments', desc: 'When you are assigned to a new or existing task.' },
+                { key: 'statusChanged', label: 'Status changes & task completions', desc: 'When task status updates or moves to completed.' },
+                { key: 'commentsAndMentions', label: 'Comments and @mentions', desc: 'When someone comments on your task or mentions you.' },
+                { key: 'dueDates', label: 'Due dates & overdue alerts', desc: 'Reminders for approaching and overdue deadlines.' },
+                { key: 'teamUpdates', label: 'Team invitations & role changes', desc: 'When team membership or roles are modified.' },
+                { key: 'emailNotifications', label: 'Email notification digest', desc: 'Receive transactional emails for key updates.' },
+              ].map(({ key, label, desc }) => (
+                <div
+                  key={key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    padding: '8px 0',
+                    borderBottom: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-ink, #171717)' }}>
+                      {label}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--color-canvas-mute, #888888)', lineHeight: '16px' }}>
+                      {desc}
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(notificationPreferences[key])}
+                      disabled={savingNotifPrefs}
+                      onChange={async () => {
+                        const updated = { ...notificationPreferences, [key]: !notificationPreferences[key] };
+                        setNotificationPreferences(updated);
+                        setSavingNotifPrefs(true);
+                        try {
+                          await axios.patch(`${API}/notifications/preferences`, updated, {
+                            headers: { Authorization: `Bearer ${token}` },
+                          });
+                          setNotifPrefSuccess(true);
+                          setTimeout(() => setNotifPrefSuccess(false), 3000);
+                        } catch (err) {
+                          console.error('Failed to update notification preference:', err);
+                        } finally {
+                          setSavingNotifPrefs(false);
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0070f3]" />
+                  </label>
+                </div>
+              ))}
             </div>
           </Card>
 

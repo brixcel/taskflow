@@ -9,6 +9,7 @@ import AnalyticsOverview from '../components/AnalyticsOverview';
 import KanbanBoard from '../components/KanbanBoard';
 import UndoToast from '../components/UndoToast';
 import ThemeToggle from '../components/ThemeToggle';
+import NotificationBell from '../components/NotificationBell';
 import { API_URL } from '../api/config';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -681,6 +682,33 @@ export default function Dashboard() {
     }
   }, [teamId, token, activeTab, currentUserId, debouncedSearch, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleOpenTaskById = useCallback(async (taskId) => {
+    if (!taskId) return;
+    const existing = tasks.find(t => t.id === taskId);
+    if (existing) {
+      setSelectedTask(existing);
+      return;
+    }
+    try {
+      const res = await axios.get(`${API}/tasks/${taskId}`, { headers });
+      if (res.data?.task) {
+        setSelectedTask(res.data.task);
+      }
+    } catch (err) {
+      console.error('Failed to load task from notification:', err);
+    }
+  }, [tasks, headers]);
+
+  useEffect(() => {
+    const paramTaskId = searchParams.get('taskId');
+    if (paramTaskId) {
+      handleOpenTaskById(paramTaskId);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('taskId');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, handleOpenTaskById, setSearchParams]);
+
   const fetchAnalytics = useCallback(async () => {
     if (!teamId || !token) return;
     setAnalyticsLoading(true);
@@ -964,6 +992,9 @@ export default function Dashboard() {
                 aria-label="Search tasks"
               />
             </div>
+
+            {/* Quick notifications bell */}
+            <NotificationBell onSelectTask={handleOpenTaskById} />
 
             {/* Quick theme toggle in dashboard header */}
             <ThemeToggle variant="icon" size="sm" />

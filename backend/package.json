@@ -22,7 +22,7 @@
       "/node_modules/"
     ],
     "testMatch": [
-      "**/__tests__/**/*.test.js"
+      "<rootDir>/__tests__/**/*.test.js"
     ]
   },
   "keywords": [],

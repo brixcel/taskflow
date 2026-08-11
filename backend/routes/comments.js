@@ -7,6 +7,7 @@ const { sanitize } = require('../middleware/sanitize');
 const schemas     = require('../validation/schemas');
 const { scopedTaskQuery } = require('../helpers/scopedQuery');
 const logger      = require('../middleware/logger');
+const { createNotification, parseMentions } = require('../services/notifications');
 
 const router = express.Router({ mergeParams: true }); // inherit :taskId from parent
 
@@ -57,6 +58,49 @@ router.post('/', validate(schemas.commentCreate), async (req, res) => {
         details: `Added a comment`,
       },
     });
+
+    // ── Notifications ──────────────────────────────────────────────────────────
+    // 1. Mentions
+    const mentionedUsers = await parseMentions(content, req.teamId);
+    const notifiedUserIds = new Set();
+
+    for (const mentionedUser of mentionedUsers) {
+      if (mentionedUser.id !== req.userId) {
+        notifiedUserIds.add(mentionedUser.id);
+        await createNotification({
+          userId:  mentionedUser.id,
+          actorId: req.userId,
+          teamId:  req.teamId,
+          taskId:  task.id,
+          type:    'mention',
+          title:   'Mentioned in a comment',
+          message: `${comment.author?.name || 'Someone'} mentioned you in task "${task.title}"`,
+          data:    { taskId: task.id, taskTitle: task.title, commentId: comment.id },
+        });
+      }
+    }
+
+    // 2. Task Assignee & Creator (if not already notified & not actor)
+    const taskSubscribers = new Set();
+    if (task.assigneeId && task.assigneeId !== req.userId && !notifiedUserIds.has(task.assigneeId)) {
+      taskSubscribers.add(task.assigneeId);
+    }
+    if (task.createdById && task.createdById !== req.userId && !notifiedUserIds.has(task.createdById)) {
+      taskSubscribers.add(task.createdById);
+    }
+
+    for (const subscriberId of taskSubscribers) {
+      await createNotification({
+        userId:  subscriberId,
+        actorId: req.userId,
+        teamId:  req.teamId,
+        taskId:  task.id,
+        type:    'comment_created',
+        title:   'New comment on task',
+        message: `${comment.author?.name || 'Someone'} commented on "${task.title}"`,
+        data:    { taskId: task.id, taskTitle: task.title, commentId: comment.id },
+      });
+    }
 
     res.status(201).json({ comment });
   } catch (error) {

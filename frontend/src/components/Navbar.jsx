@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
+import NotificationBell from './NotificationBell';
 
 // ── Logo mark ──────────────────────────────────────────────────────────────────
 function LogoMark() {
@@ -191,8 +192,13 @@ export default function Navbar({ teams = [], activeTeam = null, onTeamSwitch, on
           ))}
         </nav>
 
-        {/* ── Right: ThemeToggle + logout ───────────────────────────────────── */}
+        {/* ── Right: NotificationBell + ThemeToggle + logout ────────────────── */}
         <div className="flex items-center gap-2">
+          <NotificationBell
+            onSelectTask={(taskId) => {
+              navigate(`/dashboard?taskId=${taskId}`);
+            }}
+          />
           <ThemeToggle variant="icon" size="sm" />
           <button
             onClick={onLogout}

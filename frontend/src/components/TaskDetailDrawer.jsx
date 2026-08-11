@@ -17,6 +17,22 @@ function formatTimestamp(isoString) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+function formatShortDate(isoString) {
+  if (!isoString) return null;
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function isSubtaskOverdue(dueDateStr, completed) {
+  if (!dueDateStr || completed) return false;
+  const d = new Date(dueDateStr);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+  return endOfDay < now;
+}
+
 function UserAvatar({ name, size = 26 }) {
   const initials = (name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   return (
@@ -27,7 +43,7 @@ function UserAvatar({ name, size = 26 }) {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: size, height: size, borderRadius: '50%',
         background: 'var(--color-canvas-hover, #f0f1f3)', border: '1px solid var(--color-canvas-hairline, #e8eaec)',
-        fontSize: size <= 22 ? 9.5 : 10.5, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)',
+        fontSize: size <= 20 ? 8.5 : size <= 22 ? 9.5 : 10.5, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)',
         fontFamily: "'JetBrains Mono', monospace", flexShrink: 0,
       }}
     >
@@ -50,6 +66,21 @@ function getActivityIcon(action) {
       return (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#e5484d" strokeWidth="2.5" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
       );
+    case 'subtask_created':
+    case 'subtask_updated':
+    case 'subtask_assigned':
+    case 'subtask_due_date_changed':
+      return (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0070f3" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+      );
+    case 'subtask_completed':
+      return (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+      );
+    case 'subtask_deleted':
+      return (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#e5484d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+      );
     case 'watched':
     case 'unwatched':
       return (
@@ -64,6 +95,23 @@ function getActivityIcon(action) {
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="3" /></svg>
       );
   }
+}
+
+function buildSubtaskTree(flatList = []) {
+  const map = new Map();
+  const roots = [];
+  flatList.forEach(item => {
+    map.set(item.id, { ...item, children: [] });
+  });
+  flatList.forEach(item => {
+    const node = map.get(item.id);
+    if (item.parentId && map.has(item.parentId)) {
+      map.get(item.parentId).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  return roots;
 }
 
 export default function TaskDetailDrawer({
@@ -81,6 +129,7 @@ export default function TaskDetailDrawer({
   const [task,         setTask]         = useState(initialTask);
   const [loading,      setLoading]      = useState(true);
   const [comments,     setComments]     = useState([]);
+  const [subtasks,     setSubtasks]     = useState(initialTask?.subtasks || []);
   const [activities,   setActivities]   = useState([]);
   const [watchers,     setWatchers]     = useState([]);
   const [activeTab,    setActiveTab]    = useState('comments'); // 'comments' | 'activity'
@@ -97,11 +146,27 @@ export default function TaskDetailDrawer({
   const [newLabelInput,  setNewLabelInput]  = useState('');
   const [showAddLabel,   setShowAddLabel]   = useState(false);
 
+  // Subtasks State
+  const [subtaskDraft,        setSubtaskDraft]        = useState('');
+  const [subtaskAssignee,     setSubtaskAssignee]     = useState('');
+  const [subtaskDueDate,      setSubtaskDueDate]      = useState('');
+  const [showSubtaskOptions,  setShowSubtaskOptions]  = useState(false);
+  const [addingNestedToId,    setAddingNestedToId]    = useState(null);
+  const [nestedDraft,         setNestedDraft]         = useState('');
+  const [nestedAssignee,      setNestedAssignee]      = useState('');
+  const [nestedDueDate,       setNestedDueDate]       = useState('');
+  const [subtaskFilter,       setSubtaskFilter]       = useState('all'); // 'all' | 'incomplete'
+  const [collapsedParents,    setCollapsedParents]    = useState({});
+  const [editingSubtaskId,    setEditingSubtaskId]    = useState(null);
+  const [editingSubtaskTitle, setEditingSubtaskTitle] = useState('');
+  const [isSubtaskSubmitting, setIsSubtaskSubmitting] = useState(false);
+
   // Comment edit state
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [commentDraft,     setCommentDraft]     = useState('');
 
   const titleInputRef = useRef(null);
+  const subtaskInputRef = useRef(null);
 
   // Fetch full task graph
   const reloadTaskDetails = async () => {
@@ -113,6 +178,7 @@ export default function TaskDetailDrawer({
         setTitleDraft(res.data.task.title || '');
         setDescDraft(res.data.task.description || '');
         setComments(res.data.task.comments || []);
+        setSubtasks(res.data.task.subtasks || []);
         setActivities(res.data.task.activities || []);
         setWatchers(res.data.task.watchers?.map(w => w.user) || []);
       }
@@ -132,6 +198,7 @@ export default function TaskDetailDrawer({
           setTitleDraft(res.data.task.title || '');
           setDescDraft(res.data.task.description || '');
           setComments(res.data.task.comments || []);
+          setSubtasks(res.data.task.subtasks || []);
           setActivities(res.data.task.activities || []);
           setWatchers(res.data.task.watchers?.map(w => w.user) || []);
         }
@@ -262,6 +329,137 @@ export default function TaskDetailDrawer({
     }
   };
 
+  // ─── Subtasks CRUD Handlers ─────────────────────────────────────────────────
+
+  const handleCreateSubtask = async (e, parentId = null) => {
+    e?.preventDefault();
+    const rawTitle = parentId ? nestedDraft : subtaskDraft;
+    const title = rawTitle.trim();
+    if (!title || isSubtaskSubmitting) return;
+
+    setIsSubtaskSubmitting(true);
+    setError('');
+
+    const payload = {
+      title,
+      assigneeId: parentId ? (nestedAssignee || null) : (subtaskAssignee || null),
+      dueDate: parentId ? (nestedDueDate || null) : (subtaskDueDate || null),
+      parentId: parentId || null,
+    };
+
+    try {
+      const res = await axios.post(`${API}/tasks/${task.id}/subtasks`, payload, { headers });
+      const created = res.data.subtask;
+
+      setSubtasks(prev => [...prev, created]);
+      setTask(prev => ({
+        ...prev,
+        subtasks: [...(prev.subtasks || []), created],
+      }));
+      onTaskUpdated?.({
+        ...task,
+        subtasks: [...(subtasks || []), created],
+      });
+
+      if (parentId) {
+        setNestedDraft('');
+        setNestedAssignee('');
+        setNestedDueDate('');
+        setAddingNestedToId(null);
+      } else {
+        setSubtaskDraft('');
+        setSubtaskAssignee('');
+        setSubtaskDueDate('');
+        setShowSubtaskOptions(false);
+      }
+      reloadTaskDetails();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to add subtask.');
+    } finally {
+      setIsSubtaskSubmitting(false);
+    }
+  };
+
+  const handleToggleSubtask = async (subtaskId) => {
+    const target = subtasks.find(s => s.id === subtaskId);
+    if (!target) return;
+    const nextCompleted = !target.completed;
+
+    // Optimistic UI update
+    setSubtasks(prev => prev.map(s => s.id === subtaskId ? { ...s, completed: nextCompleted } : s));
+    setTask(prev => ({
+      ...prev,
+      subtasks: (prev.subtasks || []).map(s => s.id === subtaskId ? { ...s, completed: nextCompleted } : s),
+    }));
+
+    try {
+      const res = await axios.patch(`${API}/subtasks/${subtaskId}`, { completed: nextCompleted }, { headers });
+      const updated = res.data.subtask;
+      setSubtasks(prev => prev.map(s => s.id === subtaskId ? updated : s));
+      onTaskUpdated?.({
+        ...task,
+        subtasks: subtasks.map(s => s.id === subtaskId ? updated : s),
+      });
+      reloadTaskDetails();
+    } catch (err) {
+      // Revert on error
+      setSubtasks(prev => prev.map(s => s.id === subtaskId ? target : s));
+      setError(err.response?.data?.error || 'Failed to update subtask status.');
+    }
+  };
+
+  const handleSaveSubtaskTitle = async (subtaskId) => {
+    const trimmed = editingSubtaskTitle.trim();
+    if (!trimmed) {
+      setEditingSubtaskId(null);
+      return;
+    }
+
+    try {
+      const res = await axios.patch(`${API}/subtasks/${subtaskId}`, { title: trimmed }, { headers });
+      setSubtasks(prev => prev.map(s => s.id === subtaskId ? res.data.subtask : s));
+      setEditingSubtaskId(null);
+      setEditingSubtaskTitle('');
+      reloadTaskDetails();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to rename subtask.');
+    }
+  };
+
+  const handleUpdateSubtaskAssignee = async (subtaskId, newAssigneeId) => {
+    try {
+      const res = await axios.patch(`${API}/subtasks/${subtaskId}`, { assigneeId: newAssigneeId || null }, { headers });
+      setSubtasks(prev => prev.map(s => s.id === subtaskId ? res.data.subtask : s));
+      reloadTaskDetails();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to reassign subtask.');
+    }
+  };
+
+  const handleUpdateSubtaskDueDate = async (subtaskId, newDueDate) => {
+    try {
+      const res = await axios.patch(`${API}/subtasks/${subtaskId}`, { dueDate: newDueDate || null }, { headers });
+      setSubtasks(prev => prev.map(s => s.id === subtaskId ? res.data.subtask : s));
+      reloadTaskDetails();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update subtask due date.');
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId) => {
+    try {
+      await axios.delete(`${API}/subtasks/${subtaskId}`, { headers });
+      // Remove subtask and its nested children
+      const remaining = subtasks.filter(s => s.id !== subtaskId && s.parentId !== subtaskId);
+      setSubtasks(remaining);
+      setTask(prev => ({ ...prev, subtasks: remaining }));
+      onTaskUpdated?.({ ...task, subtasks: remaining });
+      reloadTaskDetails();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete subtask.');
+    }
+  };
+
   // Watch / Unwatch
   const handleToggleWatch = async () => {
     try {
@@ -328,6 +526,322 @@ export default function TaskDetailDrawer({
   };
 
   if (!initialTask) return null;
+
+  // Subtask calculations
+  const totalSubtasks = subtasks.length;
+  const completedSubtasks = subtasks.filter(s => s.completed).length;
+  const progressPercent = totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
+
+  const subtaskTree = buildSubtaskTree(subtasks);
+
+  // Subtask row renderer
+  const renderSubtaskItem = (subtaskItem, depth = 0) => {
+    const hasChildren = subtaskItem.children && subtaskItem.children.length > 0;
+    const isCollapsed = Boolean(collapsedParents[subtaskItem.id]);
+    const isEditingThis = editingSubtaskId === subtaskItem.id;
+    const isAddingChild = addingNestedToId === subtaskItem.id;
+    const overdue = isSubtaskOverdue(subtaskItem.dueDate, subtaskItem.completed);
+    const formattedDueDate = formatShortDate(subtaskItem.dueDate);
+
+    // Apply filtering
+    if (subtaskFilter === 'incomplete' && subtaskItem.completed && !hasChildren) {
+      return null;
+    }
+
+    return (
+      <div key={subtaskItem.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div
+          className="subtask-row"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            padding: '7px 10px',
+            paddingLeft: depth > 0 ? `${12 + depth * 22}px` : '10px',
+            borderRadius: 6,
+            background: subtaskItem.completed ? 'var(--color-canvas-subtle, #f9fafa)' : 'var(--color-canvas-card, #ffffff)',
+            border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+            position: 'relative',
+            transition: 'background 120ms, border-color 120ms',
+          }}
+        >
+          {/* Depth tree guide indicator */}
+          {depth > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                left: `${depth * 22 - 6}px`,
+                top: 0,
+                bottom: 0,
+                width: 2,
+                background: 'var(--color-canvas-hairline, #e8eaec)',
+              }}
+            />
+          )}
+
+          {/* Left part: collapse chevron + checkbox + title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+            {/* Collapse toggle if has children */}
+            {hasChildren ? (
+              <button
+                type="button"
+                onClick={() => setCollapsedParents(prev => ({ ...prev, [subtaskItem.id]: !isCollapsed }))}
+                style={{
+                  background: 'none', border: 'none', padding: 0, width: 14, height: 14,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'var(--color-canvas-mute, #888888)', flexShrink: 0,
+                }}
+                title={isCollapsed ? 'Expand subtasks' : 'Collapse subtasks'}
+              >
+                <svg
+                  width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 120ms' }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            ) : depth > 0 ? (
+              <span style={{ width: 14, flexShrink: 0 }} />
+            ) : null}
+
+            {/* Interactive Checkbox */}
+            <button
+              type="button"
+              onClick={() => handleToggleSubtask(subtaskItem.id)}
+              className="subtask-checkbox"
+              style={{
+                width: 17,
+                height: 17,
+                borderRadius: 4,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                background: subtaskItem.completed ? '#0070f3' : 'var(--color-canvas-card, #ffffff)',
+                border: subtaskItem.completed ? '1.5px solid #0070f3' : '1.5px solid var(--color-canvas-hairline, #c8cacc)',
+                padding: 0,
+                flexShrink: 0,
+                transition: 'all 120ms ease',
+              }}
+              title={subtaskItem.completed ? 'Mark incomplete' : 'Mark complete'}
+              aria-label={subtaskItem.completed ? 'Mark incomplete' : 'Mark complete'}
+            >
+              {subtaskItem.completed && (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </button>
+
+            {/* Subtask Title (inline editable) */}
+            {isEditingThis ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+                <input
+                  type="text"
+                  value={editingSubtaskTitle}
+                  onChange={e => setEditingSubtaskTitle(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveSubtaskTitle(subtaskItem.id);
+                    if (e.key === 'Escape') setEditingSubtaskId(null);
+                  }}
+                  className="field-input"
+                  style={{ height: 24, fontSize: 12.5, padding: '0 6px', flex: 1 }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ height: 22, fontSize: 10.5, padding: '0 6px' }}
+                  onClick={() => handleSaveSubtaskTitle(subtaskItem.id)}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ height: 22, fontSize: 10.5, padding: '0 6px' }}
+                  onClick={() => setEditingSubtaskId(null)}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <span
+                onClick={() => { setEditingSubtaskId(subtaskItem.id); setEditingSubtaskTitle(subtaskItem.title); }}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: subtaskItem.completed ? 'var(--color-canvas-mute, #888888)' : 'var(--color-canvas-ink, #0f1011)',
+                  textDecoration: subtaskItem.completed ? 'line-through' : 'none',
+                  lineHeight: '18px',
+                  cursor: 'text',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  flex: 1,
+                }}
+                title="Click to rename"
+              >
+                {subtaskItem.title}
+              </span>
+            )}
+          </div>
+
+          {/* Right part: Assignee + Due Date + Actions */}
+          {!isEditingThis && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {/* Due Date pill */}
+              {formattedDueDate ? (
+                <span
+                  className={`badge ${overdue ? 'badge-overdue' : ''}`}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 5px',
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                  title={overdue ? `Overdue (${formattedDueDate})` : `Due ${formattedDueDate}`}
+                >
+                  {overdue ? '⚠ ' : ''}{formattedDueDate}
+                </span>
+              ) : null}
+
+              {/* Assignee Avatar / Picker */}
+              <select
+                value={subtaskItem.assigneeId || ''}
+                onChange={e => handleUpdateSubtaskAssignee(subtaskItem.id, e.target.value)}
+                style={{
+                  fontSize: 10,
+                  height: 20,
+                  padding: '0 4px',
+                  borderRadius: 4,
+                  border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                  background: 'var(--color-canvas-subtle, #fafafa)',
+                  color: subtaskItem.assigneeId ? 'var(--color-canvas-ink, #0f1011)' : 'var(--color-canvas-mute, #888888)',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  maxWidth: 90,
+                }}
+                title="Change assignee"
+              >
+                <option value="">+ Assign</option>
+                {members.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.name.split(' ')[0]}{m.id === currentUserId ? ' (me)' : ''}
+                  </option>
+                ))}
+              </select>
+
+              {/* Add nested child subtask button (allowed if depth < 2 to keep hierarchy clean) */}
+              {depth < 2 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingNestedToId(isAddingChild ? null : subtaskItem.id);
+                    setNestedDraft('');
+                  }}
+                  style={{
+                    background: 'none', border: 'none', padding: '0 4px', fontSize: 11,
+                    color: isAddingChild ? '#0070f3' : 'var(--color-canvas-mute, #888888)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2,
+                  }}
+                  title="Add nested checklist item"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  Sub
+                </button>
+              )}
+
+              {/* Delete button */}
+              <button
+                type="button"
+                onClick={() => handleDeleteSubtask(subtaskItem.id)}
+                style={{
+                  background: 'none', border: 'none', padding: '0 3px',
+                  color: 'var(--color-canvas-mute, #888888)', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center',
+                }}
+                title="Delete subtask"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Nested Child Creation Input */}
+        {isAddingChild && (
+          <form
+            onSubmit={(e) => handleCreateSubtask(e, subtaskItem.id)}
+            style={{
+              display: 'flex', flexDirection: 'column', gap: 6,
+              marginLeft: `${24 + depth * 22}px`, padding: '8px 10px',
+              borderRadius: 6, background: 'var(--color-canvas-subtle, #f9fafa)',
+              border: '1px dashed var(--color-canvas-hairline, #ebebeb)',
+            }}
+          >
+            <input
+              type="text"
+              value={nestedDraft}
+              onChange={e => setNestedDraft(e.target.value)}
+              placeholder={`Add sub-item under "${subtaskItem.title}"…`}
+              className="field-input"
+              style={{ height: 26, fontSize: 12 }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <select
+                  value={nestedAssignee}
+                  onChange={e => setNestedAssignee(e.target.value)}
+                  style={{ height: 22, fontSize: 10.5, borderRadius: 3, border: '1px solid var(--color-canvas-hairline)' }}
+                >
+                  <option value="">Assignee</option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={nestedDueDate}
+                  onChange={e => setNestedDueDate(e.target.value)}
+                  style={{ height: 22, fontSize: 10.5, borderRadius: 3, border: '1px solid var(--color-canvas-hairline)' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ height: 22, fontSize: 10.5, padding: '0 6px' }}
+                  onClick={() => setAddingNestedToId(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!nestedDraft.trim()}
+                  className="btn-primary"
+                  style={{ height: 22, fontSize: 10.5, padding: '0 8px' }}
+                >
+                  Add Sub-item
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {/* Render child subtasks recursively */}
+        {hasChildren && !isCollapsed && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {subtaskItem.children.map(child => renderSubtaskItem(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -459,8 +973,8 @@ export default function TaskDetailDrawer({
           </div>
         ) : (
           <div style={{ flex: 1, display: 'flex', overflowY: 'auto', flexDirection: 'row', flexWrap: 'wrap' }}>
-            {/* Main Column (Title, Description, Comments & Activity) */}
-            <div style={{ flex: '1 1 420px', minWidth: 320, padding: '24px', borderRight: '1px solid var(--color-canvas-hairline, #ebebeb)', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Main Column (Title, Description, Subtasks & Checklists, Comments & Activity) */}
+            <div style={{ flex: '1 1 420px', minWidth: 320, padding: '24px', borderRight: '1px solid var(--color-canvas-hairline, #ebebeb)', display: 'flex', flexDirection: 'column', gap: 22 }}>
               {/* Title Section with Inline Edit */}
               <div>
                 {isEditingTitle ? (
@@ -550,8 +1064,196 @@ export default function TaskDetailDrawer({
                 )}
               </div>
 
+              {/* ─── Phase 20: Subtasks & Checklists Workspace Section ──────────────── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px', borderRadius: 8, background: 'var(--color-canvas-subtle, #fafafa)', border: '1px solid var(--color-canvas-hairline, #ebebeb)' }}>
+                {/* Header & Progress Stats */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-canvas-body, #333333)' }}>
+                      Subtasks & Checklists
+                    </span>
+                    {totalSubtasks > 0 && (
+                      <span
+                        style={{
+                          fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 99,
+                          background: progressPercent === 100 ? 'rgba(16, 185, 129, 0.15)' : 'var(--color-canvas-hover, #e8eaec)',
+                          color: progressPercent === 100 ? '#10b981' : 'var(--color-canvas-body, #4d4d4d)',
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}
+                      >
+                        {completedSubtasks}/{totalSubtasks} ({progressPercent}%)
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Filter toggle */}
+                  {totalSubtasks > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button
+                        type="button"
+                        onClick={() => setSubtaskFilter('all')}
+                        style={{
+                          padding: '2px 6px', fontSize: 10.5, borderRadius: 4,
+                          background: subtaskFilter === 'all' ? 'var(--color-canvas-card, #ffffff)' : 'transparent',
+                          border: subtaskFilter === 'all' ? '1px solid var(--color-canvas-hairline, #ebebeb)' : '1px solid transparent',
+                          fontWeight: subtaskFilter === 'all' ? 600 : 500,
+                          color: subtaskFilter === 'all' ? '#0070f3' : 'var(--color-canvas-mute, #888888)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSubtaskFilter('incomplete')}
+                        style={{
+                          padding: '2px 6px', fontSize: 10.5, borderRadius: 4,
+                          background: subtaskFilter === 'incomplete' ? 'var(--color-canvas-card, #ffffff)' : 'transparent',
+                          border: subtaskFilter === 'incomplete' ? '1px solid var(--color-canvas-hairline, #ebebeb)' : '1px solid transparent',
+                          fontWeight: subtaskFilter === 'incomplete' ? 600 : 500,
+                          color: subtaskFilter === 'incomplete' ? '#0070f3' : 'var(--color-canvas-mute, #888888)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Incomplete
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Visual Progress Bar */}
+                {totalSubtasks > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div
+                      style={{
+                        height: 6,
+                        width: '100%',
+                        borderRadius: 99,
+                        background: 'var(--color-canvas-hairline, #e2e4e8)',
+                        overflow: 'hidden',
+                      }}
+                      role="progressbar"
+                      aria-valuenow={progressPercent}
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                    >
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${progressPercent}%`,
+                          background: progressPercent === 100
+                            ? '#10b981'
+                            : 'linear-gradient(90deg, #0070f3, #00c6ff)',
+                          borderRadius: 99,
+                          transition: 'width 240ms ease-out',
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: 'var(--color-canvas-mute, #888888)' }}>
+                      <span>{progressPercent}% complete</span>
+                      <span>{totalSubtasks - completedSubtasks} remaining</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Subtasks Tree List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                  {totalSubtasks === 0 ? (
+                    <p style={{ margin: '4px 0', fontSize: 12.5, color: 'var(--color-canvas-mute, #888888)', fontStyle: 'italic' }}>
+                      Break this task down into subtasks and checklist items below.
+                    </p>
+                  ) : (
+                    subtaskTree.map(rootItem => renderSubtaskItem(rootItem, 0))
+                  )}
+                </div>
+
+                {/* Add Subtask Quick Input */}
+                <form
+                  onSubmit={e => handleCreateSubtask(e, null)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    marginTop: 6,
+                    paddingTop: 8,
+                    borderTop: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input
+                      ref={subtaskInputRef}
+                      type="text"
+                      value={subtaskDraft}
+                      onChange={e => setSubtaskDraft(e.target.value)}
+                      onFocus={() => setShowSubtaskOptions(true)}
+                      placeholder="Add a subtask or checklist item… (Press Enter)"
+                      className="field-input"
+                      style={{ fontSize: 12.5, height: 30, flex: 1 }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!subtaskDraft.trim() || isSubtaskSubmitting}
+                      className="btn-primary"
+                      style={{ height: 30, fontSize: 11.5, padding: '0 12px' }}
+                    >
+                      {isSubtaskSubmitting ? 'Adding…' : 'Add'}
+                    </button>
+                  </div>
+
+                  {/* Optional Assignee and Due Date bar */}
+                  {showSubtaskOptions && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, paddingTop: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <select
+                          value={subtaskAssignee}
+                          onChange={e => setSubtaskAssignee(e.target.value)}
+                          style={{
+                            height: 24, fontSize: 11, borderRadius: 4,
+                            border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                            background: 'var(--color-canvas-card, #ffffff)',
+                            color: 'var(--color-canvas-body, #4d4d4d)',
+                          }}
+                        >
+                          <option value="">Assign to…</option>
+                          {members.map(m => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}{m.id === currentUserId ? ' (me)' : ''}
+                            </option>
+                          ))}
+                        </select>
+
+                        <input
+                          type="date"
+                          value={subtaskDueDate}
+                          onChange={e => setSubtaskDueDate(e.target.value)}
+                          style={{
+                            height: 24, fontSize: 11, borderRadius: 4,
+                            border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                            background: 'var(--color-canvas-card, #ffffff)',
+                            color: 'var(--color-canvas-body, #4d4d4d)',
+                          }}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSubtaskOptions(false);
+                          setSubtaskDraft('');
+                          setSubtaskAssignee('');
+                          setSubtaskDueDate('');
+                        }}
+                        style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, color: 'var(--color-canvas-mute, #888888)', cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </form>
+              </div>
+
               {/* Tabbed Section: Comments vs Activity */}
-              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', flex: 1 }}>
                 {/* Tab Header */}
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--color-canvas-hairline, #ebebeb)', marginBottom: 14 }}>
                   <button

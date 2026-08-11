@@ -79,21 +79,38 @@ const dueDateSchema = z.preprocess(
     .nullable()
 );
 
+const prioritySchema = z.enum(['low', 'medium', 'high', 'urgent'], {
+  errorMap: () => ({ message: 'priority must be low, medium, high, or urgent' }),
+});
+
+const labelsSchema = z.array(
+  z.string().trim().min(1, 'Label cannot be empty').max(30, 'Label must be 30 characters or fewer')
+).max(15, 'Maximum 15 labels allowed');
+
 const taskCreate = z.object({
   title:       nonBlankString(200, { requiredMsg: 'Title is required', maxMsg: 'Title must be 200 characters or fewer' }),
-  // description has no min — trim only, so ordering doesn't matter here
   description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional(),
+  status:      z.enum(['todo', 'in_progress', 'done'], {
+    errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
+  }).optional(),
+  priority:    prioritySchema.optional(),
+  labels:      labelsSchema.optional(),
+  order:       z.number().optional(),
+  position:    z.number().optional(),
   assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
   dueDate:     dueDateSchema,
 });
 
 const taskUpdate = z.object({
   title:       nonBlankString(200, { requiredMsg: 'Title cannot be blank', maxMsg: 'Title must be 200 characters or fewer' }).optional(),
-  // description has no min — trim only
   description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional().nullable(),
   status:      z.enum(['todo', 'in_progress', 'done'], {
     errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
   }).optional(),
+  priority:    prioritySchema.optional(),
+  labels:      labelsSchema.optional(),
+  order:       z.number().optional(),
+  position:    z.number().optional(),
   assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
   dueDate:     dueDateSchema,
 }).refine(
@@ -101,10 +118,68 @@ const taskUpdate = z.object({
   { message: 'At least one field must be provided' },
 );
 
+const taskOrder = z.object({
+  position: z.number().optional(),
+  order:    z.number().optional(),
+  status:   z.enum(['todo', 'in_progress', 'done'], {
+    errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
+  }).optional(),
+}).refine(
+  (data) => data.position !== undefined || data.order !== undefined || data.status !== undefined,
+  { message: 'position, order, or status must be provided' },
+);
+
+const tasksBatchReorder = z.object({
+  tasks: z.array(z.object({
+    id:       z.string().uuid('id must be a valid UUID'),
+    order:    z.number().optional(),
+    position: z.number().optional(),
+    status:   z.enum(['todo', 'in_progress', 'done']).optional(),
+  })).min(1, 'At least one task update must be provided').max(200, 'Maximum 200 updates allowed'),
+});
+
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
 const commentCreate = z.object({
   content: nonBlankString(2000, { requiredMsg: 'Comment content is required', maxMsg: 'Comment must be 2000 characters or fewer' }),
+});
+
+const commentUpdate = z.object({
+  content: nonBlankString(2000, { requiredMsg: 'Comment content is required', maxMsg: 'Comment must be 2000 characters or fewer' }),
+});
+
+// ─── Subtasks ─────────────────────────────────────────────────────────────────
+
+const subtaskCreate = z.object({
+  title:      nonBlankString(200, { requiredMsg: 'Subtask title is required', maxMsg: 'Subtask title must be 200 characters or fewer' }),
+  completed:  z.boolean().optional(),
+  order:      z.number().optional(),
+  position:   z.number().optional(),
+  dueDate:    dueDateSchema,
+  assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  parentId:   z.string().uuid('parentId must be a valid UUID').optional().nullable(),
+});
+
+const subtaskUpdate = z.object({
+  title:      nonBlankString(200, { requiredMsg: 'Subtask title cannot be blank', maxMsg: 'Subtask title must be 200 characters or fewer' }).optional(),
+  completed:  z.boolean().optional(),
+  order:      z.number().optional(),
+  position:   z.number().optional(),
+  dueDate:    dueDateSchema,
+  assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  parentId:   z.string().uuid('parentId must be a valid UUID').optional().nullable(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field must be provided' },
+);
+
+const subtasksBatchReorder = z.object({
+  subtasks: z.array(z.object({
+    id:       z.string().uuid('id must be a valid UUID'),
+    order:    z.number().optional(),
+    position: z.number().optional(),
+    parentId: z.string().uuid('parentId must be a valid UUID').optional().nullable(),
+  })).min(1, 'At least one subtask update must be provided').max(200, 'Maximum 200 updates allowed'),
 });
 
 // ─── Teams ────────────────────────────────────────────────────────────────────
@@ -130,16 +205,56 @@ const memberRoleUpdate = z.object({
   }),
 });
 
+const analyticsQuery = z.object({
+  range: z.enum(['7d', '30d', '90d', 'all'], {
+    errorMap: () => ({ message: 'range must be 7d, 30d, 90d, or all' }),
+  }).optional().default('30d'),
+  userId: z.string().uuid('userId must be a valid UUID').optional(),
+});
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+const notificationPreferencesUpdate = z.object({
+  taskAssigned:        z.boolean().optional(),
+  statusChanged:       z.boolean().optional(),
+  commentsAndMentions: z.boolean().optional(),
+  dueDates:            z.boolean().optional(),
+  teamUpdates:         z.boolean().optional(),
+  emailNotifications:  z.boolean().optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one preference field must be provided' },
+);
+
+const notificationQuery = z.object({
+  unread: z.enum(['true', 'false']).optional(),
+  type:   z.string().trim().optional(),
+  page:   z.string().regex(/^\d+$/).transform(Number).optional(),
+  limit:  z.string().regex(/^\d+$/).transform(Number).optional(),
+});
+
 module.exports = {
   register,
   login,
   forgotPassword,
   resetPassword,
+  verifyEmail,
+  resendVerification,
   taskCreate,
   taskUpdate,
+  taskOrder,
+  tasksBatchReorder,
+  subtaskCreate,
+  subtaskUpdate,
+  subtasksBatchReorder,
   commentCreate,
+  commentUpdate,
   teamCreate,
   teamJoin,
   memberAdd,
   memberRoleUpdate,
+  analyticsQuery,
+  notificationPreferencesUpdate,
+  notificationQuery,
 };
+

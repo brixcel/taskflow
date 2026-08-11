@@ -13,22 +13,28 @@ datasource db {
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  name         String
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String
+  name            String
   emailVerified   Boolean   @default(false)
   isDeleted       Boolean   @default(false)
   deletedAt       DateTime?
   createdAt       DateTime  @default(now())
 
-  tasksCreated        Task[]               @relation("CreatedTasks")
-  tasksAssigned       Task[]               @relation("AssignedTasks")
-  comments            Comment[]
-  activities          Activity[]
-  teamMemberships     TeamMembership[]
-  teamsOwned          Team[]               @relation("OwnedTeams")
-  passwordResetTokens PasswordResetToken[]
+  tasksCreated             Task[]                  @relation("CreatedTasks")
+  tasksAssigned            Task[]                  @relation("AssignedTasks")
+  subtasksAssigned         Subtask[]               @relation("AssignedSubtasks")
+  taskWatchers             TaskWatcher[]
+  comments                 Comment[]
+  activities               Activity[]
+  teamMemberships          TeamMembership[]
+  teamsOwned               Team[]                  @relation("OwnedTeams")
+  passwordResetTokens      PasswordResetToken[]
+  emailVerificationTokens  EmailVerificationToken[]
+  notifications            Notification[]          @relation("UserNotifications")
+  actorNotifications       Notification[]          @relation("ActorNotifications")
+  notificationPreferences  NotificationPreference?
 
   @@map("users")
 }
@@ -41,9 +47,10 @@ model Team {
   ownerId   String
   createdAt DateTime @default(now())
 
-  owner       User             @relation("OwnedTeams", fields: [ownerId], references: [id])
-  memberships TeamMembership[]
-  tasks       Task[]
+  owner         User             @relation("OwnedTeams", fields: [ownerId], references: [id])
+  memberships   TeamMembership[]
+  tasks         Task[]
+  notifications Notification[]
 
   @@map("teams")
 }
@@ -68,6 +75,9 @@ model Task {
   title       String
   description String?
   status      String   @default("todo")
+  priority    String   @default("medium") // low | medium | high | urgent
+  labels      String[] @default([])
+  order       Float    @default(0)
   dueDate     DateTime?
   assigneeId  String?
   createdById String
@@ -75,16 +85,60 @@ model Task {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  assignee   User?    @relation("AssignedTasks", fields: [assigneeId], references: [id])
-  createdBy  User     @relation("CreatedTasks", fields: [createdById], references: [id])
-  team       Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  comments   Comment[]
-  activities Activity[]
+  assignee      User?          @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  createdBy     User           @relation("CreatedTasks", fields: [createdById], references: [id])
+  team          Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  comments      Comment[]
+  activities    Activity[]
+  watchers      TaskWatcher[]
+  subtasks      Subtask[]
+  notifications Notification[]
 
+  @@index([teamId, status, order])
+  @@index([teamId, order])
+  @@index([teamId, status])
+  @@index([teamId, dueDate])
+  @@index([teamId, assigneeId])
+  @@index([teamId, createdAt])
   @@map("tasks")
 }
 
 // ─── Supporting models ────────────────────────────────────────────────────────
+
+model TaskWatcher {
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@map("task_watchers")
+}
+
+model Subtask {
+  id         String    @id @default(uuid())
+  title      String
+  completed  Boolean   @default(false)
+  order      Float     @default(0)
+  dueDate    DateTime?
+  taskId     String
+  assigneeId String?
+  parentId   String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  task     Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignee User?     @relation("AssignedSubtasks", fields: [assigneeId], references: [id])
+  parent   Subtask?  @relation("NestedSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  children Subtask[] @relation("NestedSubtasks")
+
+  @@index([taskId, order])
+  @@index([taskId, parentId])
+  @@index([taskId, completed])
+  @@map("subtasks")
+}
 
 model Comment {
   id        String   @id @default(uuid())
@@ -110,6 +164,7 @@ model Activity {
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id])
 
+  @@index([taskId, createdAt])
   @@map("activities")
 }
 
@@ -126,3 +181,60 @@ model PasswordResetToken {
 
   @@map("password_reset_tokens")
 }
+
+// ─── Email Verification ───────────────────────────────────────────────────────
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique   // SHA-256 hash of the raw token sent by email
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?          // null = unused; set when verification succeeds
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verification_tokens")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String    // Recipient user ID
+  actorId   String?   // User who performed the action
+  teamId    String?   // Team scope
+  taskId    String?   // Task context (if task-related)
+  type      String    // task_assigned | task_reassigned | status_changed | task_completed | mention | comment_created | due_date_approaching | overdue | team_invitation | role_changed
+  title     String
+  message   String
+  data      Json?     // Metadata payload
+  read      Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user  User  @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("ActorNotifications", fields: [actorId], references: [id], onDelete: SetNull)
+  team  Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  task  Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+  @@index([userId, createdAt])
+  @@index([teamId])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  userId              String   @id
+  taskAssigned        Boolean  @default(true)
+  statusChanged       Boolean  @default(true)
+  commentsAndMentions Boolean  @default(true)
+  dueDates            Boolean  @default(true)
+  teamUpdates         Boolean  @default(true)
+  emailNotifications  Boolean  @default(false)
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+

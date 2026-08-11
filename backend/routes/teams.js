@@ -5,6 +5,7 @@ const requireRole = require('../middleware/requireRole');
 const validate    = require('../middleware/validate');
 const schemas     = require('../validation/schemas');
 const logger      = require('../middleware/logger');
+const { createNotification } = require('../services/notifications');
 
 const router = express.Router();
 
@@ -99,7 +100,22 @@ router.post('/:id/members', validate(schemas.memberAdd), async (req, res) => {
       where:  { userId_teamId: { userId: targetUserId, teamId } },
       create: { userId: targetUserId, teamId, role },
       update: { role },
+      include: {
+        team: { select: { id: true, name: true } },
+      },
     });
+
+    if (targetUserId !== req.userId) {
+      await createNotification({
+        userId:  targetUserId,
+        actorId: req.userId,
+        teamId,
+        type:    'team_invitation',
+        title:   'Added to team',
+        message: `You were added to team "${membership.team?.name || 'Workspace'}" as ${role || 'member'}`,
+        data:    { teamId, role: role || 'member' },
+      });
+    }
 
     res.status(201).json({ membership });
   } catch (error) {
@@ -442,7 +458,22 @@ router.patch('/:id/members/:userId/role', resolveTeamFromParam, requireRole('own
     const updated = await prisma.teamMembership.update({
       where: { userId_teamId: { userId: targetUserId, teamId } },
       data:  { role },
+      include: {
+        team: { select: { id: true, name: true } },
+      },
     });
+
+    if (targetUserId !== req.userId) {
+      await createNotification({
+        userId:  targetUserId,
+        actorId: req.userId,
+        teamId,
+        type:    'role_changed',
+        title:   'Team role updated',
+        message: `Your role in "${updated.team?.name || 'Workspace'}" was updated to ${role}`,
+        data:    { teamId, oldRole: membership.role, newRole: role },
+      });
+    }
 
     res.json({ membership: updated });
   } catch (error) {
