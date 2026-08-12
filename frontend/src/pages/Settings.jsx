@@ -40,18 +40,18 @@ const Row = ({ label, value, badge }) => (
 export default function Settings() {
   const navigate = useNavigate();
 
-  const [user]                      = useState(getCurrentUser);
+  const [user] = useState(getCurrentUser);
   const [activeTeam, setActiveTeam] = useState(getActiveTeam);
-  const [teams,      setTeams]      = useState([]);
+  const [teams, setTeams] = useState([]);
 
-  const [exporting,     setExporting]     = useState(false);
-  const [exportError,   setExportError]   = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
   const [exportSuccess, setExportSuccess] = useState(false);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [confirmEmail,    setConfirmEmail]    = useState('');
-  const [deleting,        setDeleting]        = useState(false);
-  const [deleteError,     setDeleteError]     = useState('');
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // ── Notification preferences state ──────────────────────────────────────────
   const [notificationPreferences, setNotificationPreferences] = useState({
@@ -77,7 +77,7 @@ export default function Settings() {
           setNotificationPreferences(res.data.preferences);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     axios.get(`${API}/teams/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
         const t = res.data.teams ?? [];

@@ -456,6 +456,33 @@ export default function ProjectDashboardHeader({
 
           <button
             type="button"
+            onClick={() => onViewModeChange('calendar')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '5px 12px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 500,
+              border: 'none',
+              background: viewMode === 'calendar' ? 'var(--color-canvas-card, #ffffff)' : 'transparent',
+              color: viewMode === 'calendar' ? 'var(--color-canvas-ink, #0f1011)' : 'var(--color-canvas-mute, #8a8f98)',
+              boxShadow: viewMode === 'calendar' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2.5" width="10" height="9.5" rx="1" />
+              <line x1="2" y1="5.5" x2="12" y2="5.5" />
+              <line x1="4.5" y1="1.5" x2="4.5" y2="3.5" />
+              <line x1="9.5" y1="1.5" x2="9.5" y2="3.5" />
+            </svg>
+            Calendar
+          </button>
+
+          <button
+            type="button"
             onClick={() => onViewModeChange('analytics')}
             style={{
               display: 'flex',

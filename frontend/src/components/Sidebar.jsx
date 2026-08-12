@@ -7,8 +7,8 @@ function IconTasks() {
   return (
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
       <rect x="2" y="3.5" width="11" height="1.25" rx="0.625" fill="currentColor" />
-      <rect x="2" y="7.5" width="8"  height="1.25" rx="0.625" fill="currentColor" />
-      <rect x="2" y="11" width="5"  height="1.25" rx="0.625" fill="currentColor" />
+      <rect x="2" y="7.5" width="8" height="1.25" rx="0.625" fill="currentColor" />
+      <rect x="2" y="11" width="5" height="1.25" rx="0.625" fill="currentColor" />
     </svg>
   );
 }
@@ -18,6 +18,17 @@ function IconMyTasks() {
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
       <circle cx="7.5" cy="7.5" r="5.5" stroke="currentColor" strokeWidth="1.25" />
       <path d="M5 7.5l1.8 1.8L10.5 5.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconCalendar() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+      <rect x="2" y="3" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+      <line x1="2" y1="6.5" x2="13" y2="6.5" stroke="currentColor" strokeWidth="1.25" />
+      <line x1="5" y1="1.5" x2="5" y2="3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+      <line x1="10" y1="1.5" x2="10" y2="3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
     </svg>
   );
 }
@@ -202,24 +213,28 @@ export default function Sidebar({
   activeTeam = null,
   projects = [],
   activeProjectId = null,
-  onSelectProject = () => {},
-  onNewProject = () => {},
+  onSelectProject = () => { },
+  onNewProject = () => { },
   onTeamSwitch,
   onLogout,
   userName,
   userEmail,
   isOpen = false,
-  onClose = () => {},
+  onClose = () => { },
   activeTab = 'all',
-  onTabChange = () => {},
+  onTabChange = () => { },
 }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleNav = (tab) => {
+  const handleNav = (tab, view = null) => {
     onTabChange(tab);
     onSelectProject(null);
-    navigate(`/dashboard?tab=${tab}`);
+    if (view) {
+      navigate(`/dashboard?view=${view}`);
+    } else {
+      navigate(`/dashboard?tab=${tab}`);
+    }
     onClose();
   };
 
@@ -234,6 +249,9 @@ export default function Sidebar({
   };
 
   const isDashboard = location.pathname === '/dashboard';
+  const searchParams = new URLSearchParams(location.search);
+  const currentView = searchParams.get('view');
+  const isCalendar = isDashboard && currentView === 'calendar';
 
   return (
     <>
@@ -277,7 +295,7 @@ export default function Sidebar({
           <button
             type="button"
             onClick={() => handleNav('mine')}
-            className={`sidebar-item${isDashboard && activeTab === 'mine' && !activeProjectId ? ' active' : ''}`}
+            className={`sidebar-item${isDashboard && activeTab === 'mine' && !activeProjectId && !isCalendar ? ' active' : ''}`}
             style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
           >
             <IconMyTasks />
@@ -287,11 +305,21 @@ export default function Sidebar({
           <button
             type="button"
             onClick={() => handleNav('all')}
-            className={`sidebar-item${isDashboard && activeTab === 'all' && !activeProjectId ? ' active' : ''}`}
+            className={`sidebar-item${isDashboard && activeTab === 'all' && !activeProjectId && !isCalendar ? ' active' : ''}`}
             style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
           >
             <IconTasks />
             All Tasks
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleNav('all', 'calendar')}
+            className={`sidebar-item${isCalendar ? ' active' : ''}`}
+            style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+          >
+            <IconCalendar />
+            Calendar
           </button>
 
           {/* ─── Projects Section ─────────────────────────────────────────── */}

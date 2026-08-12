@@ -163,6 +163,13 @@ export default function TaskDetailDrawer({
   const [editingSubtaskTitle, setEditingSubtaskTitle] = useState('');
   const [isSubtaskSubmitting, setIsSubtaskSubmitting] = useState(false);
 
+  // AI Task Breakdown State (Phase 27)
+  const [showAiBreakdown,         setShowAiBreakdown]         = useState(false);
+  const [isGeneratingAiBreakdown, setIsGeneratingAiBreakdown] = useState(false);
+  const [aiSuggestions,           setAiSuggestions]           = useState([]);
+  const [isBatchAddingSubtasks,   setIsBatchAddingSubtasks]   = useState(false);
+  const [aiBreakdownError,        setAiBreakdownError]        = useState('');
+
   // Comment edit state
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [commentDraft,     setCommentDraft]     = useState('');
@@ -589,6 +596,92 @@ export default function TaskDetailDrawer({
       setComments(prev => prev.filter(c => c.id !== commentId));
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete comment.');
+    }
+  };
+
+  // ─── AI Task Breakdown Handlers (Phase 27) ──────────────────────────────────
+
+  const handleOpenAiBreakdown = async () => {
+    setShowAiBreakdown(true);
+    setIsGeneratingAiBreakdown(true);
+    setAiBreakdownError('');
+    setAiSuggestions([]);
+
+    try {
+      const res = await axios.post(
+        `${API}/ai/breakdown-task`,
+        { taskId: task.id },
+        { headers }
+      );
+
+      const items = (res.data.subtasks || []).map((st, idx) => ({
+        tempId: `ai-st-${Date.now()}-${idx}`,
+        title: st.title || '',
+        estimatedMinutes: st.estimatedMinutes || 30,
+        order: st.order || (idx + 1) * 1000,
+        selected: true,
+      }));
+
+      setAiSuggestions(items);
+    } catch (err) {
+      setAiBreakdownError(err.response?.data?.error || 'Failed to generate AI task breakdown.');
+    } finally {
+      setIsGeneratingAiBreakdown(false);
+    }
+  };
+
+  const handleToggleAiSuggestion = (tempId) => {
+    setAiSuggestions(prev =>
+      prev.map(s => s.tempId === tempId ? { ...s, selected: !s.selected } : s)
+    );
+  };
+
+  const handleUpdateAiSuggestionTitle = (tempId, newTitle) => {
+    setAiSuggestions(prev =>
+      prev.map(s => s.tempId === tempId ? { ...s, title: newTitle } : s)
+    );
+  };
+
+  const handleToggleSelectAllAi = () => {
+    const allSelected = aiSuggestions.length > 0 && aiSuggestions.every(s => s.selected);
+    setAiSuggestions(prev => prev.map(s => ({ ...s, selected: !allSelected })));
+  };
+
+  const handleAcceptAiBreakdown = async () => {
+    const selectedItems = aiSuggestions.filter(s => s.selected && s.title.trim().length > 0);
+    if (selectedItems.length === 0) return;
+
+    setIsBatchAddingSubtasks(true);
+    setAiBreakdownError('');
+
+    try {
+      const payload = {
+        subtasks: selectedItems.map(s => ({
+          title: s.title.trim(),
+          order: s.order,
+        })),
+      };
+
+      const res = await axios.post(`${API}/tasks/${task.id}/subtasks/batch`, payload, { headers });
+      const createdSubtasks = res.data.subtasks || [];
+
+      setSubtasks(prev => [...prev, ...createdSubtasks]);
+      setTask(prev => ({
+        ...prev,
+        subtasks: [...(prev.subtasks || []), ...createdSubtasks],
+      }));
+      onTaskUpdated?.({
+        ...task,
+        subtasks: [...(subtasks || []), ...createdSubtasks],
+      });
+
+      setShowAiBreakdown(false);
+      setAiSuggestions([]);
+      reloadTaskDetails();
+    } catch (err) {
+      setAiBreakdownError(err.response?.data?.error || 'Failed to apply AI breakdown subtasks.');
+    } finally {
+      setIsBatchAddingSubtasks(false);
     }
   };
 
@@ -1168,7 +1261,7 @@ export default function TaskDetailDrawer({
                 )}
               </div>
 
-              {/* ─── Phase 20: Subtasks & Checklists Workspace Section ──────────────── */}
+              {/* ─── Phase 20 & 27: Subtasks & Checklists with AI Breakdown Workspace Section ── */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px', borderRadius: 8, background: 'var(--color-canvas-subtle, #fafafa)', border: '1px solid var(--color-canvas-hairline, #ebebeb)' }}>
                 {/* Header & Progress Stats */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
@@ -1190,40 +1283,307 @@ export default function TaskDetailDrawer({
                     )}
                   </div>
 
-                  {/* Filter toggle */}
-                  {totalSubtasks > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {/* Actions: AI Breakdown & Filter toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={handleOpenAiBreakdown}
+                      disabled={isGeneratingAiBreakdown}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '3px 8px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(99, 102, 241, 0.12))',
+                        color: '#7c3aed',
+                        border: '1px solid rgba(124, 58, 237, 0.25)',
+                        cursor: isGeneratingAiBreakdown ? 'not-allowed' : 'pointer',
+                        transition: 'all 150ms ease',
+                      }}
+                      title="Automatically break down this task into step-by-step actionable checklist items with TaskFlow AI"
+                    >
+                      <span style={{ fontSize: 12 }}>✨</span>
+                      {isGeneratingAiBreakdown ? 'Breaking down…' : 'Break down with AI'}
+                    </button>
+
+                    {totalSubtasks > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button
+                          type="button"
+                          onClick={() => setSubtaskFilter('all')}
+                          style={{
+                            padding: '2px 6px', fontSize: 10.5, borderRadius: 4,
+                            background: subtaskFilter === 'all' ? 'var(--color-canvas-card, #ffffff)' : 'transparent',
+                            border: subtaskFilter === 'all' ? '1px solid var(--color-canvas-hairline, #ebebeb)' : '1px solid transparent',
+                            fontWeight: subtaskFilter === 'all' ? 600 : 500,
+                            color: subtaskFilter === 'all' ? '#0070f3' : 'var(--color-canvas-mute, #888888)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubtaskFilter('incomplete')}
+                          style={{
+                            padding: '2px 6px', fontSize: 10.5, borderRadius: 4,
+                            background: subtaskFilter === 'incomplete' ? 'var(--color-canvas-card, #ffffff)' : 'transparent',
+                            border: subtaskFilter === 'incomplete' ? '1px solid var(--color-canvas-hairline, #ebebeb)' : '1px solid transparent',
+                            fontWeight: subtaskFilter === 'incomplete' ? 600 : 500,
+                            color: subtaskFilter === 'incomplete' ? '#0070f3' : 'var(--color-canvas-mute, #888888)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Incomplete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Breakdown Interactive Card */}
+                {showAiBreakdown && (
+                  <div
+                    style={{
+                      margin: '4px 0 6px',
+                      padding: '12px 14px',
+                      borderRadius: 8,
+                      background: 'linear-gradient(180deg, rgba(245, 243, 255, 0.95) 0%, rgba(238, 242, 255, 0.8) 100%)',
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      boxShadow: '0 2px 10px rgba(124, 58, 237, 0.08)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 14 }}>✨</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#5b21b6', letterSpacing: '-0.01em' }}>
+                          TaskFlow AI Breakdown
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            padding: '1px 6px',
+                            borderRadius: 99,
+                            background: 'rgba(124, 58, 237, 0.15)',
+                            color: '#6d28d9',
+                          }}
+                        >
+                          AI Suggested
+                        </span>
+                      </div>
+
                       <button
                         type="button"
-                        onClick={() => setSubtaskFilter('all')}
+                        onClick={() => { setShowAiBreakdown(false); setAiSuggestions([]); }}
                         style={{
-                          padding: '2px 6px', fontSize: 10.5, borderRadius: 4,
-                          background: subtaskFilter === 'all' ? 'var(--color-canvas-card, #ffffff)' : 'transparent',
-                          border: subtaskFilter === 'all' ? '1px solid var(--color-canvas-hairline, #ebebeb)' : '1px solid transparent',
-                          fontWeight: subtaskFilter === 'all' ? 600 : 500,
-                          color: subtaskFilter === 'all' ? '#0070f3' : 'var(--color-canvas-mute, #888888)',
+                          background: 'none',
+                          border: 'none',
+                          padding: '2px 4px',
+                          color: '#7c3aed',
+                          fontSize: 12,
                           cursor: 'pointer',
+                          borderRadius: 4,
                         }}
+                        title="Close AI suggestions"
                       >
-                        All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSubtaskFilter('incomplete')}
-                        style={{
-                          padding: '2px 6px', fontSize: 10.5, borderRadius: 4,
-                          background: subtaskFilter === 'incomplete' ? 'var(--color-canvas-card, #ffffff)' : 'transparent',
-                          border: subtaskFilter === 'incomplete' ? '1px solid var(--color-canvas-hairline, #ebebeb)' : '1px solid transparent',
-                          fontWeight: subtaskFilter === 'incomplete' ? 600 : 500,
-                          color: subtaskFilter === 'incomplete' ? '#0070f3' : 'var(--color-canvas-mute, #888888)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Incomplete
+                        ✕
                       </button>
                     </div>
-                  )}
-                </div>
+
+                    {/* Loading State */}
+                    {isGeneratingAiBreakdown && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0', color: '#6d28d9', fontSize: 12 }}>
+                        <div
+                          style={{
+                            width: 14,
+                            height: 14,
+                            border: '2px solid rgba(124, 58, 237, 0.3)',
+                            borderTopColor: '#7c3aed',
+                            borderRadius: '50%',
+                            animation: 'spinIndicator 0.8s linear infinite',
+                          }}
+                        />
+                        <span>Analyzing task objective and drafting sequential checklist items…</span>
+                      </div>
+                    )}
+
+                    {/* Error State */}
+                    {aiBreakdownError && (
+                      <div
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: 6,
+                          background: '#fee2e2',
+                          border: '1px solid #fca5a5',
+                          color: '#991b1b',
+                          fontSize: 11.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span>{aiBreakdownError}</span>
+                        <button
+                          type="button"
+                          onClick={handleOpenAiBreakdown}
+                          style={{
+                            background: '#ffffff',
+                            border: '1px solid #f87171',
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#b91c1c',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Suggestions List */}
+                    {!isGeneratingAiBreakdown && aiSuggestions.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#6d28d9' }}>
+                          <span>
+                            Select subtasks to add ({aiSuggestions.filter(s => s.selected).length}/{aiSuggestions.length} selected):
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleToggleSelectAllAi}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#7c3aed',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                            }}
+                          >
+                            {aiSuggestions.every(s => s.selected) ? 'Deselect all' : 'Select all'}
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 220, overflowY: 'auto' }}>
+                          {aiSuggestions.map((item, idx) => (
+                            <div
+                              key={item.tempId}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '6px 8px',
+                                borderRadius: 6,
+                                background: '#ffffff',
+                                border: item.selected ? '1px solid #c4b5fd' : '1px solid #e5e7eb',
+                                transition: 'all 120ms ease',
+                              }}
+                            >
+                              {/* Checkbox */}
+                              <input
+                                type="checkbox"
+                                checked={item.selected}
+                                onChange={() => handleToggleAiSuggestion(item.tempId)}
+                                style={{
+                                  width: 15,
+                                  height: 15,
+                                  accentColor: '#7c3aed',
+                                  cursor: 'pointer',
+                                }}
+                              />
+
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', width: 14 }}>
+                                {idx + 1}.
+                              </span>
+
+                              {/* Editable Subtask Title */}
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={e => handleUpdateAiSuggestionTitle(item.tempId, e.target.value)}
+                                style={{
+                                  flex: 1,
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  border: 'none',
+                                  outline: 'none',
+                                  background: 'transparent',
+                                  color: item.selected ? '#1f2937' : '#9ca3af',
+                                  textDecoration: item.selected ? 'none' : 'line-through',
+                                }}
+                              />
+
+                              {/* Estimated minutes badge */}
+                              {item.estimatedMinutes && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    padding: '1px 5px',
+                                    borderRadius: 4,
+                                    background: '#f3f4f6',
+                                    color: '#6b7280',
+                                    fontFamily: "'JetBrains Mono', monospace",
+                                    flexShrink: 0,
+                                  }}
+                                  title="Estimated effort"
+                                >
+                                  ~{item.estimatedMinutes}m
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, paddingTop: 4 }}>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => { setShowAiBreakdown(false); setAiSuggestions([]); }}
+                            style={{ height: 26, fontSize: 11 }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAcceptAiBreakdown}
+                            disabled={isBatchAddingSubtasks || aiSuggestions.filter(s => s.selected && s.title.trim()).length === 0}
+                            style={{
+                              height: 26,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              padding: '0 12px',
+                              borderRadius: 6,
+                              background: '#7c3aed',
+                              color: '#ffffff',
+                              border: 'none',
+                              cursor: isBatchAddingSubtasks || aiSuggestions.filter(s => s.selected && s.title.trim()).length === 0 ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              opacity: isBatchAddingSubtasks || aiSuggestions.filter(s => s.selected && s.title.trim()).length === 0 ? 0.6 : 1,
+                              transition: 'all 120ms ease',
+                            }}
+                          >
+                            {isBatchAddingSubtasks ? 'Adding…' : `Accept Selected (${aiSuggestions.filter(s => s.selected && s.title.trim()).length})`}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Visual Progress Bar */}
                 {totalSubtasks > 0 && (

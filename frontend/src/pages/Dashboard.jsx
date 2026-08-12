@@ -13,6 +13,8 @@ import NotificationBell from '../components/NotificationBell';
 import ProjectModal from '../components/ProjectModal';
 import ProjectDashboardHeader from '../components/ProjectDashboardHeader';
 import ProjectAnalytics from '../components/ProjectAnalytics';
+import CalendarView from '../components/CalendarView';
+import GlobalSearchModal from '../components/GlobalSearchModal';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 
@@ -20,11 +22,11 @@ import { API_URL } from '../api/config';
 const API = API_URL;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function getActiveTeam()       { try { return JSON.parse(localStorage.getItem('team')); }   catch { return null; } }
-function getCurrentUser()      { try { return JSON.parse(localStorage.getItem('user')); }   catch { return null; } }
-function getCurrentUserId()    { return getCurrentUser()?.id ?? null; }
+function getActiveTeam() { try { return JSON.parse(localStorage.getItem('team')); } catch { return null; } }
+function getCurrentUser() { try { return JSON.parse(localStorage.getItem('user')); } catch { return null; } }
+function getCurrentUserId() { return getCurrentUser()?.id ?? null; }
 function getCurrentUserEmail() { return getCurrentUser()?.email ?? null; }
-function isEmailVerified()     { try { return JSON.parse(localStorage.getItem('user'))?.emailVerified === true; } catch { return true; } }
+function isEmailVerified() { try { return JSON.parse(localStorage.getItem('user'))?.emailVerified === true; } catch { return true; } }
 
 function useDebounce(value, delay = 350) {
   const [debounced, setDebounced] = useState(value);
@@ -78,9 +80,9 @@ function PriorityBadge({ priority }) {
 
   const config = {
     urgent: { label: 'Urgent', color: '#e5484d', bg: 'rgba(229, 72, 77, 0.12)', border: 'rgba(229, 72, 77, 0.3)' },
-    high:   { label: 'High',   color: '#f76808', bg: 'rgba(247, 104, 8, 0.12)', border: 'rgba(247, 104, 8, 0.3)' },
-    medium: { label: 'Med',    color: '#0070f3', bg: 'rgba(0, 112, 243, 0.10)', border: 'rgba(0, 112, 243, 0.25)' },
-    low:    { label: 'Low',    color: '#8a8f98', bg: 'rgba(138, 143, 152, 0.10)', border: 'rgba(138, 143, 152, 0.2)' },
+    high: { label: 'High', color: '#f76808', bg: 'rgba(247, 104, 8, 0.12)', border: 'rgba(247, 104, 8, 0.3)' },
+    medium: { label: 'Med', color: '#0070f3', bg: 'rgba(0, 112, 243, 0.10)', border: 'rgba(0, 112, 243, 0.25)' },
+    low: { label: 'Low', color: '#8a8f98', bg: 'rgba(138, 143, 152, 0.10)', border: 'rgba(138, 143, 152, 0.2)' },
   }[p] || { label: 'Med', color: '#0070f3', bg: 'rgba(0, 112, 243, 0.10)', border: 'rgba(0, 112, 243, 0.25)' };
 
   return (
@@ -144,25 +146,124 @@ function IconBoard() {
   );
 }
 
-// ── New Task Modal ─────────────────────────────────────────────────────────
+function IconCalendar() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="2.5" width="10" height="9.5" rx="1" />
+      <line x1="2" y1="5.5" x2="12" y2="5.5" />
+      <line x1="4.5" y1="1.5" x2="4.5" y2="3.5" />
+      <line x1="9.5" y1="1.5" x2="9.5" y2="3.5" />
+    </svg>
+  );
+}
+
+// ── New Task Modal (Enhanced with AI Task Assistant) ─────────────────────────
 function NewTaskModal({
   members,
   projects = [],
   currentUserId,
   defaultStatus = 'todo',
   defaultProjectId = '',
+  defaultDueDate = '',
+  token,
   onSubmit,
   onClose,
 }) {
-  const [title,       setTitle]       = useState('');
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [status,      setStatus]      = useState(defaultStatus);
-  const [priority,    setPriority]    = useState('medium');
-  const [labelsStr,   setLabelsStr]   = useState('');
-  const [assigneeId,  setAssigneeId]  = useState('');
-  const [projectId,   setProjectId]   = useState(defaultProjectId || '');
-  const [dueDate,     setDueDate]     = useState('');
-  const [loading,     setLoading]     = useState(false);
+  const [status, setStatus] = useState(defaultStatus);
+  const [priority, setPriority] = useState('medium');
+  const [labelsStr, setLabelsStr] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [projectId, setProjectId] = useState(defaultProjectId || '');
+  const [dueDate, setDueDate] = useState(defaultDueDate || '');
+  const [subtasks, setSubtasks] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // AI Assistant state
+  const [showAi, setShowAi] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState('');
+
+  const samplePrompts = [
+    'Redesign login page with OAuth support',
+    'Configure AWS deployment & monitoring',
+    'Database schema design & indices',
+    'Investigate and fix critical crash bug',
+  ];
+
+  const handleAiGenerate = async (customPrompt) => {
+    const promptToUse = (customPrompt || aiPrompt).trim();
+    if (!promptToUse) return;
+
+    setAiGenerating(true);
+    setAiError('');
+
+    try {
+      const res = await fetch(`${API_URL}/ai/generate-task`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          prompt: promptToUse,
+          projectId: projectId || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate task with AI');
+      }
+
+      const { suggestion } = data;
+      if (suggestion.title) setTitle(suggestion.title);
+      if (suggestion.description) setDescription(suggestion.description);
+      if (suggestion.priority) setPriority(suggestion.priority);
+      if (Array.isArray(suggestion.labels) && suggestion.labels.length > 0) {
+        setLabelsStr(suggestion.labels.join(', '));
+      }
+      if (suggestion.suggestedDueDate) {
+        setDueDate(suggestion.suggestedDueDate);
+      }
+      if (Array.isArray(suggestion.suggestedSubtasks) && suggestion.suggestedSubtasks.length > 0) {
+        setSubtasks(
+          suggestion.suggestedSubtasks.map((s, idx) => ({
+            id: `ai-sub-${Date.now()}-${idx}`,
+            title: s.title,
+            order: s.order || (idx + 1) * 1000,
+            included: true,
+          }))
+        );
+      }
+      setShowAi(false);
+    } catch (err) {
+      setAiError(err.message || 'AI generation failed. Please try again.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const handleToggleSubtask = (index) => {
+    setSubtasks(prev => prev.map((s, idx) => idx === index ? { ...s, included: !s.included } : s));
+  };
+
+  const handleRemoveSubtask = (index) => {
+    setSubtasks(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleAddCustomSubtask = () => {
+    setSubtasks(prev => [
+      ...prev,
+      { id: `custom-sub-${Date.now()}`, title: '', order: (prev.length + 1) * 1000, included: true },
+    ]);
+  };
+
+  const handleSubtaskTitleChange = (index, newTitle) => {
+    setSubtasks(prev => prev.map((s, idx) => idx === index ? { ...s, title: newTitle } : s));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -174,6 +275,13 @@ function NewTaskModal({
       .map(s => s.trim())
       .filter(Boolean);
 
+    const activeSubtasks = subtasks
+      .filter(s => s.included && s.title.trim())
+      .map((s, idx) => ({
+        title: s.title.trim(),
+        order: s.order || (idx + 1) * 1000,
+      }));
+
     await onSubmit({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -183,6 +291,7 @@ function NewTaskModal({
       assigneeId: assigneeId || undefined,
       projectId: projectId || undefined,
       dueDate: dueDate || undefined,
+      subtasks: activeSubtasks.length > 0 ? activeSubtasks : undefined,
     });
     setLoading(false);
   };
@@ -198,7 +307,7 @@ function NewTaskModal({
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
-        background: 'var(--color-modal-backdrop, rgba(0,0,0,0.35))', backdropFilter: 'blur(2px)',
+        background: 'var(--color-modal-backdrop, rgba(0,0,0,0.45))', backdropFilter: 'blur(3px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -207,13 +316,95 @@ function NewTaskModal({
       aria-labelledby="modal-title"
     >
       <div style={{
-        background: 'var(--color-modal-bg, #fff)', borderRadius: 12, width: '100%', maxWidth: 480,
-        border: '1px solid var(--color-modal-border, #ebebeb)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-        padding: 24,
+        background: 'var(--color-modal-bg, #ffffff)', borderRadius: 14, width: '100%', maxWidth: 520,
+        border: '1px solid var(--color-modal-border, #ebebeb)', boxShadow: '0 16px 40px rgba(0,0,0,0.25)',
+        padding: 24, maxHeight: '90vh', overflowY: 'auto',
       }}>
-        <h2 id="modal-title" style={{ margin: '0 0 18px', fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #171717)', letterSpacing: '-0.4px' }}>
-          New task
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h2 id="modal-title" style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--color-canvas-ink, #171717)', letterSpacing: '-0.4px' }}>
+            New task
+          </h2>
+          <button
+            type="button"
+            onClick={() => setShowAi(prev => !prev)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+              background: showAi ? 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' : 'var(--color-canvas-hover, #f3f4f6)',
+              color: showAi ? '#ffffff' : 'var(--color-canvas-ink, #4f46e5)',
+              border: showAi ? 'none' : '1px solid var(--color-canvas-hairline, #e0e7ff)',
+              cursor: 'pointer', transition: 'all 150ms ease',
+            }}
+            title="Toggle AI Task Assistant"
+          >
+            <span>✨</span>
+            <span>{showAi ? 'Close AI' : 'Create with AI'}</span>
+          </button>
+        </div>
+
+        {/* AI Generator Box */}
+        {showAi && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(168, 85, 247, 0.08) 100%)',
+            border: '1px solid rgba(99, 102, 241, 0.25)',
+            borderRadius: 10, padding: 14, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#4f46e5' }}>
+              <span>✨</span>
+              <span>AI Task Assistant (Powered by Gemini)</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="text"
+                className="field-input"
+                placeholder="What would you like to accomplish? (e.g. Implement OAuth login)"
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAiGenerate(); } }}
+                style={{ flex: 1, fontSize: 13, background: 'var(--color-canvas-card, #ffffff)' }}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => handleAiGenerate()}
+                disabled={aiGenerating || !aiPrompt.trim()}
+                style={{
+                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                  border: 'none', padding: '0 14px', fontSize: 12.5, whiteSpace: 'nowrap',
+                }}
+              >
+                {aiGenerating ? 'Generating…' : 'Generate'}
+              </button>
+            </div>
+
+            {/* Quick preset chips */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {samplePrompts.map((p, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => { setAiPrompt(p); handleAiGenerate(p); }}
+                  disabled={aiGenerating}
+                  style={{
+                    fontSize: 11, padding: '3px 8px', borderRadius: 12,
+                    background: 'var(--color-canvas-card, #ffffff)',
+                    border: '1px solid var(--color-canvas-hairline, #e2e8f0)',
+                    color: 'var(--color-canvas-body, #64748b)', cursor: 'pointer',
+                  }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {aiError && (
+              <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 500 }}>
+                ⚠️ {aiError}
+              </div>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Title */}
@@ -226,7 +417,6 @@ function NewTaskModal({
               placeholder="Task title…"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              autoFocus
               required
             />
           </div>
@@ -237,13 +427,68 @@ function NewTaskModal({
             <textarea
               id="modal-task-desc"
               className="field-input"
-              placeholder="Add details, notes, or sub-tasks…"
-              rows={2}
+              placeholder="Add details, notes, or objectives…"
+              rows={3}
               value={description}
               onChange={e => setDescription(e.target.value)}
-              style={{ resize: 'vertical' }}
+              style={{ resize: 'vertical', fontSize: 13 }}
             />
           </div>
+
+          {/* Subtasks Checklist Section */}
+          {subtasks.length > 0 && (
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 6,
+              background: 'var(--color-canvas-hover, #f8fafc)',
+              borderRadius: 8, padding: 10, border: '1px solid var(--color-canvas-hairline, #e2e8f0)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-canvas-ink, #334155)' }}>
+                  Checklist Subtasks ({subtasks.filter(s => s.included).length}/{subtasks.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAddCustomSubtask}
+                  style={{ fontSize: 11, background: 'transparent', border: 'none', color: '#4f46e5', cursor: 'pointer', fontWeight: 500 }}
+                >
+                  + Add subtask
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
+                {subtasks.map((st, idx) => (
+                  <div key={st.id || idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={st.included}
+                      onChange={() => handleToggleSubtask(idx)}
+                      style={{ cursor: 'pointer' }}
+                      title="Include in created task"
+                    />
+                    <input
+                      type="text"
+                      className="field-input"
+                      value={st.title}
+                      onChange={e => handleSubtaskTitleChange(idx, e.target.value)}
+                      placeholder="Subtask title…"
+                      style={{
+                        flex: 1, height: 26, fontSize: 12,
+                        textDecoration: st.included ? 'none' : 'line-through',
+                        opacity: st.included ? 1 : 0.6,
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSubtask(idx)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 14 }}
+                      title="Delete subtask"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Status & Priority row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -363,7 +608,7 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
   const [hovered, setHovered] = useState(false);
 
   const formattedDate = formatDueDate(task.dueDate);
-  const overdue       = isOverdue(task.dueDate, task.status);
+  const overdue = isOverdue(task.dueDate, task.status);
 
   return (
     <div
@@ -541,45 +786,47 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const token   = localStorage.getItem('token');
-  const teamId  = localStorage.getItem('teamId');
+  const token = localStorage.getItem('token');
+  const teamId = localStorage.getItem('teamId');
   const { joinTeam, subscribe } = useRealtime();
 
-  const [teams,       setTeams]       = useState([]);
-  const [activeTeam,  setActiveTeam]  = useState(getActiveTeam);
-  const [projects,    setProjects]    = useState([]);
-  const [tasks,       setTasks]       = useState([]);
-  const [members,     setMembers]     = useState([]);
-  const [error,       setError]       = useState('');
+  const [teams, setTeams] = useState([]);
+  const [activeTeam, setActiveTeam] = useState(getActiveTeam);
+  const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [error, setError] = useState('');
   const activeTab = searchParams.get('tab') === 'mine' ? 'mine' : 'all';
   const activeProjectId = searchParams.get('projectId') || null;
   const [showProjectModal, setShowProjectModal] = useState(false);
-  const [editingProject,   setEditingProject]   = useState(null);
+  const [editingProject, setEditingProject] = useState(null);
   const [searchInput, setSearchInput] = useState('');
-  const [showModal,   setShowModal]   = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [modalDefaultStatus, setModalDefaultStatus] = useState('todo');
-  const [emailVerified,   setEmailVerified]   = useState(isEmailVerified);
-  const [resendStatus,    setResendStatus]    = useState('idle');
-  const [tasksLoading,    setTasksLoading]    = useState(true);
+  const [modalDefaultDueDate, setModalDefaultDueDate] = useState('');
+  const [emailVerified, setEmailVerified] = useState(isEmailVerified);
+  const [resendStatus, setResendStatus] = useState('idle');
+  const [tasksLoading, setTasksLoading] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDrawerEditRequested, setIsDrawerEditRequested] = useState(false);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const searchInputRef = useRef(null);
 
   const activeProject = projects.find(p => p.id === activeProjectId) || null;
 
-  // ── Kanban view mode & Undo state ─────────────────────────────────────────
+  // ── Kanban / Calendar view mode & Undo state ──────────────────────────────
   const [viewMode, setViewMode] = useState(() => {
     return searchParams.get('view') || localStorage.getItem('taskflow_view') || 'board';
   });
   const [undoToast, setUndoToast] = useState(null);
 
   // ── Analytics state ────────────────────────────────────────────────────────
-  const [analytics,         setAnalytics]         = useState(null);
-  const [analyticsLoading,  setAnalyticsLoading]  = useState(false);
-  const [analyticsRange,    setAnalyticsRange]    = useState('30d');
-  const [analyticsScope,    setAnalyticsScope]    = useState('team');
-  const [drillDownFilter,   setDrillDownFilter]   = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsRange, setAnalyticsRange] = useState('30d');
+  const [analyticsScope, setAnalyticsScope] = useState('team');
+  const [drillDownFilter, setDrillDownFilter] = useState(null);
 
   const handleTabChange = (tab) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -592,16 +839,46 @@ export default function Dashboard() {
     setViewMode(mode);
     localStorage.setItem('taskflow_view', mode);
     const nextParams = new URLSearchParams(searchParams);
-    if (mode === 'list') nextParams.set('view', 'list');
-    else nextParams.delete('view');
+    if (mode === 'board') nextParams.delete('view');
+    else nextParams.set('view', mode);
     setSearchParams(nextParams);
   };
 
-  const currentUserId   = getCurrentUserId();
-  const currentUser     = getCurrentUser();
+  const handleTaskReschedule = async (taskId, newDueDate) => {
+    const previousTasks = [...tasks];
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, dueDate: newDueDate } : t))
+    );
+
+    try {
+      await axios.patch(
+        `${API}/tasks/${taskId}/due-date`,
+        { dueDate: newDueDate },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-Team-Id': teamId,
+          },
+        }
+      );
+    } catch (err) {
+      setTasks(previousTasks);
+      setError('Failed to reschedule task');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
+  const handleCalendarQuickAdd = (dateKey) => {
+    setModalDefaultStatus('todo');
+    setModalDefaultDueDate(dateKey || '');
+    setShowModal(true);
+  };
+
+  const currentUserId = getCurrentUserId();
+  const currentUser = getCurrentUser();
   const currentUserEmail = getCurrentUserEmail();
-  const currentMember   = members.find(m => m.id === currentUserId);
-  const userRole        = currentMember?.role || 'member';
+  const currentMember = members.find(m => m.id === currentUserId);
+  const userRole = currentMember?.role || 'member';
 
   const debouncedSearch = useDebounce(searchInput, 350);
 
@@ -640,10 +917,17 @@ export default function Dashboard() {
         return;
       }
 
-      // '/' -> Search
+      // ⌘K / Ctrl+K -> Global Search
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setShowGlobalSearch((prev) => !prev);
+        return;
+      }
+
+      // '/' -> Global Search
       if (e.key === '/') {
         e.preventDefault();
-        searchInputRef.current?.focus();
+        setShowGlobalSearch(true);
         return;
       }
 
@@ -777,7 +1061,7 @@ export default function Dashboard() {
   }, [teamId, token, analyticsRange, analyticsScope, currentUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!token)  { navigate('/'); return; }
+    if (!token) { navigate('/'); return; }
     if (!teamId) { navigate('/onboarding'); return; }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTeams();
@@ -1011,7 +1295,7 @@ export default function Dashboard() {
     return true;
   });
 
-  const doneCount  = displayedTasks.filter(t => t.status === 'done').length;
+  const doneCount = displayedTasks.filter(t => t.status === 'done').length;
   const totalCount = displayedTasks.length;
 
   const handleSelectProject = (projId) => {
@@ -1093,8 +1377,8 @@ export default function Dashboard() {
             {/* Tabs */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {[
-                { key: 'all',  label: 'All tasks' },
-                { key: 'mine', label: 'My tasks'  },
+                { key: 'all', label: 'All tasks' },
+                { key: 'mine', label: 'My tasks' },
               ].map(({ key, label }) => (
                 <button
                   key={key}
@@ -1121,7 +1405,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {/* View Switcher: List vs Board */}
+            {/* View Switcher: Board vs List vs Calendar */}
             <div className="view-switcher-pill" role="radiogroup" aria-label="Task view mode">
               <button
                 type="button"
@@ -1145,27 +1429,53 @@ export default function Dashboard() {
                 <IconList />
                 List
               </button>
+              <button
+                type="button"
+                onClick={() => handleViewModeChange('calendar')}
+                className={`view-switcher-btn ${viewMode === 'calendar' ? 'active' : ''}`}
+                aria-checked={viewMode === 'calendar'}
+                role="radio"
+                title="Calendar View"
+              >
+                <IconCalendar />
+                Calendar
+              </button>
             </div>
           </div>
 
           {/* Search + ThemeToggle + New task */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+            <button
+              onClick={() => setShowGlobalSearch(true)}
+              className="field-input"
+              style={{
+                height: 32,
+                paddingLeft: 10,
+                paddingRight: 10,
+                width: 190,
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                background: 'var(--color-canvas-card, #ffffff)',
+                color: 'var(--color-canvas-mute, #888888)',
+                border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                borderRadius: 6,
+              }}
+              aria-label="Open advanced global search (Press / or ⌘K)"
+              title="Global Search (/ or ⌘K)"
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--color-canvas-body, #4d4d4d)' }}>
                 <SearchIcon />
+                <span style={{ fontSize: 13, color: searchInput ? 'var(--color-canvas-ink, #171717)' : 'var(--color-canvas-mute, #888888)' }}>
+                  {searchInput ? searchInput : 'Search…'}
+                </span>
               </span>
-              <input
-                ref={searchInputRef}
-                id="search-tasks-input"
-                type="search"
-                placeholder="Search… (Press /)"
-                value={searchInput}
-                onChange={e => setSearchInput(e.target.value)}
-                className="field-input"
-                style={{ height: 32, paddingLeft: 30, paddingRight: 10, width: 180, fontSize: 13 }}
-                aria-label="Search tasks"
-              />
-            </div>
+              <kbd style={{ fontSize: 11, fontFamily: 'monospace', opacity: 0.7, background: 'var(--color-canvas-hover, #f0f0f0)', padding: '1px 5px', borderRadius: 4 }}>
+                /
+              </kbd>
+            </button>
 
             {/* Quick notifications bell */}
             <NotificationBell onSelectTask={handleOpenTaskById} />
@@ -1324,13 +1634,25 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Main workspace view: Project Analytics vs Kanban Board vs List View */}
+          {/* Main workspace view: Project Analytics vs Calendar vs Kanban Board vs List View */}
           {activeProjectId && viewMode === 'analytics' ? (
             <ProjectAnalytics
               projectId={activeProjectId}
               teamId={teamId}
               token={token}
               project={activeProject}
+            />
+          ) : viewMode === 'calendar' ? (
+            <CalendarView
+              tasks={tasks}
+              projects={projects}
+              members={members}
+              currentUserId={currentUserId}
+              activeProjectId={activeProjectId}
+              onSelectTask={(t) => setSelectedTask(t)}
+              onStatusChange={handleStatusChange}
+              onTaskReschedule={handleTaskReschedule}
+              onQuickAdd={handleCalendarQuickAdd}
             />
           ) : tasksLoading ? (
             <TaskSkeleton count={3} />
@@ -1356,28 +1678,28 @@ export default function Dashboard() {
                 justifyContent: 'center', marginBottom: 12,
               }}>
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <rect x="3" y="4"  width="12" height="1.3" rx="0.65" fill="var(--color-canvas-mute, #50545c)" />
-                  <rect x="3" y="8"  width="9"  height="1.3" rx="0.65" fill="var(--color-canvas-mute, #50545c)" />
-                  <rect x="3" y="12" width="6"  height="1.3" rx="0.65" fill="var(--color-canvas-mute, #50545c)" />
+                  <rect x="3" y="4" width="12" height="1.3" rx="0.65" fill="var(--color-canvas-mute, #50545c)" />
+                  <rect x="3" y="8" width="9" height="1.3" rx="0.65" fill="var(--color-canvas-mute, #50545c)" />
+                  <rect x="3" y="12" width="6" height="1.3" rx="0.65" fill="var(--color-canvas-mute, #50545c)" />
                 </svg>
               </div>
               <p style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.3px' }}>
                 {drillDownFilter
                   ? 'No tasks match the active filter'
                   : debouncedSearch.trim()
-                  ? 'No matching tasks'
-                  : activeTab === 'mine'
-                  ? 'No tasks assigned to you'
-                  : 'No tasks yet'}
+                    ? 'No matching tasks'
+                    : activeTab === 'mine'
+                      ? 'No tasks assigned to you'
+                      : 'No tasks yet'}
               </p>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--color-canvas-body, #50545c)', maxWidth: 260, lineHeight: '18px' }}>
                 {drillDownFilter
                   ? 'Try clearing the filter to see all team tasks.'
                   : debouncedSearch.trim()
-                  ? 'Try a different search term.'
-                  : activeTab === 'mine'
-                  ? 'Tasks assigned to you will show here.'
-                  : 'Click "New task" to create your first one.'}
+                    ? 'Try a different search term.'
+                    : activeTab === 'mine'
+                      ? 'Tasks assigned to you will show here.'
+                      : 'Click "New task" to create your first one.'}
               </p>
               {drillDownFilter ? (
                 <button
@@ -1428,8 +1750,13 @@ export default function Dashboard() {
           currentUserId={currentUserId}
           defaultStatus={modalDefaultStatus}
           defaultProjectId={activeProjectId}
+          defaultDueDate={modalDefaultDueDate}
+          token={token}
           onSubmit={handleCreate}
-          onClose={() => setShowModal(false)}
+          onClose={() => {
+            setShowModal(false);
+            setModalDefaultDueDate('');
+          }}
         />
       )}
 
@@ -1477,6 +1804,15 @@ export default function Dashboard() {
         toast={undoToast}
         onUndo={handleUndoMove}
         onDismiss={() => setUndoToast(null)}
+      />
+
+      {/* Global Advanced Search Modal */}
+      <GlobalSearchModal
+        isOpen={showGlobalSearch}
+        onClose={() => setShowGlobalSearch(false)}
+        onSelectTask={handleOpenTaskById}
+        onSelectProject={handleSelectProject}
+        initialQuery={searchInput}
       />
     </div>
   );

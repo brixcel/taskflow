@@ -3,4 +3,5 @@ node_modules
 .github
 
 /generated/prisma
-*.Zone.Identifier
+*Zone.Identifier*
+*:Zone.Identifier

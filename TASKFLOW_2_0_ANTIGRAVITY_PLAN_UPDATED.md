@@ -22,10 +22,10 @@
 | **Milestone H** | **Phase 21** | Notifications Center | ✅ **COMPLETE** | `phase21-notifications.test.js` |
 | **Milestone H** | **Phase 22** | Real-Time Collaboration | ✅ **COMPLETE** | `phase22-realtime.test.js` |
 | **Milestone H2** | **Phase 23** | Projects / Workspaces | ✅ **COMPLETE** | `phase23-projects.test.js` (22/22 passed) |
-| **Milestone H2** | **Phase 24** | Calendar View | ⏳ Ready / Next | `phase24-calendar.test.js` |
-| **Milestone H2** | **Phase 25** | Advanced Search | ⏳ Pending | `phase25-search.test.js` |
-| **Milestone I** | **Phase 26** | AI Task Assistant | ⏳ Pending | `phase26-ai-assistant.test.js` |
-| **Milestone I** | **Phase 27** | AI Task Breakdown | ⏳ Pending | `phase27-ai-breakdown.test.js` |
+| **Milestone H2** | **Phase 24** | Calendar View | ✅ **COMPLETE** | `phase24-calendar.test.js` (13/13 passed) |
+| **Milestone H2** | **Phase 25** | Advanced Search | ✅ **COMPLETE** | `phase25-search.test.js` (28/28 passed) |
+| **Milestone I** | **Phase 26** | AI Task Assistant | ✅ **COMPLETE** | `phase26-ai-assistant.test.js` (15/15 passed) |
+| **Milestone I** | **Phase 27** | AI Task Breakdown | ✅ **COMPLETE** | `phase27-ai-breakdown.test.js` (15/15 passed) |
 | **Milestone I** | **Phase 28** | AI Project Planner | ⏳ Pending | `phase28-ai-planner.test.js` |
 | **Milestone I** | **Phase 29** | AI Productivity Insights | ⏳ Pending | `phase29-ai-insights.test.js` |
 | **Milestone I** | **Phase 30** | Natural-Language Search | ⏳ Pending | `phase30-ai-search.test.js` |

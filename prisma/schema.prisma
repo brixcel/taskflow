@@ -37,6 +37,8 @@ model User {
   notifications            Notification[]          @relation("UserNotifications")
   actorNotifications       Notification[]          @relation("ActorNotifications")
   notificationPreferences  NotificationPreference?
+  savedSearches            SavedSearch[]
+  recentSearches           RecentSearch[]
 
   @@map("users")
 }
@@ -54,6 +56,8 @@ model Team {
   projects      Project[]
   tasks         Task[]
   notifications Notification[]
+  savedSearches SavedSearch[]
+  recentSearches RecentSearch[]
 
   @@map("teams")
 }
@@ -286,5 +290,40 @@ model NotificationPreference {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_preferences")
+}
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+
+model SavedSearch {
+  id        String   @id @default(uuid())
+  name      String
+  query     String
+  filters   Json?
+  userId    String
+  teamId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([userId, teamId])
+  @@map("saved_searches")
+}
+
+model RecentSearch {
+  id        String   @id @default(uuid())
+  query     String
+  userId    String
+  teamId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId, query])
+  @@index([userId, teamId, updatedAt])
+  @@map("recent_searches")
 }
 

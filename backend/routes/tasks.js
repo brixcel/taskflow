@@ -7,6 +7,7 @@ const validate   = require('../middleware/validate');
 const { sanitize } = require('../middleware/sanitize');
 const schemas    = require('../validation/schemas');
 const { scopedTaskQuery } = require('../helpers/scopedQuery');
+const { parseSearchQuery, buildPrismaWhereClause } = require('../services/searchParser');
 const logger     = require('../middleware/logger');
 const { createNotification } = require('../services/notifications');
 const {
@@ -27,7 +28,7 @@ router.use(requireAuth, resolveTeam);
 
 router.post('/', validate(schemas.taskCreate), async (req, res) => {
   try {
-    const { title, description, assigneeId, projectId, dueDate, status, priority, labels, order, position } = req.body;
+    const { title, description, assigneeId, projectId, dueDate, status, priority, labels, order, position, subtasks } = req.body;
 
     // If an assignee is specified, verify they are a member of this team.
     if (assigneeId) {
@@ -66,6 +67,16 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
       ? labels.map(l => sanitize(String(l).trim())).filter(Boolean)
       : [];
 
+    const subtasksCreateData = (Array.isArray(subtasks) && subtasks.length > 0)
+      ? {
+          create: subtasks.map((s, idx) => ({
+            title: sanitize(s.title),
+            order: s.order !== undefined ? s.order : (idx + 1) * 1000,
+            completed: false,
+          })),
+        }
+      : undefined;
+
     const task = await prisma.task.create({
       data: {
         title:       sanitize(title),
@@ -79,11 +90,13 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
         dueDate:     dueDate ? new Date(dueDate) : null,
         createdById: req.userId,
         teamId:      req.teamId,
+        subtasks:    subtasksCreateData,
       },
       include: {
         assignee:  { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
         project:   { select: { id: true, name: true, color: true, icon: true } },
+        subtasks:  { orderBy: { order: 'asc' } },
       },
     });
 
@@ -140,7 +153,7 @@ router.get('/', async (req, res) => {
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 20));
     const skip     = (page - 1) * pageSize;
 
-    const where = scopedTaskQuery(req);
+    let where = scopedTaskQuery(req);
     if (status)     where.status     = status;
     if (assigneeId) where.assigneeId = assigneeId;
     if (projectId) {
@@ -152,9 +165,18 @@ router.get('/', async (req, res) => {
     }
     if (priority)   where.priority   = priority;
     if (label)      where.labels     = { has: label.trim() };
-    if (search) {
+
+    if (search && search.trim()) {
       const term = search.trim();
-      if (term) {
+      const hasOperators = /[a-zA-Z_-]+:(?:"[^"]+"|'[^']+'|[^\s]+)/.test(term);
+      if (hasOperators) {
+        const parsed = parseSearchQuery(term);
+        where = buildPrismaWhereClause(parsed, {
+          userId: req.userId,
+          teamId: req.teamId,
+          baseWhere: where,
+        });
+      } else {
         where.OR = [
           { title:       { contains: term, mode: 'insensitive' } },
           { description: { contains: term, mode: 'insensitive' } },
@@ -316,8 +338,63 @@ router.patch('/:id/order', validate(schemas.taskOrder), async (req, res) => {
 
     res.json({ task });
   } catch (error) {
-    logger.error({ err: error }, 'PATCH /tasks/:id/order failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'PATCH /tasks/:id/order failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
+// ─── PATCH /:id/due-date — update task due date (calendar reschedule) ─────────
+
+router.patch('/:id/due-date', validate(schemas.taskDueDateUpdate), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existingTask = await prisma.task.findFirst({
+      where: scopedTaskQuery(req, { id }),
+    });
+    if (!existingTask) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const { dueDate } = req.body;
+    const parsedDueDate = dueDate ? new Date(dueDate) : null;
+
+    const task = await prisma.task.update({
+      where: { id },
+      data: {
+        dueDate: parsedDueDate,
+      },
+      include: {
+        assignee:  { select: { id: true, name: true, email: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+        project:   { select: { id: true, name: true, color: true, icon: true } },
+        subtasks:  { select: { id: true, completed: true } },
+      },
+    });
+
+    const details = parsedDueDate
+      ? `Due date set to ${parsedDueDate.toISOString().split('T')[0]}`
+      : 'Due date removed';
+
+    await prisma.activity.create({
+      data: {
+        taskId:  task.id,
+        userId:  req.userId,
+        action:  'due_date_changed',
+        details,
+      },
+    });
+
+    emitTaskUpdated(req.teamId, task);
+
+    res.json({ task });
+  } catch (error) {
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'PATCH /tasks/:id/due-date failed');
+    }
+    res.status(500).json({ error: 'Something went wrong updating due date' });
   }
 });
 

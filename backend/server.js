@@ -54,6 +54,9 @@ const subtaskRoutes = require('./routes/subtasks');
 const activityRoutes = require('./routes/activities');
 const notificationRoutes = require('./routes/notifications');
 const projectRoutes = require('./routes/projects');
+const calendarRoutes = require('./routes/calendar');
+const searchRoutes = require('./routes/search');
+const aiRoutes = require('./routes/ai');
 const http = require('http');
 const { initSocketServer } = require('./services/realtime');
 
@@ -170,6 +173,9 @@ app.use('/teams', teamRoutes);
 app.use('/teams/:teamId/projects', projectRoutes);
 app.use('/projects', projectRoutes);
 app.use('/notifications', notificationRoutes);
+app.use('/calendar', calendarRoutes);
+app.use('/search', searchRoutes);
+app.use('/ai', aiRoutes);
 
 // Comments, subtasks and activities are nested under tasks
 app.use('/tasks/:taskId/comments', commentRoutes);

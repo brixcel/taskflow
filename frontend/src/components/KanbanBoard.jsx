@@ -2,9 +2,9 @@ import { useState } from 'react';
 import KanbanCard from './KanbanCard';
 
 const COLUMNS = [
-  { id: 'todo',        label: 'Todo',        color: '#8a8f98', bg: 'rgba(138, 143, 152, 0.12)' },
+  { id: 'todo', label: 'Todo', color: '#8a8f98', bg: 'rgba(138, 143, 152, 0.12)' },
   { id: 'in_progress', label: 'In Progress', color: '#f76808', bg: 'rgba(247, 104, 8, 0.12)' },
-  { id: 'done',        label: 'Done',        color: '#0070f3', bg: 'rgba(0, 112, 243, 0.12)' },
+  { id: 'done', label: 'Done', color: '#0070f3', bg: 'rgba(0, 112, 243, 0.12)' },
 ];
 
 export default function KanbanBoard({
@@ -17,13 +17,13 @@ export default function KanbanBoard({
 }) {
   const [draggedTask, setDraggedTask] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
-  const [dropIndex,   setDropIndex]   = useState(null);
+  const [dropIndex, setDropIndex] = useState(null);
 
   // Group tasks by column and sort by order ascending
   const columnTasks = {
-    todo:        tasks.filter(t => t.status === 'todo').sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    todo: tasks.filter(t => t.status === 'todo').sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     in_progress: tasks.filter(t => t.status === 'in_progress').sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-    done:        tasks.filter(t => t.status === 'done').sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    done: tasks.filter(t => t.status === 'done').sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
   };
 
   const handleDragStart = (e, task) => {

@@ -1,9 +1,9 @@
-const express     = require('express');
-const prisma      = require('../prisma');
+const express = require('express');
+const prisma = require('../prisma');
 const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
-const validate    = require('../middleware/validate');
-const schemas     = require('../validation/schemas');
+const validate = require('../middleware/validate');
+const schemas = require('../validation/schemas');
 
 const router = express.Router();
 
@@ -14,7 +14,7 @@ router.use(requireAuth);
 router.get('/me', async (req, res) => {
   try {
     const memberships = await prisma.teamMembership.findMany({
-      where:   { userId: req.userId },
+      where: { userId: req.userId },
       orderBy: { joinedAt: 'asc' },
       include: {
         team: {
@@ -25,7 +25,7 @@ router.get('/me', async (req, res) => {
 
     const teams = memberships.map((m) => ({
       ...m.team,
-      role:     m.role,
+      role: m.role,
       joinedAt: m.joinedAt,
     }));
 
@@ -97,7 +97,7 @@ router.post('/:id/members', validate(schemas.memberAdd), async (req, res) => {
 
     // Upsert — idempotent if the user is already a member.
     const membership = await prisma.teamMembership.upsert({
-      where:  { userId_teamId: { userId: targetUserId, teamId } },
+      where: { userId_teamId: { userId: targetUserId, teamId } },
       create: { userId: targetUserId, teamId, role },
       update: { role },
     });
@@ -105,13 +105,13 @@ router.post('/:id/members', validate(schemas.memberAdd), async (req, res) => {
     if (targetUserId !== req.userId) {
       const { createNotification } = require('../services/notifications');
       await createNotification({
-        userId:  targetUserId,
+        userId: targetUserId,
         actorId: req.userId,
         teamId,
-        type:    'team_invitation',
-        title:   'Added to team',
+        type: 'team_invitation',
+        title: 'Added to team',
         message: `You were added to team "${team?.name || 'team'}" as ${role}`,
-        data:    { teamId, teamName: team?.name, role },
+        data: { teamId, teamName: team?.name, role },
       });
     }
 
@@ -141,13 +141,13 @@ router.post('/join', validate(schemas.teamJoin), async (req, res) => {
 
     // Upsert — safe to call even if already a member.
     const membership = await prisma.teamMembership.upsert({
-      where:  { userId_teamId: { userId: req.userId, teamId: team.id } },
+      where: { userId_teamId: { userId: req.userId, teamId: team.id } },
       create: { userId: req.userId, teamId: team.id, role: 'member' },
       update: {},
     });
 
     res.status(201).json({
-      team:       { id: team.id, name: team.name },
+      team: { id: team.id, name: team.name },
       membership,
     });
   } catch (error) {
@@ -170,17 +170,17 @@ router.get('/:id/members', async (req, res) => {
       return res.status(403).json({ error: 'You are not a member of this team' });
     }
     const memberships = await prisma.teamMembership.findMany({
-      where:   { teamId },
+      where: { teamId },
       orderBy: { joinedAt: 'asc' },
       include: {
         user: { select: { id: true, name: true, email: true } },
       },
     });
     const members = memberships.map((m) => ({
-      id:       m.user.id,
-      name:     m.user.name,
-      email:    m.user.email,
-      role:     m.role,
+      id: m.user.id,
+      name: m.user.name,
+      email: m.user.email,
+      role: m.role,
       joinedAt: m.joinedAt,
     }));
     res.json({ members });
@@ -205,7 +205,7 @@ async function resolveTeamFromParam(req, res, next) {
     if (!membership) {
       return res.status(403).json({ error: 'You are not a member of this team' });
     }
-    req.teamId   = membership.teamId;
+    req.teamId = membership.teamId;
     req.teamRole = membership.role;
     next();
   } catch (err) {
@@ -264,20 +264,20 @@ router.patch('/:id/members/:userId/role', resolveTeamFromParam, requireRole('own
 
     const updated = await prisma.teamMembership.update({
       where: { userId_teamId: { userId: targetUserId, teamId } },
-      data:  { role },
+      data: { role },
     });
 
     if (targetUserId !== req.userId) {
       const team = await prisma.team.findUnique({ where: { id: teamId } });
       const { createNotification } = require('../services/notifications');
       await createNotification({
-        userId:  targetUserId,
+        userId: targetUserId,
         actorId: req.userId,
         teamId,
-        type:    'role_changed',
-        title:   'Team role updated',
+        type: 'role_changed',
+        title: 'Team role updated',
         message: `Your role in team "${team?.name || 'team'}" was updated to ${role}`,
-        data:    { teamId, teamName: team?.name, role },
+        data: { teamId, teamName: team?.name, role },
       });
     }
 

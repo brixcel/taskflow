@@ -31,7 +31,7 @@ const { z } = require('zod');
 function nonBlankString(maxLen, { requiredMsg, maxMsg } = {}) {
   return z.string()
     .trim()
-    .refine((v) => v.length >= 1,   requiredMsg ?? 'This field is required')
+    .refine((v) => v.length >= 1, requiredMsg ?? 'This field is required')
     .refine((v) => v.length <= maxLen, maxMsg ?? `Must be ${maxLen} characters or fewer`);
 }
 
@@ -40,14 +40,14 @@ function nonBlankString(maxLen, { requiredMsg, maxMsg } = {}) {
 const emailSchema = z.string().trim().toLowerCase().email('Must be a valid email address');
 
 const register = z.object({
-  email:    emailSchema,
+  email: emailSchema,
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  name:     nonBlankString(100, { requiredMsg: 'Name is required', maxMsg: 'Name must be 100 characters or fewer' }),
+  name: nonBlankString(100, { requiredMsg: 'Name is required', maxMsg: 'Name must be 100 characters or fewer' }),
   teamName: nonBlankString(100).optional(),
 });
 
 const login = z.object({
-  email:    emailSchema,
+  email: emailSchema,
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -56,7 +56,7 @@ const forgotPassword = z.object({
 });
 
 const resetPassword = z.object({
-  token:    z.string().min(1, 'Reset token is required'),
+  token: z.string().min(1, 'Reset token is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
@@ -87,34 +87,40 @@ const labelsSchema = z.array(
   z.string().trim().min(1, 'Label cannot be empty').max(30, 'Label must be 30 characters or fewer')
 ).max(15, 'Maximum 15 labels allowed');
 
+const initialSubtaskSchema = z.object({
+  title: nonBlankString(200, { requiredMsg: 'Subtask title is required', maxMsg: 'Subtask title must be 200 characters or fewer' }),
+  order: z.number().optional(),
+});
+
 const taskCreate = z.object({
-  title:       nonBlankString(200, { requiredMsg: 'Title is required', maxMsg: 'Title must be 200 characters or fewer' }),
+  title: nonBlankString(200, { requiredMsg: 'Title is required', maxMsg: 'Title must be 200 characters or fewer' }),
   description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional(),
-  status:      z.enum(['todo', 'in_progress', 'done'], {
+  status: z.enum(['todo', 'in_progress', 'done'], {
     errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
   }).optional(),
-  priority:    prioritySchema.optional(),
-  labels:      labelsSchema.optional(),
-  order:       z.number().optional(),
-  position:    z.number().optional(),
-  assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
-  projectId:   z.string().uuid('projectId must be a valid UUID').optional().nullable(),
-  dueDate:     dueDateSchema,
+  priority: prioritySchema.optional(),
+  labels: labelsSchema.optional(),
+  order: z.number().optional(),
+  position: z.number().optional(),
+  assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  projectId: z.string().uuid('projectId must be a valid UUID').optional().nullable(),
+  dueDate: dueDateSchema,
+  subtasks: z.array(initialSubtaskSchema).max(30, 'Maximum 30 initial subtasks allowed').optional(),
 });
 
 const taskUpdate = z.object({
-  title:       nonBlankString(200, { requiredMsg: 'Title cannot be blank', maxMsg: 'Title must be 200 characters or fewer' }).optional(),
+  title: nonBlankString(200, { requiredMsg: 'Title cannot be blank', maxMsg: 'Title must be 200 characters or fewer' }).optional(),
   description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional().nullable(),
-  status:      z.enum(['todo', 'in_progress', 'done'], {
+  status: z.enum(['todo', 'in_progress', 'done'], {
     errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
   }).optional(),
-  priority:    prioritySchema.optional(),
-  labels:      labelsSchema.optional(),
-  order:       z.number().optional(),
-  position:    z.number().optional(),
-  assigneeId:  z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
-  projectId:   z.string().uuid('projectId must be a valid UUID').optional().nullable(),
-  dueDate:     dueDateSchema,
+  priority: prioritySchema.optional(),
+  labels: labelsSchema.optional(),
+  order: z.number().optional(),
+  position: z.number().optional(),
+  assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  projectId: z.string().uuid('projectId must be a valid UUID').optional().nullable(),
+  dueDate: dueDateSchema,
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'At least one field must be provided' },
@@ -122,8 +128,8 @@ const taskUpdate = z.object({
 
 const taskOrder = z.object({
   position: z.number().optional(),
-  order:    z.number().optional(),
-  status:   z.enum(['todo', 'in_progress', 'done'], {
+  order: z.number().optional(),
+  status: z.enum(['todo', 'in_progress', 'done'], {
     errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
   }).optional(),
 }).refine(
@@ -133,40 +139,55 @@ const taskOrder = z.object({
 
 const tasksBatchReorder = z.object({
   tasks: z.array(z.object({
-    id:       z.string().uuid('id must be a valid UUID'),
-    order:    z.number().optional(),
+    id: z.string().uuid('id must be a valid UUID'),
+    order: z.number().optional(),
     position: z.number().optional(),
-    status:   z.enum(['todo', 'in_progress', 'done']).optional(),
+    status: z.enum(['todo', 'in_progress', 'done']).optional(),
   })).min(1, 'At least one task update must be provided').max(200, 'Maximum 200 updates allowed'),
+});
+
+const taskDueDateUpdate = z.object({
+  dueDate: dueDateSchema,
+});
+
+const calendarQuery = z.object({
+  from: z.string().trim().refine((val) => !isNaN(Date.parse(val)), { message: 'from must be a valid date string' }).optional(),
+  to: z.string().trim().refine((val) => !isNaN(Date.parse(val)), { message: 'to must be a valid date string' }).optional(),
+  projectId: z.string().trim().optional(),
+  assigneeId: z.string().trim().optional(),
+  status: z.enum(['todo', 'in_progress', 'done'], {
+    errorMap: () => ({ message: 'status must be todo, in_progress, or done' }),
+  }).optional(),
+  includeOverdue: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
 });
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 
 const projectCreate = z.object({
-  name:        nonBlankString(100, { requiredMsg: 'Project name is required', maxMsg: 'Project name must be 100 characters or fewer' }),
+  name: nonBlankString(100, { requiredMsg: 'Project name is required', maxMsg: 'Project name must be 100 characters or fewer' }),
   description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional().nullable(),
-  icon:        z.string().trim().max(50, 'Icon must be 50 characters or fewer').optional().nullable(),
-  color:       z.string().trim().max(50, 'Color must be 50 characters or fewer').optional().nullable(),
-  status:      z.enum(['active', 'planning', 'in_progress', 'completed', 'on_hold', 'archived'], {
+  icon: z.string().trim().max(50, 'Icon must be 50 characters or fewer').optional().nullable(),
+  color: z.string().trim().max(50, 'Color must be 50 characters or fewer').optional().nullable(),
+  status: z.enum(['active', 'planning', 'in_progress', 'completed', 'on_hold', 'archived'], {
     errorMap: () => ({ message: 'status must be active, planning, in_progress, completed, on_hold, or archived' }),
   }).optional(),
-  startDate:   dueDateSchema,
-  targetDate:  dueDateSchema,
-  memberIds:   z.array(z.string().uuid('memberId must be a valid UUID')).optional(),
+  startDate: dueDateSchema,
+  targetDate: dueDateSchema,
+  memberIds: z.array(z.string().uuid('memberId must be a valid UUID')).optional(),
 });
 
 const projectUpdate = z.object({
-  name:        nonBlankString(100, { requiredMsg: 'Project name cannot be blank', maxMsg: 'Project name must be 100 characters or fewer' }).optional(),
+  name: nonBlankString(100, { requiredMsg: 'Project name cannot be blank', maxMsg: 'Project name must be 100 characters or fewer' }).optional(),
   description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional().nullable(),
-  icon:        z.string().trim().max(50, 'Icon must be 50 characters or fewer').optional().nullable(),
-  color:       z.string().trim().max(50, 'Color must be 50 characters or fewer').optional().nullable(),
-  status:      z.enum(['active', 'planning', 'in_progress', 'completed', 'on_hold', 'archived'], {
+  icon: z.string().trim().max(50, 'Icon must be 50 characters or fewer').optional().nullable(),
+  color: z.string().trim().max(50, 'Color must be 50 characters or fewer').optional().nullable(),
+  status: z.enum(['active', 'planning', 'in_progress', 'completed', 'on_hold', 'archived'], {
     errorMap: () => ({ message: 'status must be active, planning, in_progress, completed, on_hold, or archived' }),
   }).optional(),
-  startDate:   dueDateSchema,
-  targetDate:  dueDateSchema,
-  order:       z.number().optional(),
-  isArchived:  z.boolean().optional(),
+  startDate: dueDateSchema,
+  targetDate: dueDateSchema,
+  order: z.number().optional(),
+  isArchived: z.boolean().optional(),
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'At least one field must be provided' },
@@ -174,7 +195,7 @@ const projectUpdate = z.object({
 
 const projectMemberAdd = z.object({
   userId: z.string().uuid('userId must be a valid UUID'),
-  role:   z.enum(['lead', 'member', 'viewer'], {
+  role: z.enum(['lead', 'member', 'viewer'], {
     errorMap: () => ({ message: 'role must be lead, member, or viewer' }),
   }).optional().default('member'),
 });
@@ -192,23 +213,23 @@ const commentUpdate = z.object({
 // ─── Subtasks ─────────────────────────────────────────────────────────────────
 
 const subtaskCreate = z.object({
-  title:      nonBlankString(200, { requiredMsg: 'Subtask title is required', maxMsg: 'Subtask title must be 200 characters or fewer' }),
-  completed:  z.boolean().optional(),
-  order:      z.number().optional(),
-  position:   z.number().optional(),
-  dueDate:    dueDateSchema,
+  title: nonBlankString(200, { requiredMsg: 'Subtask title is required', maxMsg: 'Subtask title must be 200 characters or fewer' }),
+  completed: z.boolean().optional(),
+  order: z.number().optional(),
+  position: z.number().optional(),
+  dueDate: dueDateSchema,
   assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
-  parentId:   z.string().uuid('parentId must be a valid UUID').optional().nullable(),
+  parentId: z.string().uuid('parentId must be a valid UUID').optional().nullable(),
 });
 
 const subtaskUpdate = z.object({
-  title:      nonBlankString(200, { requiredMsg: 'Subtask title cannot be blank', maxMsg: 'Subtask title must be 200 characters or fewer' }).optional(),
-  completed:  z.boolean().optional(),
-  order:      z.number().optional(),
-  position:   z.number().optional(),
-  dueDate:    dueDateSchema,
+  title: nonBlankString(200, { requiredMsg: 'Subtask title cannot be blank', maxMsg: 'Subtask title must be 200 characters or fewer' }).optional(),
+  completed: z.boolean().optional(),
+  order: z.number().optional(),
+  position: z.number().optional(),
+  dueDate: dueDateSchema,
   assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
-  parentId:   z.string().uuid('parentId must be a valid UUID').optional().nullable(),
+  parentId: z.string().uuid('parentId must be a valid UUID').optional().nullable(),
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'At least one field must be provided' },
@@ -216,11 +237,21 @@ const subtaskUpdate = z.object({
 
 const subtasksBatchReorder = z.object({
   subtasks: z.array(z.object({
-    id:       z.string().uuid('id must be a valid UUID'),
-    order:    z.number().optional(),
+    id: z.string().uuid('id must be a valid UUID'),
+    order: z.number().optional(),
     position: z.number().optional(),
     parentId: z.string().uuid('parentId must be a valid UUID').optional().nullable(),
   })).min(1, 'At least one subtask update must be provided').max(200, 'Maximum 200 updates allowed'),
+});
+
+const subtasksBatchCreate = z.object({
+  subtasks: z.array(z.object({
+    title: nonBlankString(200, { requiredMsg: 'Subtask title is required', maxMsg: 'Subtask title must be 200 characters or fewer' }),
+    completed: z.boolean().optional().default(false),
+    order: z.number().optional(),
+    dueDate: dueDateSchema.optional(),
+    assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  })).min(1, 'At least one subtask is required').max(50, 'Maximum 50 subtasks allowed per batch'),
 });
 
 // ─── Teams ────────────────────────────────────────────────────────────────────
@@ -235,7 +266,7 @@ const teamJoin = z.object({
 
 const memberAdd = z.object({
   userId: z.string().uuid('userId must be a valid UUID'),
-  role:   z.enum(['owner', 'admin', 'member'], {
+  role: z.enum(['owner', 'admin', 'member'], {
     errorMap: () => ({ message: 'role must be owner, admin, or member' }),
   }).optional().default('member'),
 });
@@ -256,12 +287,12 @@ const analyticsQuery = z.object({
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 const notificationPreferencesUpdate = z.object({
-  taskAssigned:        z.boolean().optional(),
-  statusChanged:       z.boolean().optional(),
+  taskAssigned: z.boolean().optional(),
+  statusChanged: z.boolean().optional(),
   commentsAndMentions: z.boolean().optional(),
-  dueDates:            z.boolean().optional(),
-  teamUpdates:         z.boolean().optional(),
-  emailNotifications:  z.boolean().optional(),
+  dueDates: z.boolean().optional(),
+  teamUpdates: z.boolean().optional(),
+  emailNotifications: z.boolean().optional(),
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'At least one preference field must be provided' },
@@ -269,9 +300,77 @@ const notificationPreferencesUpdate = z.object({
 
 const notificationQuery = z.object({
   unread: z.enum(['true', 'false']).optional(),
-  type:   z.string().trim().optional(),
-  page:   z.string().regex(/^\d+$/).transform(Number).optional(),
-  limit:  z.string().regex(/^\d+$/).transform(Number).optional(),
+  type: z.string().trim().optional(),
+  page: z.string().regex(/^\d+$/).transform(Number).optional(),
+  limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+});
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+
+const searchQuery = z.object({
+  q: z.string().max(500, 'Search query must be 500 characters or fewer').optional(),
+  status: z.string().trim().optional(),
+  assigneeId: z.string().trim().optional(),
+  projectId: z.string().trim().optional(),
+  priority: z.string().trim().optional(),
+  label: z.string().trim().optional(),
+  page: z.union([z.string().regex(/^\d+$/).transform(Number), z.number()]).optional(),
+  pageSize: z.union([z.string().regex(/^\d+$/).transform(Number), z.number()]).optional(),
+  sortBy: z.enum(['relevance', 'dueDate', 'priority', 'createdAt', 'updatedAt', 'order', 'title']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+});
+
+const savedSearchCreate = z.object({
+  name: nonBlankString(100, { requiredMsg: 'Name is required', maxMsg: 'Name must be 100 characters or fewer' }),
+  query: nonBlankString(500, { requiredMsg: 'Query is required', maxMsg: 'Query must be 500 characters or fewer' }),
+  filters: z.record(z.any()).optional().nullable(),
+});
+
+const recentSearchCreate = z.object({
+  query: nonBlankString(500, { requiredMsg: 'Query is required', maxMsg: 'Query must be 500 characters or fewer' }),
+});
+
+// ─── AI Assistant ─────────────────────────────────────────────────────────────
+
+const aiTaskGenerateRequest = z.object({
+  prompt: nonBlankString(1000, { requiredMsg: 'Prompt is required', maxMsg: 'Prompt must be 1000 characters or fewer' }),
+  projectId: z.string().uuid('projectId must be a valid UUID').optional().nullable(),
+  currentContext: z.string().trim().max(1000, 'Current context must be 1000 characters or fewer').optional(),
+});
+
+const aiTaskGenerateResponse = z.object({
+  title: nonBlankString(200, { requiredMsg: 'Title is required', maxMsg: 'Title must be 200 characters or fewer' }),
+  description: z.string().trim().max(5000).optional().default(''),
+  priority: prioritySchema.optional().default('medium'),
+  suggestedDeadlineDays: z.number().int().min(0).max(365).optional().default(3),
+  suggestedDueDate: z.string().optional().nullable(),
+  labels: z.array(z.string().trim().max(30)).max(15).optional().default([]),
+  suggestedSubtasks: z.array(
+    z.object({
+      title: nonBlankString(200),
+      order: z.number().optional().default(1000),
+    })
+  ).max(20).optional().default([]),
+});
+
+const aiTaskBreakdownRequest = z.object({
+  taskId: z.string().uuid('taskId must be a valid UUID').optional(),
+  title: z.string().trim().max(200, 'Title must be 200 characters or fewer').optional(),
+  description: z.string().trim().max(5000, 'Description must be 5000 characters or fewer').optional(),
+  projectId: z.string().uuid('projectId must be a valid UUID').optional().nullable(),
+}).refine(
+  (data) => Boolean(data.taskId || (data.title && data.title.trim().length > 0)),
+  { message: 'Either taskId or a non-empty title must be provided' }
+);
+
+const aiTaskBreakdownResponse = z.object({
+  subtasks: z.array(
+    z.object({
+      title: nonBlankString(200),
+      estimatedMinutes: z.number().int().min(1).max(1440).optional().default(30),
+      order: z.number().optional().default(1000),
+    })
+  ).min(1).max(30),
 });
 
 module.exports = {
@@ -291,6 +390,7 @@ module.exports = {
   subtaskCreate,
   subtaskUpdate,
   subtasksBatchReorder,
+  subtasksBatchCreate,
   commentCreate,
   commentUpdate,
   teamCreate,
@@ -300,5 +400,15 @@ module.exports = {
   analyticsQuery,
   notificationPreferencesUpdate,
   notificationQuery,
+  taskDueDateUpdate,
+  calendarQuery,
+  searchQuery,
+  savedSearchCreate,
+  recentSearchCreate,
+  aiTaskGenerateRequest,
+  aiTaskGenerateResponse,
+  aiTaskBreakdownRequest,
+  aiTaskBreakdownResponse,
 };
+
 
