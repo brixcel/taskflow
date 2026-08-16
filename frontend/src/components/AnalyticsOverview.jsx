@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AIProductivityInsights from './AIProductivityInsights';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function timeAgo(dateString) {
@@ -82,6 +83,10 @@ export default function AnalyticsOverview({
   onDrillDown,
   onClearFilter,
   onRefresh,
+  teamId = null,
+  token = null,
+  userId = null,
+  projectId = null,
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -110,6 +115,19 @@ export default function AnalyticsOverview({
 
   return (
     <section aria-label="Productivity Analytics" className="analytics-container">
+      {/* ── AI Productivity Insights Hero Widget ── */}
+      {teamId && token && (
+        <AIProductivityInsights
+          teamId={teamId}
+          token={token}
+          range={range}
+          onRangeChange={onRangeChange}
+          userId={userId}
+          projectId={projectId}
+          scope={scope}
+        />
+      )}
+
       {/* ── Toolbar: Scope, Range & Collapse Toggle ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

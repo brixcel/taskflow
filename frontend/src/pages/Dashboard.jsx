@@ -11,6 +11,7 @@ import UndoToast from '../components/UndoToast';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
 import ProjectModal from '../components/ProjectModal';
+import AIProjectPlannerModal from '../components/AIProjectPlannerModal';
 import ProjectDashboardHeader from '../components/ProjectDashboardHeader';
 import ProjectAnalytics from '../components/ProjectAnalytics';
 import CalendarView from '../components/CalendarView';
@@ -799,6 +800,7 @@ export default function Dashboard() {
   const activeTab = searchParams.get('tab') === 'mine' ? 'mine' : 'all';
   const activeProjectId = searchParams.get('projectId') || null;
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showAIPlannerModal, setShowAIPlannerModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [searchInput, setSearchInput] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -1342,6 +1344,7 @@ export default function Dashboard() {
           setEditingProject(null);
           setShowProjectModal(true);
         }}
+        onAIPlanProject={() => setShowAIPlannerModal(true)}
         onTeamSwitch={handleTeamSwitch}
         onLogout={handleLogout}
         userName={currentUser?.name}
@@ -1605,6 +1608,10 @@ export default function Dashboard() {
               onDrillDown={handleDrillDown}
               onClearFilter={handleClearFilter}
               onRefresh={fetchAnalytics}
+              teamId={teamId}
+              token={token}
+              userId={currentUserId}
+              projectId={activeProjectId}
             />
           )}
 
@@ -1773,6 +1780,19 @@ export default function Dashboard() {
         teamMembers={members}
         onProjectSaved={handleProjectSaved}
         onProjectDeleted={handleProjectDeleted}
+      />
+
+      {/* AI Project Planner Modal */}
+      <AIProjectPlannerModal
+        isOpen={showAIPlannerModal}
+        onClose={() => setShowAIPlannerModal(false)}
+        teamId={teamId}
+        token={token}
+        onProjectCreated={(newProject) => {
+          fetchProjects();
+          fetchTasks();
+          handleSelectProject(newProject.id);
+        }}
       />
 
       {/* Task Detail & Collaboration Workspace Drawer */}

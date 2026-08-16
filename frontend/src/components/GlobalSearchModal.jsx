@@ -120,6 +120,10 @@ export default function GlobalSearchModal({
   const [recentSearches, setRecentSearches] = useState([]);
   const [suggestions, setSuggestions] = useState(null);
 
+  const [isAiMode, setIsAiMode] = useState(false);
+  const [aiExplanation, setAiExplanation] = useState(null);
+  const [aiSearchExpression, setAiSearchExpression] = useState(null);
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [saveLoading, setSaveLoading] = useState(false);
@@ -198,18 +202,34 @@ export default function GlobalSearchModal({
   };
 
   // Execute search API
-  const performSearch = useCallback(async (q) => {
+  const performSearch = useCallback(async (q, useAi = isAiMode) => {
     if (!token || !team?.id) return;
     setIsLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/search/tasks`, {
-        headers,
-        params: { q, pageSize: 30 },
-      });
-      setResults(res.data.tasks || []);
-      setTotalCount(res.data.pagination?.total || 0);
-      setParsedTokens(res.data.parsedQuery?.tokens || []);
-      setFacets(res.data.facets || null);
+      if (useAi && q.trim().length >= 2) {
+        const res = await axios.post(
+          `${API_URL}/ai/search`,
+          { prompt: q.trim(), executeSearch: true },
+          { headers }
+        );
+        setResults(res.data.results || []);
+        setTotalCount(res.data.total || 0);
+        setAiExplanation(res.data.explanation || null);
+        setAiSearchExpression(res.data.searchExpression || null);
+        setParsedTokens([]);
+        setFacets(res.data.facets || null);
+      } else {
+        setAiExplanation(null);
+        setAiSearchExpression(null);
+        const res = await axios.get(`${API_URL}/search/tasks`, {
+          headers,
+          params: { q, pageSize: 30 },
+        });
+        setResults(res.data.tasks || []);
+        setTotalCount(res.data.pagination?.total || 0);
+        setParsedTokens(res.data.parsedQuery?.tokens || []);
+        setFacets(res.data.facets || null);
+      }
       setSelectedIndex(0);
 
       // Record to recent if non-empty query
@@ -219,18 +239,21 @@ export default function GlobalSearchModal({
     } catch {
       setResults([]);
       setTotalCount(0);
+      setAiExplanation(null);
     } finally {
       setIsLoading(false);
     }
-  }, [token, team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, team?.id, isAiMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Trigger search on debounced query change
   useEffect(() => {
     if (isOpen) {
-      performSearch(debouncedQuery);
-      fetchSuggestions(debouncedQuery);
+      performSearch(debouncedQuery, isAiMode);
+      if (!isAiMode) {
+        fetchSuggestions(debouncedQuery);
+      }
     }
-  }, [debouncedQuery, isOpen, performSearch]);
+  }, [debouncedQuery, isOpen, isAiMode, performSearch]);
 
   // Handle keyboard shortcuts inside modal
   const handleKeyDown = (e) => {
@@ -362,6 +385,26 @@ export default function GlobalSearchModal({
             spellCheck="false"
           />
 
+          <button
+            type="button"
+            onClick={() => {
+              const nextMode = !isAiMode;
+              setIsAiMode(nextMode);
+              if (query.trim()) {
+                performSearch(query, nextMode);
+              }
+            }}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer border shrink-0 ${
+              isAiMode
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-transparent shadow-sm'
+                : 'bg-[var(--color-canvas-card,#ffffff)] text-[var(--color-canvas-mute,#888888)] border-[var(--color-canvas-hairline,#ebebeb)] hover:text-indigo-600 hover:border-indigo-300'
+            }`}
+            title="Toggle Natural-Language AI Search"
+          >
+            <span>✨</span>
+            <span className="hidden sm:inline">{isAiMode ? 'AI Search' : 'AI Search'}</span>
+          </button>
+
           {query && (
             <button
               onClick={() => {
@@ -382,6 +425,29 @@ export default function GlobalSearchModal({
             ESC
           </kbd>
         </div>
+
+        {/* ── AI Explanation Banner (when in AI search mode) ── */}
+        {isAiMode && aiExplanation && (
+          <div className="px-4 py-2 border-b border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/70 dark:bg-indigo-950/30 flex flex-wrap items-center justify-between gap-2 text-[12px] text-indigo-900 dark:text-indigo-200 animate-fade-in">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="text-base shrink-0">✨</span>
+              <span className="font-medium truncate">{aiExplanation}</span>
+            </div>
+            {aiSearchExpression && (
+              <button
+                onClick={() => {
+                  setIsAiMode(false);
+                  setQuery(aiSearchExpression);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 font-mono text-[11px] transition-colors cursor-pointer border-0 shrink-0"
+                title="Convert to standard expression"
+              >
+                <span>Filter: {aiSearchExpression}</span>
+                <span>↗</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── Active Token Highlight Pills (if query has operators) ── */}
         {parsedTokens.length > 0 && (

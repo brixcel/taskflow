@@ -373,6 +373,134 @@ const aiTaskBreakdownResponse = z.object({
   ).min(1).max(30),
 });
 
+const aiProjectPlanRequest = z.object({
+  prompt: nonBlankString(500, { requiredMsg: 'Prompt is required', maxMsg: 'Prompt must be 500 characters or fewer' }),
+  timeframeWeeks: z.number().int().min(1).max(52).optional().default(4),
+  template: z.string().trim().max(50).optional(),
+});
+
+const aiProjectPlanResponse = z.object({
+  name: nonBlankString(100, { requiredMsg: 'Project name is required', maxMsg: 'Project name must be 100 characters or fewer' }),
+  description: z.string().trim().max(5000).optional().default(''),
+  icon: z.string().trim().max(50).optional().default('🚀'),
+  color: z.string().trim().max(50).optional().default('#6366f1'),
+  targetDays: z.number().int().min(1).max(365).optional().default(28),
+  phases: z.array(nonBlankString(100)).min(1).max(10),
+  tasks: z.array(
+    z.object({
+      title: nonBlankString(200, { requiredMsg: 'Task title is required', maxMsg: 'Task title must be 200 characters or fewer' }),
+      description: z.string().trim().max(5000).optional().default(''),
+      phase: nonBlankString(100),
+      priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().default('medium'),
+      suggestedDeadlineOffsetDays: z.number().int().min(0).max(365).optional().default(7),
+      labels: z.array(z.string().trim().max(50)).max(10).optional().default([]),
+      subtasks: z.array(
+        z.object({
+          title: nonBlankString(200),
+          estimatedMinutes: z.number().int().min(1).max(1440).optional().default(30),
+          order: z.number().optional().default(1000),
+        })
+      ).max(20).optional().default([]),
+    })
+  ).min(1).max(50),
+});
+
+const aiProjectApplyRequest = z.object({
+  name: nonBlankString(100, { requiredMsg: 'Project name is required', maxMsg: 'Project name must be 100 characters or fewer' }),
+  description: z.string().trim().max(5000).optional().nullable(),
+  icon: z.string().trim().max(50).optional().default('🚀'),
+  color: z.string().trim().max(50).optional().default('#6366f1'),
+  startDate: dueDateSchema,
+  targetDate: dueDateSchema,
+  tasks: z.array(
+    z.object({
+      title: nonBlankString(200, { requiredMsg: 'Task title is required', maxMsg: 'Task title must be 200 characters or fewer' }),
+      description: z.string().trim().max(5000).optional().nullable(),
+      priority: z.enum(['low', 'medium', 'high', 'urgent']).optional().default('medium'),
+      status: z.enum(['todo', 'in_progress', 'done']).optional().default('todo'),
+      dueDate: dueDateSchema,
+      labels: z.array(z.string().trim().max(50)).max(10).optional().default([]),
+      subtasks: z.array(
+        z.object({
+          title: nonBlankString(200),
+          estimatedMinutes: z.number().int().min(1).max(1440).optional().default(30),
+          order: z.number().optional().default(1000),
+        })
+      ).max(20).optional().default([]),
+    })
+  ).min(1, 'At least one task must be selected to create the project').max(100),
+});
+
+const aiProductivityInsightsQuery = z.object({
+  range: z.enum(['7d', '30d', '90d', 'this_week', 'last_week', 'this_month', 'all'], {
+    errorMap: () => ({ message: 'range must be 7d, 30d, 90d, this_week, last_week, this_month, or all' }),
+  }).optional().default('7d'),
+  userId: z.string().uuid('userId must be a valid UUID').optional().nullable(),
+  projectId: z.string().uuid('projectId must be a valid UUID').optional().nullable(),
+});
+
+const aiProductivityInsightsResponse = z.object({
+  timeRange: z.object({
+    range: z.string(),
+    startDate: z.string().nullable(),
+    endDate: z.string(),
+    label: z.string(),
+  }),
+  summary: z.string(),
+  metrics: z.object({
+    totalTasks: z.number().optional().default(0),
+    tasksCompleted: z.number(),
+    tasksCreated: z.number(),
+    completionRate: z.number(),
+    velocityChangePct: z.number(),
+    overdueCount: z.number(),
+    activeWorkloadCount: z.number(),
+    peakProductivityDay: z.string().optional().nullable(),
+    topContributor: z.object({
+      name: z.string(),
+      completedCount: z.number(),
+    }).optional().nullable(),
+    highestWorkloadMember: z.object({
+      name: z.string(),
+      activeCount: z.number(),
+    }).optional().nullable(),
+  }),
+  highlights: z.array(z.string()),
+  bottlenecks: z.array(z.string()),
+  workloadAnalysis: z.array(z.string()),
+  recommendations: z.array(z.string()),
+  generatedAt: z.string(),
+});
+
+const aiSearchRequest = z.object({
+  prompt: nonBlankString(500, { requiredMsg: 'Search prompt is required', maxMsg: 'Search prompt must be 500 characters or fewer' }),
+  executeSearch: z.boolean().optional().default(true),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
+
+const aiSearchResponse = z.object({
+  naturalQuery: z.string(),
+  explanation: z.string(),
+  structuredFilters: z.object({
+    text: z.string().optional().default(''),
+    statuses: z.array(z.string()).optional().default([]),
+    priorities: z.array(z.string()).optional().default([]),
+    assignee: z.string().optional().nullable(),
+    project: z.string().optional().nullable(),
+    due: z.string().optional().nullable(),
+    labels: z.array(z.string()).optional().default([]),
+    sortBy: z.string().optional().default('relevance'),
+    sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
+  }),
+  searchExpression: z.string(),
+  results: z.array(z.any()).optional().default([]),
+  total: z.number().int().optional().default(0),
+  page: z.number().int().optional().default(1),
+  pageSize: z.number().int().optional().default(20),
+  facets: z.record(z.any()).optional().default({}),
+});
+
 module.exports = {
   register,
   login,
@@ -409,6 +537,14 @@ module.exports = {
   aiTaskGenerateResponse,
   aiTaskBreakdownRequest,
   aiTaskBreakdownResponse,
+  aiProjectPlanRequest,
+  aiProjectPlanResponse,
+  aiProjectApplyRequest,
+  aiProductivityInsightsQuery,
+  aiProductivityInsightsResponse,
+  aiSearchRequest,
+  aiSearchResponse,
 };
+
 
 

@@ -6,7 +6,15 @@ const requireAuth = require('../middleware/auth');
 const resolveTeam = require('../middleware/resolveTeam');
 const validate = require('../middleware/validate');
 const schemas = require('../validation/schemas');
-const { generateTaskFromPrompt, breakdownTaskIntoSubtasks } = require('../services/ai');
+const {
+  generateTaskFromPrompt,
+  breakdownTaskIntoSubtasks,
+  generateProjectPlan,
+  applyProjectPlan,
+  generateProductivityInsights,
+  executeNaturalSearch,
+} = require('../services/ai');
+const { emitProjectCreated, emitTaskCreated } = require('../services/realtime');
 const logger = require('../middleware/logger');
 
 const aiLimiter = rateLimit({
@@ -127,4 +135,145 @@ router.post('/breakdown-task', validate(schemas.aiTaskBreakdownRequest), async (
   }
 });
 
+router.post('/plan-project', validate(schemas.aiProjectPlanRequest), async (req, res) => {
+  try {
+    const { prompt, timeframeWeeks, template } = req.body;
+
+    const team = await prisma.team.findUnique({
+      where: { id: req.teamId },
+      select: { id: true, name: true },
+    });
+
+    const plan = await generateProjectPlan({
+      prompt,
+      timeframeWeeks: timeframeWeeks || 4,
+      teamContext: team,
+    });
+
+    res.json({
+      success: true,
+      plan,
+    });
+  } catch (error) {
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'POST /ai/plan-project failed');
+    }
+    res.status(500).json({ error: 'Failed to generate project plan with AI' });
+  }
+});
+
+router.post('/apply-project-plan', validate(schemas.aiProjectApplyRequest), async (req, res) => {
+  try {
+    const result = await applyProjectPlan({
+      teamId: req.teamId,
+      userId: req.userId,
+      planData: req.body,
+      prismaInstance: prisma,
+    });
+
+    // Notify connected realtime clients
+    try {
+      if (typeof emitProjectCreated === 'function') {
+        emitProjectCreated(req.teamId, result.project);
+      }
+      if (typeof emitTaskCreated === 'function' && Array.isArray(result.tasks)) {
+        for (const t of result.tasks) {
+          emitTaskCreated(req.teamId, t);
+        }
+      }
+    } catch {
+      // Realtime notification is non-blocking
+    }
+
+    res.status(201).json({
+      success: true,
+      project: result.project,
+      tasksCount: result.tasksCount,
+      subtasksCount: result.subtasksCount,
+      tasks: result.tasks,
+    });
+  } catch (error) {
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'POST /ai/apply-project-plan failed');
+    }
+    res.status(500).json({ error: 'Failed to apply project plan' });
+  }
+});
+
+router.get('/productivity-insights', validate(schemas.aiProductivityInsightsQuery, 'query'), async (req, res) => {
+  try {
+    const { range = '7d', userId, projectId } = req.query;
+
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, teamId: req.teamId },
+        select: { id: true, name: true },
+      });
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found in this team' });
+      }
+    }
+
+    if (userId) {
+      const membership = await prisma.teamMembership.findUnique({
+        where: { userId_teamId: { userId, teamId: req.teamId } },
+      });
+      if (!membership) {
+        return res.status(403).json({ error: 'User is not a member of this team' });
+      }
+    }
+
+    const team = await prisma.team.findUnique({
+      where: { id: req.teamId },
+      select: { id: true, name: true },
+    });
+
+    const insights = await generateProductivityInsights({
+      teamId: req.teamId,
+      userId: userId || null,
+      projectId: projectId || null,
+      range,
+      teamName: team?.name || 'Your team',
+      prismaInstance: prisma,
+    });
+
+    res.json({
+      success: true,
+      insights,
+    });
+  } catch (error) {
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'GET /ai/productivity-insights failed');
+    }
+    res.status(500).json({ error: 'Failed to generate productivity insights' });
+  }
+});
+
+router.post('/search', validate(schemas.aiSearchRequest), async (req, res) => {
+  try {
+    const { prompt, executeSearch = true, page = 1, pageSize = 20 } = req.body;
+
+    const result = await executeNaturalSearch({
+      prompt,
+      teamId: req.teamId,
+      userId: req.userId,
+      executeSearch,
+      page,
+      pageSize,
+      prismaInstance: prisma,
+    });
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'POST /ai/search failed');
+    }
+    res.status(500).json({ error: 'Failed to process natural language search' });
+  }
+});
+
 module.exports = router;
+

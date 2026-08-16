@@ -215,6 +215,7 @@ export default function Sidebar({
   activeProjectId = null,
   onSelectProject = () => { },
   onNewProject = () => { },
+  onAIPlanProject = () => { },
   onTeamSwitch,
   onLogout,
   userName,
@@ -328,53 +329,104 @@ export default function Sidebar({
               <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', color: '#50545c', textTransform: 'uppercase' }}>
                 Projects
               </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onNewProject();
-                }}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#8a8f98',
-                  cursor: 'pointer',
-                  padding: '2px 4px',
-                  borderRadius: 4,
-                  fontSize: 14,
-                  lineHeight: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                title="Create Project"
-                aria-label="Create Project"
-              >
-                +
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAIPlanProject();
+                  }}
+                  style={{
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    color: '#a5b4fc',
+                    cursor: 'pointer',
+                    padding: '2px 5px',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    lineHeight: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 2,
+                    fontWeight: 600,
+                  }}
+                  title="AI Project Planner"
+                  aria-label="AI Project Planner"
+                >
+                  ✨ Plan
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNewProject();
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#8a8f98',
+                    cursor: 'pointer',
+                    padding: '2px 4px',
+                    borderRadius: 4,
+                    fontSize: 14,
+                    lineHeight: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Create Project"
+                  aria-label="Create Project"
+                >
+                  +
+                </button>
+              </div>
             </div>
 
             {projects.length === 0 ? (
-              <button
-                type="button"
-                onClick={onNewProject}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  borderRadius: 6,
-                  border: '1px dashed #2a2d31',
-                  background: 'transparent',
-                  color: '#8a8f98',
-                  fontSize: 12,
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <span>+</span> New Project
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <button
+                  type="button"
+                  onClick={onAIPlanProject}
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    color: '#a5b4fc',
+                    fontSize: 12,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontWeight: 500,
+                  }}
+                >
+                  <span>✨</span> AI Plan Project
+                </button>
+                <button
+                  type="button"
+                  onClick={onNewProject}
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    border: '1px dashed #2a2d31',
+                    background: 'transparent',
+                    color: '#8a8f98',
+                    fontSize: 12,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span>+</span> New Project
+                </button>
+              </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {projects.map((p) => {

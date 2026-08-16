@@ -26,9 +26,9 @@
 | **Milestone H2** | **Phase 25** | Advanced Search | ✅ **COMPLETE** | `phase25-search.test.js` (28/28 passed) |
 | **Milestone I** | **Phase 26** | AI Task Assistant | ✅ **COMPLETE** | `phase26-ai-assistant.test.js` (15/15 passed) |
 | **Milestone I** | **Phase 27** | AI Task Breakdown | ✅ **COMPLETE** | `phase27-ai-breakdown.test.js` (15/15 passed) |
-| **Milestone I** | **Phase 28** | AI Project Planner | ⏳ Pending | `phase28-ai-planner.test.js` |
-| **Milestone I** | **Phase 29** | AI Productivity Insights | ⏳ Pending | `phase29-ai-insights.test.js` |
-| **Milestone I** | **Phase 30** | Natural-Language Search | ⏳ Pending | `phase30-ai-search.test.js` |
+| **Milestone I** | **Phase 28** | AI Project Planner | ✅ **COMPLETE** | `phase28-ai-planner.test.js` (13/13 passed) |
+| **Milestone I** | **Phase 29** | AI Productivity Insights | ✅ **COMPLETE** | `phase29-ai-insights.test.js` (14/14 passed) |
+| **Milestone I** | **Phase 30** | Natural-Language Search | ✅ **COMPLETE** | `phase30-ai-search.test.js` (23/23 passed) |
 | **Milestone J** | **Phase 31** | Webhooks & API Keys | ⏳ Pending | `phase31-webhooks.test.js` |
 | **Milestone J** | **Phase 32** | GitHub Integration | ⏳ Pending | `phase32-github.test.js` |
 | **Milestone J** | **Phase 33** | Slack / Discord Integration | ⏳ Pending | `phase33-integrations.test.js` |
@@ -803,7 +803,9 @@ Require user approval before creating the project structure.
 
 ---
 
-# Phase 29 — AI Productivity Insights
+# Phase 29 — AI Productivity Insights [✅ COMPLETE]
+
+> **Status:** ✅ **Complete** — Server-side aggregation of authorized metrics (velocity comparisons, overdue detection, peak day detection, workload balance, project slowdowns), Gemini LLM structured insights with deterministic offline fallback, `GET /ai/productivity-insights` REST endpoint, interactive `AIProductivityInsights.jsx` frontend component, and 14/14 tests passing in `phase29-ai-insights.test.js`.
 
 Generate weekly summaries from authorized TaskFlow data.
 
