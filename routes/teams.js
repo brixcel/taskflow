@@ -288,4 +288,203 @@ router.patch('/:id/members/:userId/role', resolveTeamFromParam, requireRole('own
   }
 });
 
+// ─── GET /teams/:id/analytics — team & personal productivity analytics ─────────
+
+router.get('/:id/analytics', resolveTeamFromParam, validate(schemas.analyticsQuery, 'query'), async (req, res) => {
+  try {
+    const { id: teamId } = req.params;
+    const range = req.query.range || '30d';
+    const filterUserId = req.query.userId || null;
+    const now = new Date();
+
+    // Determine range start date
+    let rangeStartDate = null;
+    if (range === '7d') {
+      rangeStartDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (range === '30d') {
+      rangeStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (range === '90d') {
+      rangeStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    }
+
+    const weekStart = new Date(now);
+    const day = weekStart.getDay();
+    const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
+    weekStart.setDate(diff);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Fetch team memberships and all team tasks
+    const [memberships, allTeamTasks, recentActivities] = await Promise.all([
+      prisma.teamMembership.findMany({
+        where: { teamId },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { joinedAt: 'asc' },
+      }),
+      prisma.task.findMany({
+        where: { teamId },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          dueDate: true,
+          assigneeId: true,
+          createdById: true,
+          projectId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.activity.findMany({
+        where: { task: { teamId } },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          task: { select: { id: true, title: true } },
+        },
+      }),
+    ]);
+
+    // Filter tasks if personal userId filter is applied
+    const filteredTasks = filterUserId
+      ? allTeamTasks.filter((t) => t.assigneeId === filterUserId)
+      : allTeamTasks;
+
+    const totalTasks = filteredTasks.length;
+    const completedTasks = filteredTasks.filter((t) => t.status === 'done').length;
+    const inProgressTasks = filteredTasks.filter((t) => t.status === 'in_progress').length;
+    const todoTasks = filteredTasks.filter((t) => t.status === 'todo').length;
+    const overdueTasks = filteredTasks.filter(
+      (t) => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now
+    ).length;
+
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const completedThisWeek = filteredTasks.filter(
+      (t) => t.status === 'done' && new Date(t.updatedAt) >= weekStart
+    ).length;
+    const completedThisMonth = filteredTasks.filter(
+      (t) => t.status === 'done' && new Date(t.updatedAt) >= monthStart
+    ).length;
+
+    const createdInRange = rangeStartDate
+      ? filteredTasks.filter((t) => new Date(t.createdAt) >= rangeStartDate).length
+      : totalTasks;
+    const completedInRange = rangeStartDate
+      ? filteredTasks.filter((t) => t.status === 'done' && new Date(t.updatedAt) >= rangeStartDate).length
+      : completedTasks;
+
+    const overview = {
+      totalTasks,
+      completedTasks,
+      inProgressTasks,
+      todoTasks,
+      overdueTasks,
+      completionRate,
+      completedThisWeek,
+      completedThisMonth,
+      createdInRange,
+      completedInRange,
+    };
+
+    // Status breakdown
+    const statusBreakdown = [
+      {
+        status: 'todo',
+        label: 'Todo',
+        count: todoTasks,
+        percentage: totalTasks > 0 ? Math.round((todoTasks / totalTasks) * 100) : 0,
+      },
+      {
+        status: 'in_progress',
+        label: 'In Progress',
+        count: inProgressTasks,
+        percentage: totalTasks > 0 ? Math.round((inProgressTasks / totalTasks) * 100) : 0,
+      },
+      {
+        status: 'done',
+        label: 'Done',
+        count: completedTasks,
+        percentage: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+      },
+    ];
+
+    // Workload distribution by team member
+    const workloadDistribution = memberships.map((m) => {
+      const mTasks = allTeamTasks.filter((t) => t.assigneeId === m.user.id);
+      const mTotal = mTasks.length;
+      const mDone = mTasks.filter((t) => t.status === 'done').length;
+      const mInProgress = mTasks.filter((t) => t.status === 'in_progress').length;
+      const mTodo = mTasks.filter((t) => t.status === 'todo').length;
+      const mOverdue = mTasks.filter(
+        (t) => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now
+      ).length;
+
+      return {
+        userId: m.user.id,
+        name: m.user.name || m.user.email.split('@')[0],
+        email: m.user.email,
+        role: m.role,
+        totalTasks: mTotal,
+        completedTasks: mDone,
+        inProgressTasks: mInProgress,
+        todoTasks: mTodo,
+        overdueTasks: mOverdue,
+        completionRate: mTotal > 0 ? Math.round((mDone / mTotal) * 100) : 0,
+      };
+    });
+
+    // Unassigned tasks
+    const unassignedTasks = allTeamTasks.filter((t) => !t.assigneeId);
+    const unassigned = {
+      totalTasks: unassignedTasks.length,
+      completedTasks: unassignedTasks.filter((t) => t.status === 'done').length,
+      inProgressTasks: unassignedTasks.filter((t) => t.status === 'in_progress').length,
+      todoTasks: unassignedTasks.filter((t) => t.status === 'todo').length,
+      overdueTasks: unassignedTasks.filter(
+        (t) => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now
+      ).length,
+    };
+
+    // Daily trends for range
+    const daysCount = range === '7d' ? 7 : range === '90d' ? 90 : 30;
+    const dailyTrends = [];
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateStr = d.toISOString().slice(0, 10);
+      const created = filteredTasks.filter(
+        (t) => t.createdAt && new Date(t.createdAt).toISOString().slice(0, 10) === dateStr
+      ).length;
+      const completed = filteredTasks.filter(
+        (t) => t.status === 'done' && t.updatedAt && new Date(t.updatedAt).toISOString().slice(0, 10) === dateStr
+      ).length;
+      dailyTrends.push({ date: dateStr, created, completed });
+    }
+
+    const responsePayload = {
+      teamId,
+      range,
+      overview,
+      statusBreakdown,
+      workloadDistribution,
+      unassigned,
+      recentActivities,
+      dailyTrends,
+    };
+
+    if (filterUserId) {
+      responsePayload.filterUserId = filterUserId;
+    }
+
+    res.json({ analytics: responsePayload });
+  } catch (error) {
+    console.error('GET /teams/:id/analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch team analytics' });
+  }
+});
+
 module.exports = router;

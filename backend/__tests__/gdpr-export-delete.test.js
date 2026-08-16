@@ -13,7 +13,7 @@
 const request = require('supertest');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const app     = require('../server');
+const { app } = require('../server');
 const prisma  = require('../prisma');
 
 function makeToken(userId, teamId) {

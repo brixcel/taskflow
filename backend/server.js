@@ -14,6 +14,7 @@ const aiRoutes = require('./routes/ai');
 const subtaskRoutes = require('./routes/subtasks');
 const developerRoutes = require('./routes/developer');
 const githubRoutes = require('./routes/github');
+const usersRoutes = require('./routes/users');
 
 const http = require('http');
 const { initSocketServer } = require('./services/realtime');
@@ -35,6 +36,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/auth', authRoutes);
+app.use('/users', usersRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/teams', teamRoutes);
 app.use('/teams/:teamId/projects', projectRoutes);

@@ -97,7 +97,7 @@ function generateFallbackTask(prompt, project) {
       { title: 'Implement bug fix and edge-case guard', order: 3000 },
       { title: 'Add regression test in test suite', order: 4000 },
     ];
-  } else if (pLower.includes('redesign') || pLower.includes('ui') || pLower.includes('design') || pLower.includes('frontend')) {
+  } else if (pLower.includes('redesign') || /\bui\b/i.test(pLower) || /\bux\b/i.test(pLower) || pLower.includes('design') || pLower.includes('frontend')) {
     labels = ['ui', 'design', 'frontend'];
     subtasks = [
       { title: 'Create UI mockups and component hierarchy', order: 1000 },
@@ -279,7 +279,7 @@ function generateFallbackBreakdown({ title = '', description = '', existingSubta
       { title: 'Schedule posts across designated social channels', estimatedMinutes: 20, order: 5000 },
       { title: 'Monitor engagement metrics and reply to audience comments', estimatedMinutes: 25, order: 6000 },
     ];
-  } else if (combined.includes('redesign') || combined.includes('design system') || combined.includes('ui') || combined.includes('figma')) {
+  } else if (combined.includes('redesign') || combined.includes('design system') || /\bui\b/i.test(combined) || /\bux\b/i.test(combined) || combined.includes('figma')) {
     subtasks = [
       { title: 'Review Figma wireframes and component token palette', estimatedMinutes: 25, order: 1000 },
       { title: 'Create reusable UI component structure & primitives', estimatedMinutes: 40, order: 2000 },
