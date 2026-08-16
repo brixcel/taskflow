@@ -12,6 +12,8 @@ const calendarRoutes = require('./routes/calendar');
 const searchRoutes = require('./routes/search');
 const aiRoutes = require('./routes/ai');
 const subtaskRoutes = require('./routes/subtasks');
+const developerRoutes = require('./routes/developer');
+const githubRoutes = require('./routes/github');
 
 const http = require('http');
 const { initSocketServer } = require('./services/realtime');
@@ -22,7 +24,11 @@ const io = initSocketServer(server);
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -38,6 +44,9 @@ app.use('/calendar', calendarRoutes);
 app.use('/search', searchRoutes);
 app.use('/ai', aiRoutes);
 app.use('/subtasks', subtaskRoutes);
+app.use('/developer', developerRoutes);
+app.use(githubRoutes);
+app.use('/api', githubRoutes);
 
 // Comments, activities, and subtasks are nested under tasks
 app.use('/tasks/:taskId/comments', commentRoutes);

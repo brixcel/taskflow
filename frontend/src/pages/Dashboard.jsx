@@ -14,6 +14,7 @@ import ProjectModal from '../components/ProjectModal';
 import AIProjectPlannerModal from '../components/AIProjectPlannerModal';
 import ProjectDashboardHeader from '../components/ProjectDashboardHeader';
 import ProjectAnalytics from '../components/ProjectAnalytics';
+import ProjectGitHubView from '../components/ProjectGitHubView';
 import CalendarView from '../components/CalendarView';
 import GlobalSearchModal from '../components/GlobalSearchModal';
 import { useRealtime } from '../context/RealtimeContext';
@@ -1641,13 +1642,24 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Main workspace view: Project Analytics vs Calendar vs Kanban Board vs List View */}
+          {/* Main workspace view: Project Analytics vs GitHub vs Calendar vs Kanban Board vs List View */}
           {activeProjectId && viewMode === 'analytics' ? (
             <ProjectAnalytics
               projectId={activeProjectId}
               teamId={teamId}
               token={token}
               project={activeProject}
+            />
+          ) : activeProjectId && viewMode === 'github' ? (
+            <ProjectGitHubView
+              projectId={activeProjectId}
+              teamId={teamId}
+              token={token}
+              project={activeProject}
+              onSelectTask={(taskId) => {
+                const target = tasks.find((t) => t.id === taskId);
+                if (target) setSelectedTask(target);
+              }}
             />
           ) : viewMode === 'calendar' ? (
             <CalendarView

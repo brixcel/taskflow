@@ -17,6 +17,7 @@ const {
   emitTaskAssigned,
   emitTaskCompleted,
 } = require('../services/realtime');
+const { dispatchWebhookEvent } = require('../services/webhooks');
 
 const router = express.Router();
 
@@ -126,6 +127,12 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
     emitTaskCreated(req.teamId, task);
     if (task.assigneeId) {
       emitTaskAssigned(req.teamId, task, null);
+    }
+
+    // Webhook event dispatches
+    dispatchWebhookEvent(req.teamId, 'task.created', task);
+    if (task.assigneeId) {
+      dispatchWebhookEvent(req.teamId, 'task.assigned', task);
     }
 
     res.status(201).json({ task });
@@ -688,8 +695,10 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       },
     });
 
+    const isAssigned = assigneeId !== undefined && assigneeId !== existingTask.assigneeId && Boolean(assigneeId);
+
     // ── Notifications ──────────────────────────────────────────────────────────
-    if (assigneeId !== undefined && assigneeId !== existingTask.assigneeId && assigneeId) {
+    if (isAssigned) {
       const isReassignment = Boolean(existingTask.assigneeId);
       await createNotification({
         userId:  assigneeId,
@@ -734,10 +743,15 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
 
       if (status === 'done') {
         emitTaskCompleted(req.teamId, task);
+        dispatchWebhookEvent(req.teamId, 'task.completed', task);
       }
     }
 
     emitTaskUpdated(req.teamId, task);
+    dispatchWebhookEvent(req.teamId, 'task.updated', task);
+    if (isAssigned) {
+      dispatchWebhookEvent(req.teamId, 'task.assigned', task);
+    }
 
     res.json({ task });
   } catch (error) {

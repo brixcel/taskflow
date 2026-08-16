@@ -96,7 +96,6 @@ function resolveDateRange(dueToken, referenceDate = new Date()) {
     return { isNotNull: true, type: 'hasdate' };
   }
 
-  // Handle exact date YYYY-MM-DD or relative comparisons like <2026-08-15, >2026-08-15
   if (/^[<>]=?\d{4}-\d{2}-\d{2}$/.test(val)) {
     const op = val.startsWith('<=') ? 'lte' : val.startsWith('<') ? 'lt' : val.startsWith('>=') ? 'gte' : 'gt';
     const dateStr = val.replace(/^[<>=]+/, '');
@@ -147,10 +146,8 @@ function parseSearchQuery(queryStr = '') {
   const tokens = [];
   const filters = createEmptyFilters();
 
-  // Match key:"quoted value" | key:'quoted value' | key:unquoted_value
   const operatorRegex = /(?:^|\s+)([a-zA-Z_-]+):(?:"([^"]+)"|'([^']+)'|([^\s]+))/g;
   let match;
-  let textCursor = 0;
   const matchedRanges = [];
 
   while ((match = operatorRegex.exec(raw)) !== null) {
@@ -215,12 +212,10 @@ function parseSearchQuery(queryStr = '') {
         break;
       }
       default:
-        // Unknown operators are preserved in tokens but not recognized as structured filters
         break;
     }
   }
 
-  // Extract remaining non-operator text
   let remainingText = '';
   let lastIndex = 0;
   for (const range of matchedRanges) {
@@ -235,7 +230,6 @@ function parseSearchQuery(queryStr = '') {
 
   const cleanText = remainingText.replace(/\s+/g, ' ').trim();
 
-  // Deduplicate array filters
   filters.statuses   = Array.from(new Set(filters.statuses));
   filters.priorities = Array.from(new Set(filters.priorities));
   filters.assignees  = Array.from(new Set(filters.assignees));
@@ -254,10 +248,6 @@ function parseSearchQuery(queryStr = '') {
 
 /**
  * Builds Prisma where condition from parsed search query and context
- *
- * @param {Object} parsed - Result of parseSearchQuery
- * @param {Object} context - { userId, teamId, baseWhere }
- * @returns {Object} Prisma where object
  */
 function buildPrismaWhereClause(parsed, context = {}) {
   const { userId, teamId, baseWhere = {} } = context;
@@ -271,21 +261,21 @@ function buildPrismaWhereClause(parsed, context = {}) {
   const filters = { ...createEmptyFilters(), ...(parsed?.filters || {}) };
   const text = parsed?.text || '';
 
-  // ─── Status Filter ────────────────────────────────────────────────────────
+  // Status
   if (filters.statuses.length === 1) {
     where.status = filters.statuses[0];
   } else if (filters.statuses.length > 1) {
     where.status = { in: filters.statuses };
   }
 
-  // ─── Priority Filter ──────────────────────────────────────────────────────
+  // Priority
   if (filters.priorities.length === 1) {
     where.priority = filters.priorities[0];
   } else if (filters.priorities.length > 1) {
     where.priority = { in: filters.priorities };
   }
 
-  // ─── Assignee Filter ──────────────────────────────────────────────────────
+  // Assignee
   if (filters.assignees.length > 0) {
     const assigneeConditions = filters.assignees.map((assigneeVal) => {
       const valLower = assigneeVal.toLowerCase();
@@ -295,12 +285,10 @@ function buildPrismaWhereClause(parsed, context = {}) {
       if (valLower === 'unassigned' || valLower === 'none' || valLower === 'null') {
         return { assigneeId: null };
       }
-      // Check if it's a UUID
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(assigneeVal);
       if (isUUID) {
         return { assigneeId: assigneeVal };
       }
-      // Search by user name or email
       return {
         assignee: {
           OR: [
@@ -318,7 +306,7 @@ function buildPrismaWhereClause(parsed, context = {}) {
     }
   }
 
-  // ─── Project Filter ───────────────────────────────────────────────────────
+  // Project
   if (filters.projects.length > 0) {
     const projectConditions = filters.projects.map((projVal) => {
       const valLower = projVal.toLowerCase();
@@ -343,14 +331,14 @@ function buildPrismaWhereClause(parsed, context = {}) {
     }
   }
 
-  // ─── Label Filter ─────────────────────────────────────────────────────────
+  // Labels
   if (filters.labels.length > 0) {
     filters.labels.forEach((label) => {
       andConditions.push({ labels: { has: label } });
     });
   }
 
-  // ─── Due Date Filter ──────────────────────────────────────────────────────
+  // Due Date
   if (filters.due) {
     const dateRange = resolveDateRange(filters.due);
     if (dateRange) {
@@ -360,7 +348,6 @@ function buildPrismaWhereClause(parsed, context = {}) {
         where.dueDate = { not: null };
       } else if (dateRange.type === 'overdue') {
         where.dueDate = { lt: dateRange.lt };
-        // Unless user explicitly requested status:done, exclude done tasks from overdue
         if (!filters.statuses.includes('done') && !where.status) {
           where.status = { not: 'done' };
         }
@@ -375,7 +362,7 @@ function buildPrismaWhereClause(parsed, context = {}) {
     }
   }
 
-  // ─── 'is:' Flags ──────────────────────────────────────────────────────────
+  // is:
   if (filters.isFlags.length > 0) {
     filters.isFlags.forEach((flag) => {
       if (flag === 'done' || flag === 'completed') {
@@ -395,7 +382,7 @@ function buildPrismaWhereClause(parsed, context = {}) {
     });
   }
 
-  // ─── 'has:' Flags ─────────────────────────────────────────────────────────
+  // has:
   if (filters.hasFlags.length > 0) {
     filters.hasFlags.forEach((flag) => {
       if (flag === 'subtasks' || flag === 'subtask') {
@@ -412,7 +399,7 @@ function buildPrismaWhereClause(parsed, context = {}) {
     });
   }
 
-  // ─── Free-Text Search ─────────────────────────────────────────────────────
+  // Free text
   if (text) {
     const terms = text.split(/\s+/).filter(Boolean);
     if (terms.length === 1) {

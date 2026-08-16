@@ -29,8 +29,8 @@
 | **Milestone I** | **Phase 28** | AI Project Planner | ✅ **COMPLETE** | `phase28-ai-planner.test.js` (13/13 passed) |
 | **Milestone I** | **Phase 29** | AI Productivity Insights | ✅ **COMPLETE** | `phase29-ai-insights.test.js` (14/14 passed) |
 | **Milestone I** | **Phase 30** | Natural-Language Search | ✅ **COMPLETE** | `phase30-ai-search.test.js` (23/23 passed) |
-| **Milestone J** | **Phase 31** | Webhooks & API Keys | ⏳ Pending | `phase31-webhooks.test.js` |
-| **Milestone J** | **Phase 32** | GitHub Integration | ⏳ Pending | `phase32-github.test.js` |
+| **Milestone J** | **Phase 31** | Webhooks & API Keys | ✅ **COMPLETE** | `phase31-webhooks.test.js` (18/18 passed) |
+| **Milestone J** | **Phase 32** | GitHub Integration | ✅ **COMPLETE** | `phase32-github.test.js` (22/22 passed) |
 | **Milestone J** | **Phase 33** | Slack / Discord Integration | ⏳ Pending | `phase33-integrations.test.js` |
 | **Milestone K** | **Phase 34** | Infrastructure as Code | ⏳ Pending | `phase34-iac.test.js` |
 | **Milestone K** | **Phase 35** | Production Observability | ⏳ Pending | `phase35-observability.test.js` |

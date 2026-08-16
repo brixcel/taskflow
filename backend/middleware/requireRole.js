@@ -14,15 +14,16 @@
  * @returns Express middleware
  */
 function requireRole(...allowedRoles) {
+  const flatRoles = allowedRoles.flat();
   return function (req, res, next) {
     if (!req.teamRole) {
       // resolveTeam didn't run — configuration error, not a user error.
       return res.status(500).json({ error: 'Team role not resolved' });
     }
 
-    if (!allowedRoles.includes(req.teamRole)) {
+    if (!flatRoles.includes(req.teamRole)) {
       return res.status(403).json({
-        error: `Forbidden — requires role: ${allowedRoles.join(' or ')}`,
+        error: `Forbidden — requires role: ${flatRoles.join(' or ')}`,
       });
     }
 

@@ -39,6 +39,9 @@ model User {
   notificationPreferences  NotificationPreference?
   savedSearches            SavedSearch[]
   recentSearches           RecentSearch[]
+  apiKeys                  ApiKey[]
+  webhooksCreated          Webhook[]
+  githubIntegrationsCreated ProjectGitHubIntegration[]
 
   @@map("users")
 }
@@ -58,6 +61,9 @@ model Team {
   notifications Notification[]
   savedSearches SavedSearch[]
   recentSearches RecentSearch[]
+  apiKeys       ApiKey[]
+  webhooks      Webhook[]
+  githubIntegrations ProjectGitHubIntegration[]
 
   @@map("teams")
 }
@@ -97,6 +103,9 @@ model Project {
   createdBy User            @relation("CreatedProjects", fields: [createdById], references: [id])
   tasks     Task[]
   members   ProjectMember[]
+  githubIntegration ProjectGitHubIntegration?
+  githubResourceLinks GitHubResourceLink[]
+  githubEvents        GitHubEvent[]
 
   @@index([teamId, status])
   @@index([teamId, isArchived])
@@ -145,6 +154,7 @@ model Task {
   watchers      TaskWatcher[]
   subtasks      Subtask[]
   notifications Notification[]
+  githubLinks   GitHubResourceLink[]
 
   @@index([teamId, status, order])
   @@index([teamId, order])
@@ -325,5 +335,146 @@ model RecentSearch {
   @@unique([userId, teamId, query])
   @@index([userId, teamId, updatedAt])
   @@map("recent_searches")
+}
+
+// ─── Developer & Integrations (Phase 31) ──────────────────────────────────────
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  name        String
+  keyPrefix   String    // e.g. "tf_live_12345678" (first 16 chars for display)
+  keyHash     String    @unique // SHA-256 hash of the full secret key
+  scopes      String[]  @default(["*"])
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  userId      String
+  teamId      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId, revokedAt])
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+model Webhook {
+  id          String            @id @default(uuid())
+  name        String
+  url         String
+  secret      String            // Signing secret e.g. "whsec_..."
+  events      String[]          // ["task.created", "task.updated", ...]
+  isActive    Boolean           @default(true)
+  teamId      String
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  team       Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy  User              @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([teamId, isActive])
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id           String    @id @default(uuid())
+  webhookId    String
+  event        String
+  payload      Json
+  statusCode   Int?
+  responseBody String?
+  durationMs   Int?
+  status       String    @default("pending") // pending | success | failed
+  attempts     Int       @default(1)
+  error        String?
+  deliveredAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+  @@map("webhook_deliveries")
+}
+
+// ─── GitHub Integration (Phase 32) ──────────────────────────────────────────
+
+model ProjectGitHubIntegration {
+  id                     String   @id @default(uuid())
+  projectId              String   @unique
+  teamId                 String
+  repoOwner              String
+  repoName               String
+  repoFullName           String   // e.g. "brixcel/taskflow"
+  webhookSecret          String   // e.g. "gh_whsec_..."
+  autoCloseTasks         Boolean  @default(true)
+  autoCreateTasksOnIssue Boolean  @default(false)
+  defaultIssueStatus     String   @default("todo")
+  syncBranches           String[] @default(["main", "master"])
+  isActive               Boolean  @default(true)
+  lastSyncedAt           DateTime?
+  createdById            String
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team        Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy   User                 @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  links       GitHubResourceLink[]
+  events      GitHubEvent[]
+
+  @@index([teamId, isActive])
+  @@index([repoFullName])
+  @@map("project_github_integrations")
+}
+
+model GitHubResourceLink {
+  id             String    @id @default(uuid())
+  integrationId  String
+  projectId      String
+  taskId         String?
+  resourceType   String    // pull_request | issue | commit | branch
+  resourceNumber Int?      // e.g. 42
+  resourceRef    String    // e.g. "PR #42", "Issue #10", "Commit 7f3a9b"
+  title          String
+  url            String
+  author         String?
+  status         String?   // open | closed | merged
+  metadata       Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  integration ProjectGitHubIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  project     Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task        Task?                    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, resourceType])
+  @@index([taskId])
+  @@index([integrationId])
+  @@map("github_resource_links")
+}
+
+model GitHubEvent {
+  id            String   @id @default(uuid())
+  integrationId String
+  projectId     String
+  eventType     String   // pull_request | issues | push | ping
+  action        String?  // opened | closed | merged | synchronize
+  sender        String?
+  payload       Json
+  processed     Boolean  @default(true)
+  error         String?
+  createdAt     DateTime @default(now())
+
+  integration ProjectGitHubIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  project     Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, eventType])
+  @@index([integrationId, createdAt])
+  @@map("github_events")
 }
 

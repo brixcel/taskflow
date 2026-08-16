@@ -12,6 +12,7 @@ const {
   emitProjectUpdated,
   emitProjectDeleted,
 } = require('../services/realtime');
+const { dispatchWebhookEvent } = require('../services/webhooks');
 
 const router = express.Router({ mergeParams: true });
 
@@ -249,6 +250,7 @@ router.post('/', validate(schemas.projectCreate), async (req, res) => {
     };
 
     emitProjectCreated(req.teamId, responsePayload);
+    dispatchWebhookEvent(req.teamId, 'project.created', responsePayload);
 
     res.status(201).json({ project: responsePayload });
   } catch (error) {

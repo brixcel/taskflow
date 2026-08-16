@@ -168,6 +168,17 @@ export default function TaskDetailDrawer({
   const [isGeneratingAiBreakdown, setIsGeneratingAiBreakdown] = useState(false);
   const [aiSuggestions,           setAiSuggestions]           = useState([]);
   const [isBatchAddingSubtasks,   setIsBatchAddingSubtasks]   = useState(false);
+
+  // GitHub Traceability State (Phase 32)
+  const [githubLinks,             setGithubLinks]             = useState([]);
+  const [showAddGhLinkModal,      setShowAddGhLinkModal]      = useState(false);
+  const [ghLinkType,              setGhLinkType]              = useState('pull_request');
+  const [ghLinkRef,               setGhLinkRef]               = useState('');
+  const [ghLinkTitle,             setGhLinkTitle]             = useState('');
+  const [ghLinkUrl,               setGhLinkUrl]               = useState('');
+  const [ghLinkAuthor,            setGhLinkAuthor]            = useState('');
+  const [isGhLinking,             setIsGhLinking]             = useState(false);
+  const [ghLinkError,             setGhLinkError]             = useState('');
   const [aiBreakdownError,        setAiBreakdownError]        = useState('');
 
   // Comment edit state
@@ -234,6 +245,10 @@ export default function TaskDetailDrawer({
         setActivities(res.data.task.activities || []);
         setWatchers(res.data.task.watchers?.map(w => w.user) || []);
       }
+      const ghRes = await axios.get(`${API}/tasks/${initialTask.id}/github`, { headers });
+      if (ghRes.data?.links) {
+        setGithubLinks(ghRes.data.links);
+      }
     } catch {
       /* non-fatal */
     }
@@ -254,6 +269,11 @@ export default function TaskDetailDrawer({
           setActivities(res.data.task.activities || []);
           setWatchers(res.data.task.watchers?.map(w => w.user) || []);
         }
+
+        const ghRes = await axios.get(`${API}/tasks/${initialTask.id}/github`, { headers });
+        if (active && ghRes.data?.links) {
+          setGithubLinks(ghRes.data.links);
+        }
       } catch {
         /* non-fatal */
       } finally {
@@ -264,6 +284,51 @@ export default function TaskDetailDrawer({
     fetchGraph();
     return () => { active = false; };
   }, [initialTask?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAddGhLink = async (e) => {
+    e.preventDefault();
+    if (!ghLinkRef.trim() || !ghLinkTitle.trim() || !ghLinkUrl.trim()) {
+      setGhLinkError('Reference, title, and valid URL are required');
+      return;
+    }
+    setIsGhLinking(true);
+    setGhLinkError('');
+    try {
+      const res = await axios.post(
+        `${API}/tasks/${initialTask.id}/github/link`,
+        {
+          resourceType: ghLinkType,
+          resourceRef: ghLinkRef.trim(),
+          title: ghLinkTitle.trim(),
+          url: ghLinkUrl.trim(),
+          author: ghLinkAuthor.trim() || null,
+          status: 'open',
+        },
+        { headers }
+      );
+      if (res.data?.link) {
+        setGithubLinks((prev) => [res.data.link, ...prev]);
+        setShowAddGhLinkModal(false);
+        setGhLinkRef('');
+        setGhLinkTitle('');
+        setGhLinkUrl('');
+        setGhLinkAuthor('');
+      }
+    } catch (err) {
+      setGhLinkError(err.response?.data?.error || 'Failed to link GitHub resource');
+    } finally {
+      setIsGhLinking(false);
+    }
+  };
+
+  const handleUnlinkGh = async (linkId) => {
+    try {
+      await axios.delete(`${API}/tasks/${initialTask.id}/github/link/${linkId}`, { headers });
+      setGithubLinks((prev) => prev.filter((l) => l.id !== linkId));
+    } catch (err) {
+      console.error('Failed to unlink GitHub resource', err);
+    }
+  };
 
   useEffect(() => {
     if (isEditRequested) {
@@ -1757,6 +1822,28 @@ export default function TaskDetailDrawer({
                       </span>
                     )}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('github')}
+                    style={{
+                      padding: '8px 14px', fontSize: 13, fontWeight: 600,
+                      color: activeTab === 'github' ? 'var(--color-canvas-ink, #0f1011)' : 'var(--color-canvas-mute, #888888)',
+                      borderBottom: activeTab === 'github' ? '2px solid #0070f3' : '2px solid transparent',
+                      background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                    </svg>
+                    GitHub
+                    {githubLinks.length > 0 && (
+                      <span style={{ fontSize: 11, padding: '1px 5px', borderRadius: 99, background: 'rgba(99, 102, 241, 0.12)', color: '#6366f1' }}>
+                        {githubLinks.length}
+                      </span>
+                    )}
+                  </button>
                 </div>
 
                 {/* Comments Tab Content */}
@@ -1910,6 +1997,210 @@ export default function TaskDetailDrawer({
                           </span>
                         </div>
                       ))
+                    )}
+                  </div>
+                )}
+
+                {/* GitHub Traceability Tab Content */}
+                {activeTab === 'github' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: 'var(--color-canvas-mute, #888888)' }}>
+                        Linked Pull Requests, Commits, and Issues
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGhLinkError('');
+                          setShowAddGhLinkModal(true);
+                        }}
+                        className="btn-secondary"
+                        style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4 }}
+                      >
+                        + Link Resource
+                      </button>
+                    </div>
+
+                    {githubLinks.length === 0 ? (
+                      <p style={{ margin: '12px 0', fontSize: 12.5, color: 'var(--color-canvas-mute, #888888)', fontStyle: 'italic' }}>
+                        No GitHub pull requests or commits linked to this task yet. PRs with <code>[{task.id.substring(0, 8)}]</code> will appear automatically.
+                      </p>
+                    ) : (
+                      githubLinks.map((item) => {
+                        const isMerged = item.status === 'merged';
+                        const isOpen = item.status === 'open';
+                        const isCommit = item.resourceType === 'commit';
+
+                        const badgeColor = isMerged
+                          ? { bg: '#8250df18', text: '#8250df', label: 'Merged' }
+                          : isOpen
+                          ? { bg: '#2da44e18', text: '#2da44e', label: 'Open' }
+                          : isCommit
+                          ? { bg: '#0969da18', text: '#0969da', label: 'Committed' }
+                          : { bg: '#cf222e18', text: '#cf222e', label: 'Closed' };
+
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 12px',
+                              borderRadius: 8,
+                              background: 'var(--color-canvas-subtle, #f9fafa)',
+                              border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                              gap: 10,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0, flex: 1 }}>
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  background: badgeColor.bg,
+                                  color: badgeColor.text,
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {item.resourceRef || badgeColor.label}
+                              </span>
+
+                              <div style={{ minWidth: 0 }}>
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    fontSize: 12.5,
+                                    fontWeight: 600,
+                                    color: 'var(--color-canvas-ink, #0f1011)',
+                                    textDecoration: 'none',
+                                    display: 'block',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {item.title} ↗
+                                </a>
+                                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--color-canvas-mute, #888888)' }}>
+                                  by @{item.author || 'contributor'} · {formatTimestamp(item.createdAt)}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleUnlinkGh(item.id)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--color-canvas-mute, #888888)',
+                                cursor: 'pointer',
+                                fontSize: 13,
+                                padding: 4,
+                              }}
+                              title="Unlink resource"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+
+                    {/* Manual Link Modal */}
+                    {showAddGhLinkModal && (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          padding: 14,
+                          borderRadius: 8,
+                          background: 'var(--color-canvas-card, #ffffff)',
+                          border: '1px solid #0070f3',
+                        }}
+                      >
+                        <h4 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 700 }}>
+                          Link GitHub Resource
+                        </h4>
+
+                        {ghLinkError && (
+                          <div style={{ color: '#ef4444', fontSize: 11.5, marginBottom: 8 }}>
+                            {ghLinkError}
+                          </div>
+                        )}
+
+                        <form onSubmit={handleAddGhLink} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 8 }}>
+                            <select
+                              value={ghLinkType}
+                              onChange={(e) => setGhLinkType(e.target.value)}
+                              style={{ fontSize: 12, padding: '4px 6px', borderRadius: 4, border: '1px solid #ebebeb' }}
+                            >
+                              <option value="pull_request">PR</option>
+                              <option value="commit">Commit</option>
+                              <option value="issue">Issue</option>
+                            </select>
+
+                            <input
+                              type="text"
+                              placeholder="Ref (e.g. PR #42 or Commit a1b2)"
+                              value={ghLinkRef}
+                              onChange={(e) => setGhLinkRef(e.target.value)}
+                              required
+                              style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid #ebebeb' }}
+                            />
+                          </div>
+
+                          <input
+                            type="text"
+                            placeholder="Title (e.g. feat: integrate webhooks)"
+                            value={ghLinkTitle}
+                            onChange={(e) => setGhLinkTitle(e.target.value)}
+                            required
+                            style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid #ebebeb' }}
+                          />
+
+                          <input
+                            type="url"
+                            placeholder="URL (e.g. https://github.com/org/repo/pull/42)"
+                            value={ghLinkUrl}
+                            onChange={(e) => setGhLinkUrl(e.target.value)}
+                            required
+                            style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid #ebebeb' }}
+                          />
+
+                          <input
+                            type="text"
+                            placeholder="Author (e.g. octocat)"
+                            value={ghLinkAuthor}
+                            onChange={(e) => setGhLinkAuthor(e.target.value)}
+                            style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid #ebebeb' }}
+                          />
+
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 4 }}>
+                            <button
+                              type="button"
+                              onClick={() => setShowAddGhLinkModal(false)}
+                              className="btn-secondary"
+                              style={{ fontSize: 11, padding: '4px 10px' }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={isGhLinking}
+                              className="btn-primary"
+                              style={{ fontSize: 11, padding: '4px 10px' }}
+                            >
+                              {isGhLinking ? 'Linking...' : 'Link to Task'}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
                     )}
                   </div>
                 )}

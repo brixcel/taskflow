@@ -5,51 +5,12 @@ const jwt      = require('jsonwebtoken');
 const prisma   = require('../prisma');
 const validate = require('../middleware/validate');
 const schemas  = require('../validation/schemas');
-const { sendPasswordResetEmail, sendVerificationEmail } = require('../services/email');
-const logger = require('../middleware/logger');
+const { sendPasswordResetEmail } = require('../services/email');
 
 const router = express.Router();
 
-// Token lifetimes
-const RESET_TOKEN_TTL_MS  = 60 * 60 * 1000;       // 1 hour
-const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;  // 24 hours
-
-// ─── GET /auth/admin-reset-db ──────────────────────────────────────────────────
-// Secure endpoint to purge and reset all tables without needing paid Render Shell.
-// Usage: GET /auth/admin-reset-db?secret=<JWT_SECRET>
-router.get('/admin-reset-db', async (req, res) => {
-  const secret = req.query.secret || req.headers['x-admin-secret'];
-  if (!secret || secret !== process.env.JWT_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid admin secret. Pass ?secret=<JWT_SECRET>' });
-  }
-
-  try {
-    const comments    = await prisma.comment.deleteMany({});
-    const activities  = await prisma.activity.deleteMany({});
-    const tasks       = await prisma.task.deleteMany({});
-    const memberships = await prisma.teamMembership.deleteMany({});
-    const teams       = await prisma.team.deleteMany({});
-    const resets      = await prisma.passwordResetToken.deleteMany({});
-    const verifys     = await prisma.emailVerificationToken.deleteMany({});
-    const users       = await prisma.user.deleteMany({});
-
-    res.json({
-      message: 'Database reset successfully! All users, teams, and tasks deleted.',
-      deleted: {
-        users: users.count,
-        teams: teams.count,
-        tasks: tasks.count,
-        comments: comments.count,
-        activities: activities.count,
-        resetTokens: resets.count,
-        verificationTokens: verifys.count,
-      },
-    });
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to reset database');
-    res.status(500).json({ error: 'Failed to reset database' });
-  }
-});
+// Token lifetime: 1 hour
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 // ─── POST /auth/register ──────────────────────────────────────────────────────
 //
@@ -80,37 +41,13 @@ router.post('/register', validate(schemas.register), async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // ── Send verification email ───────────────────────────────────────────────
-    // Generate a 24-hour token for email verification.
-    try {
-      const rawVerifyToken  = crypto.randomBytes(32).toString('hex');
-      const verifyTokenHash = crypto.createHash('sha256').update(rawVerifyToken).digest('hex');
-      const verifyExpiresAt = new Date(Date.now() + VERIFY_TOKEN_TTL_MS);
-
-      await prisma.emailVerificationToken.create({
-        data: { tokenHash: verifyTokenHash, userId: user.id, expiresAt: verifyExpiresAt },
-      });
-
-      if (process.env.NODE_ENV === 'test') {
-        global.__lastVerifyTokenForTest__ = rawVerifyToken;
-        await sendVerificationEmail(user.email, rawVerifyToken);
-      } else {
-        // Asynchronous background dispatch in production for sub-50ms user response
-        sendVerificationEmail(user.email, rawVerifyToken).catch((emailErr) => {
-          logger.error({ err: emailErr }, 'Failed to send verification email');
-        });
-      }
-    } catch (emailErr) {
-      logger.error({ err: emailErr }, 'Failed to create verification token');
-    }
-
     res.status(201).json({
-      user:  { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified },
+      user:  { id: user.id, email: user.email, name: user.name },
       token,
     });
   } catch (error) {
-    logger.error({ err: error }, 'Auth route handler failed');
-    res.status(500).json({ error: 'Something went wrong' });
+    console.error(error);
+    res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
 
@@ -124,7 +61,7 @@ router.post('/login', validate(schemas.login), async (req, res) => {
     const { email, password } = req.body;
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || user.isDeleted) {
+    if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -151,14 +88,14 @@ router.post('/login', validate(schemas.login), async (req, res) => {
     );
 
     res.json({
-      user: { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified },
+      user: { id: user.id, email: user.email, name: user.name },
       team: membership
         ? { id: membership.team.id, name: membership.team.name }
         : null,
       token,
     });
   } catch (error) {
-    logger.error({ err: error }, 'Auth route handler failed');
+    console.error(error);
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -186,7 +123,6 @@ router.post('/forgot-password', validate(schemas.forgotPassword), async (req, re
 
     // Respond 200 even when no user found — prevents email enumeration
     if (!user) {
-      logger.info({ email }, 'Forgot-password requested for unregistered email — no reset email sent');
       return res.json({ message: 'If that email is registered, a reset link has been sent.' });
     }
 
@@ -209,16 +145,13 @@ router.post('/forgot-password', validate(schemas.forgotPassword), async (req, re
     // tests and unreachable in production (the debug endpoint guards on NODE_ENV).
     if (process.env.NODE_ENV === 'test') {
       global.__lastResetTokenForTest__ = rawToken;
-      await sendPasswordResetEmail(user.email, rawToken);
-    } else {
-      sendPasswordResetEmail(user.email, rawToken).catch((err) => {
-        logger.error({ err }, 'Failed to send password reset email');
-      });
     }
+
+    await sendPasswordResetEmail(user.email, rawToken);
 
     res.json({ message: 'If that email is registered, a reset link has been sent.' });
   } catch (error) {
-    logger.error({ err: error }, 'Auth route handler failed');
+    console.error(error);
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -272,7 +205,7 @@ router.post('/reset-password', validate(schemas.resetPassword), async (req, res)
 
     res.json({ message: 'Password updated successfully. You can now log in.' });
   } catch (error) {
-    logger.error({ err: error }, 'Auth route handler failed');
+    console.error(error);
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -281,8 +214,21 @@ router.post('/reset-password', validate(schemas.resetPassword), async (req, res)
 //
 // ⚠️  TEST-ONLY ENDPOINT — MUST NEVER BE REACHABLE IN PRODUCTION ⚠️
 //
-// Returns the raw reset token stashed in memory by the forgot-password handler
-// when NODE_ENV=test. SAFETY GUARANTEE: returns 404 unless NODE_ENV === 'test'.
+// This endpoint returns the raw reset token for the most recent
+// PasswordResetToken row in the database. It exists solely so the
+// test-password-reset.sh script can retrieve the token without reading
+// the database directly, since we only store the SHA-256 hash in prod.
+//
+// SAFETY GUARANTEE: the route returns 404 unless NODE_ENV === 'test'.
+// Any other value — including 'development', 'staging', or production
+// (where NODE_ENV is typically unset or 'production') — gets a 404.
+// This means:
+//   • The endpoint never ships enabled on a real server.
+//   • Running the dev server normally (NODE_ENV=development) returns 404.
+//   • CI and the test script must explicitly set NODE_ENV=test.
+//
+// DO NOT remove the NODE_ENV guard. DO NOT add this route to any
+// production router. DO NOT log or expose raw tokens anywhere else.
 
 router.get('/_test/last-reset-token', async (req, res) => {
   if (process.env.NODE_ENV !== 'test') {
@@ -290,6 +236,7 @@ router.get('/_test/last-reset-token', async (req, res) => {
   }
 
   try {
+    // Find the most recently created unused token
     const record = await prisma.passwordResetToken.findFirst({
       orderBy: { expiresAt: 'desc' },
     });
@@ -298,6 +245,11 @@ router.get('/_test/last-reset-token', async (req, res) => {
       return res.status(404).json({ error: 'No reset token found' });
     }
 
+    // We only store the hash, so we can't reverse it — instead, we store
+    // the raw token temporarily in a module-level variable set by the
+    // forgot-password handler when NODE_ENV=test.
+    //
+    // Return it from the in-memory store set during the forgot-password call.
     const raw = global.__lastResetTokenForTest__;
     if (!raw) {
       return res.status(404).json({ error: 'No raw token in memory — was forgot-password called first?' });
@@ -305,146 +257,7 @@ router.get('/_test/last-reset-token', async (req, res) => {
 
     res.json({ token: raw, tokenId: record.id, expiresAt: record.expiresAt });
   } catch (error) {
-    logger.error({ err: error }, 'Auth route handler failed');
-    res.status(500).json({ error: 'Something went wrong' });
-  }
-});
-
-// ─── GET /auth/verify-email ───────────────────────────────────────────────────
-//
-// Query: ?token=<rawToken>
-//
-// Validates the token and marks the user's email as verified.
-// Returns 400 for expired, already-used, or non-existent tokens.
-// Returns 200 with a success message on valid verification.
-
-router.get('/verify-email', validate(schemas.verifyEmail, 'query'), async (req, res) => {
-  try {
-    const { token } = req.query;
-
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-
-    const record = await prisma.emailVerificationToken.findUnique({
-      where: { tokenHash },
-    });
-
-    if (!record) {
-      return res.status(400).json({ error: 'Invalid or expired verification link.' });
-    }
-
-    if (record.usedAt !== null) {
-      const user = await prisma.user.findUnique({ where: { id: record.userId } });
-      if (user && user.emailVerified) {
-        return res.json({ message: 'Email is already verified. Your account is fully active.' });
-      }
-      return res.status(400).json({ error: 'This verification link has already been used.' });
-    }
-
-    if (record.expiresAt < new Date()) {
-      return res.status(400).json({ error: 'This verification link has expired.' });
-    }
-
-    // Mark user as verified and consume the token atomically
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: record.userId },
-        data:  { emailVerified: true },
-      }),
-      prisma.emailVerificationToken.update({
-        where: { id: record.id },
-        data:  { usedAt: new Date() },
-      }),
-    ]);
-
-    res.json({ message: 'Email verified successfully. Your account is now fully active.' });
-  } catch (error) {
-    logger.error({ err: error }, 'Auth route handler failed');
-    res.status(500).json({ error: 'Something went wrong' });
-  }
-});
-
-// ─── POST /auth/resend-verification ──────────────────────────────────────────
-//
-// Body: { email }
-//
-// Resends a verification email. Always responds 200 to prevent email enumeration.
-// Invalidates any existing unused verification tokens before creating a new one.
-// No-ops silently if the user is already verified or the email is not registered.
-
-router.post('/resend-verification', validate(schemas.resendVerification), async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    const user = await prisma.user.findUnique({ where: { email } });
-
-    // Respond 200 in all non-actionable cases — prevents enumeration
-    if (!user || user.emailVerified) {
-      return res.json({ message: 'If that email is registered and unverified, a new verification link has been sent.' });
-    }
-
-    // Invalidate any existing unused verification tokens
-    await prisma.emailVerificationToken.deleteMany({
-      where: { userId: user.id, usedAt: null },
-    });
-
-    // Generate and store a new token
-    const rawToken   = crypto.randomBytes(32).toString('hex');
-    const tokenHash  = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt  = new Date(Date.now() + VERIFY_TOKEN_TTL_MS);
-
-    await prisma.emailVerificationToken.create({
-      data: { tokenHash, userId: user.id, expiresAt },
-    });
-
-    if (process.env.NODE_ENV === 'test') {
-      global.__lastVerifyTokenForTest__ = rawToken;
-      await sendVerificationEmail(user.email, rawToken);
-    } else {
-      sendVerificationEmail(user.email, rawToken).catch((err) => {
-        logger.error({ err }, 'Failed to resend verification email');
-      });
-    }
-
-    res.json({ message: 'If that email is registered and unverified, a new verification link has been sent.' });
-  } catch (error) {
-    logger.error({ err: error }, 'Auth route handler failed');
-    res.status(500).json({ error: 'Something went wrong' });
-  }
-});
-
-// ─── GET /auth/_test/last-verify-token ───────────────────────────────────────
-//
-// ⚠️  TEST-ONLY ENDPOINT — MUST NEVER BE REACHABLE IN PRODUCTION ⚠️
-//
-// Returns the raw verification token stashed in memory by the register /
-// resend-verification handlers when NODE_ENV=test.
-// Mirrors the pattern of GET /auth/_test/last-reset-token.
-//
-// SAFETY GUARANTEE: returns 404 unless NODE_ENV === 'test'.
-
-router.get('/_test/last-verify-token', async (req, res) => {
-  if (process.env.NODE_ENV !== 'test') {
-    return res.status(404).json({ error: 'Not found' });
-  }
-
-  try {
-    const raw = global.__lastVerifyTokenForTest__;
-    if (!raw) {
-      return res.status(404).json({ error: 'No raw verify token in memory — was register or resend-verification called first?' });
-    }
-
-    const tokenHash = crypto.createHash('sha256').update(raw).digest('hex');
-    const record = await prisma.emailVerificationToken.findUnique({
-      where: { tokenHash },
-    });
-
-    if (!record) {
-      return res.status(404).json({ error: 'Token in memory but not found in DB' });
-    }
-
-    res.json({ token: raw, tokenId: record.id, expiresAt: record.expiresAt });
-  } catch (error) {
-    logger.error({ err: error }, 'Auth route handler failed');
+    console.error(error);
     res.status(500).json({ error: 'Something went wrong' });
   }
 });

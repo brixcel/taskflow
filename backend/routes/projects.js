@@ -12,6 +12,7 @@ const {
   emitProjectUpdated,
   emitProjectDeleted,
 } = require('../services/realtime');
+const { dispatchWebhookEvent } = require('../services/webhooks');
 
 const router = express.Router({ mergeParams: true });
 
@@ -135,7 +136,9 @@ router.get('/', async (req, res) => {
 
     res.json({ projects, count: projects.length });
   } catch (error) {
-    logger.error({ err: error }, 'GET /projects failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'GET /projects failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -247,10 +250,13 @@ router.post('/', validate(schemas.projectCreate), async (req, res) => {
     };
 
     emitProjectCreated(req.teamId, responsePayload);
+    dispatchWebhookEvent(req.teamId, 'project.created', responsePayload);
 
     res.status(201).json({ project: responsePayload });
   } catch (error) {
-    logger.error({ err: error }, 'POST /projects failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'POST /projects failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -313,7 +319,9 @@ router.get('/:id', async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error({ err: error }, 'GET /projects/:id failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'GET /projects/:id failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -400,7 +408,9 @@ router.patch('/:id', validate(schemas.projectUpdate), async (req, res) => {
 
     res.json({ project: responsePayload });
   } catch (error) {
-    logger.error({ err: error }, 'PATCH /projects/:id failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'PATCH /projects/:id failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -456,7 +466,9 @@ router.delete('/:id', async (req, res) => {
 
     res.json({ success: true, message: 'Project deleted successfully' });
   } catch (error) {
-    logger.error({ err: error }, 'DELETE /projects/:id failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'DELETE /projects/:id failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -544,7 +556,9 @@ router.get('/:id/stats', async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error({ err: error }, 'GET /projects/:id/stats failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'GET /projects/:id/stats failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -601,7 +615,9 @@ router.post('/:id/members', validate(schemas.projectMemberAdd), async (req, res)
 
     res.status(201).json({ member });
   } catch (error) {
-    logger.error({ err: error }, 'POST /projects/:id/members failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'POST /projects/:id/members failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -630,7 +646,9 @@ router.delete('/:id/members/:userId', async (req, res) => {
 
     res.json({ success: true, message: 'Member removed from project' });
   } catch (error) {
-    logger.error({ err: error }, 'DELETE /projects/:id/members/:userId failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'DELETE /projects/:id/members/:userId failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });

@@ -1,22 +1,20 @@
 /**
- * validate(schema, source?) — Express middleware factory
+ * validate(schema) — Express middleware factory
  *
- * Validates req.body (default) or req.query (source = 'query') against the
- * provided Zod schema.
+ * Validates req.body against the provided Zod schema.
  * On failure: returns 400 with an array of field-level error objects so the
  * frontend can display per-field messages without parsing a blob of text.
  *
  * Example:
- *   router.post('/',          validate(schemas.taskCreate),          handler)
- *   router.get('/verify',     validate(schemas.verifyEmail, 'query'), handler)
+ *   router.post('/', validate(schemas.taskCreate), handler)
  */
 
 const { ZodError } = require('zod');
 
 function validate(schema, source = 'body') {
   return (req, res, next) => {
-    const input  = source === 'query' ? req.query : req.body;
-    const result = schema.safeParse(input);
+    const dataToValidate = req[source] || {};
+    const result = schema.safeParse(dataToValidate);
 
     if (!result.success) {
       // Zod v4 uses .issues; v3 used .errors — support both
@@ -29,13 +27,8 @@ function validate(schema, source = 'body') {
       return res.status(400).json({ errors });
     }
 
-    // Write parsed data back to the appropriate source so routes always see
-    // clean, typed values.
-    if (source === 'query') {
-      req.query = result.data;
-    } else {
-      req.body = result.data;
-    }
+    // Replace the request source property with parsed/coerced data
+    req[source] = result.data;
     next();
   };
 }

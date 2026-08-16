@@ -6,6 +6,7 @@
  * Determines the "active team" for the request using this priority:
  *   1. X-Team-Id header  — explicit team selection (future: team switcher)
  *   2. First membership  — fallback for single-team users / existing sessions
+ *   3. If authMethod is api_key, teamId is already authenticated and scoped
  *
  * Attaches to the request:
  *   req.teamId   — the resolved team's id
@@ -20,6 +21,15 @@ const prisma = require('../prisma');
 async function resolveTeam(req, res, next) {
   try {
     const requestedTeamId = req.headers['x-team-id'];
+
+    if (req.authMethod === 'api_key' && req.teamId) {
+      if (requestedTeamId && requestedTeamId !== req.teamId) {
+        return res.status(403).json({
+          error: 'API key is not authorized for this team',
+        });
+      }
+      return next();
+    }
 
     let membership;
 
@@ -41,7 +51,6 @@ async function resolveTeam(req, res, next) {
       }
     } else {
       // No explicit team — use the first membership (oldest join date).
-      // For users with a single team this is always correct.
       membership = await prisma.teamMembership.findFirst({
         where: { userId: req.userId },
         orderBy: { joinedAt: 'asc' },

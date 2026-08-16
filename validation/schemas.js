@@ -501,6 +501,59 @@ const aiSearchResponse = z.object({
   facets: z.record(z.any()).optional().default({}),
 });
 
+// ─── Developer & Integrations (Phase 31) ──────────────────────────────────────
+
+const apiKeyCreate = z.object({
+  name: nonBlankString(100, { requiredMsg: 'Key name is required' }),
+  scopes: z.array(z.string()).optional().default(['*']),
+  expiresInDays: z.coerce.number().int().min(1).max(365).optional().nullable(),
+});
+
+const webhookCreate = z.object({
+  name: nonBlankString(100, { requiredMsg: 'Webhook name is required' }),
+  url: z.string().url('Must be a valid URL (e.g. https://example.com/webhook)').max(500),
+  events: z.array(z.string()).min(1, 'At least one event must be selected'),
+});
+
+const webhookUpdate = z.object({
+  name: z.string().min(1).max(100).optional(),
+  url: z.string().url('Must be a valid URL').max(500).optional(),
+  events: z.array(z.string()).min(1).optional(),
+  isActive: z.boolean().optional(),
+});
+
+// ─── GitHub Integration (Phase 32) ──────────────────────────────────────────
+
+const projectGitHubCreate = z.object({
+  repoOwner: nonBlankString(100, { requiredMsg: 'Repository owner is required' }),
+  repoName: nonBlankString(100, { requiredMsg: 'Repository name is required' }),
+  autoCloseTasks: z.boolean().optional().default(true),
+  autoCreateTasksOnIssue: z.boolean().optional().default(false),
+  defaultIssueStatus: z.enum(['todo', 'in_progress', 'done']).optional().default('todo'),
+  syncBranches: z.array(z.string()).optional().default(['main', 'master']),
+});
+
+const projectGitHubUpdate = z.object({
+  repoOwner: z.string().min(1).max(100).optional(),
+  repoName: z.string().min(1).max(100).optional(),
+  autoCloseTasks: z.boolean().optional(),
+  autoCreateTasksOnIssue: z.boolean().optional(),
+  defaultIssueStatus: z.enum(['todo', 'in_progress', 'done']).optional(),
+  syncBranches: z.array(z.string()).optional(),
+  isActive: z.boolean().optional(),
+});
+
+const githubManualLink = z.object({
+  resourceType: z.enum(['pull_request', 'issue', 'commit', 'branch']),
+  resourceNumber: z.coerce.number().int().optional().nullable(),
+  resourceRef: z.string().min(1).max(100),
+  title: z.string().min(1).max(255),
+  url: z.string().url('Must be a valid URL').max(500),
+  author: z.string().max(100).optional().nullable(),
+  status: z.string().max(50).optional().nullable(),
+  metadata: z.any().optional().nullable(),
+});
+
 module.exports = {
   register,
   login,
@@ -544,6 +597,12 @@ module.exports = {
   aiProductivityInsightsResponse,
   aiSearchRequest,
   aiSearchResponse,
+  apiKeyCreate,
+  webhookCreate,
+  webhookUpdate,
+  projectGitHubCreate,
+  projectGitHubUpdate,
+  githubManualLink,
 };
 
 

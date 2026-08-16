@@ -148,12 +148,10 @@ router.get('/suggestions', async (req, res) => {
       { prefix: 'has:', description: 'Filter has relation (subtasks, comments, due, project)', example: 'has:subtasks' },
     ];
 
-    // Filter matching operators
     const operatorSuggestions = OPERATORS.filter(
       (op) => !rawQ || op.prefix.startsWith(qLower) || op.example.includes(qLower)
     );
 
-    // Fetch team members, projects, and recent labels for value autocompletion
     const [teamMembers, teamProjects, recentTasks] = await Promise.all([
       prisma.teamMembership.findMany({
         where: { teamId: req.teamId },
@@ -176,7 +174,6 @@ router.get('/suggestions', async (req, res) => {
       new Set(recentTasks.flatMap((t) => t.labels || []))
     ).slice(0, 10);
 
-    // Value suggestions by operator
     const valueSuggestions = {
       status: ['todo', 'in_progress', 'done'],
       priority: ['low', 'medium', 'high', 'urgent'],
@@ -195,7 +192,6 @@ router.get('/suggestions', async (req, res) => {
       label: uniqueLabels,
     };
 
-    // Quick match preview if user has typed a query
     let quickTasks = [];
     let quickProjects = [];
 
@@ -241,7 +237,6 @@ router.get('/suggestions', async (req, res) => {
 
 // ─── Saved Searches ──────────────────────────────────────────────────────────
 
-// GET /saved — list saved searches
 router.get('/saved', async (req, res) => {
   try {
     const savedSearches = await prisma.savedSearch.findMany({
@@ -259,7 +254,6 @@ router.get('/saved', async (req, res) => {
   }
 });
 
-// POST /saved — create a saved search
 router.post('/saved', validate(schemas.savedSearchCreate), async (req, res) => {
   try {
     const { name, query, filters } = req.body;
@@ -281,7 +275,6 @@ router.post('/saved', validate(schemas.savedSearchCreate), async (req, res) => {
   }
 });
 
-// DELETE /saved/:id — delete a saved search
 router.delete('/saved/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -311,7 +304,6 @@ router.delete('/saved/:id', async (req, res) => {
 
 // ─── Recent Searches ─────────────────────────────────────────────────────────
 
-// GET /recent — list recent searches
 router.get('/recent', async (req, res) => {
   try {
     const recentSearches = await prisma.recentSearch.findMany({
@@ -330,7 +322,6 @@ router.get('/recent', async (req, res) => {
   }
 });
 
-// POST /recent — record a recent search
 router.post('/recent', validate(schemas.recentSearchCreate), async (req, res) => {
   try {
     const cleanQuery = sanitize(req.body.query).trim();
@@ -356,7 +347,6 @@ router.post('/recent', validate(schemas.recentSearchCreate), async (req, res) =>
       },
     });
 
-    // Prune older searches beyond top 20
     const count = await prisma.recentSearch.count({
       where: { userId: req.userId, teamId: req.teamId },
     });
@@ -380,7 +370,6 @@ router.post('/recent', validate(schemas.recentSearchCreate), async (req, res) =>
   }
 });
 
-// DELETE /recent — clear recent searches
 router.delete('/recent', async (req, res) => {
   try {
     await prisma.recentSearch.deleteMany({

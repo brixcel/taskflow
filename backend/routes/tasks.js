@@ -17,6 +17,7 @@ const {
   emitTaskAssigned,
   emitTaskCompleted,
 } = require('../services/realtime');
+const { dispatchWebhookEvent } = require('../services/webhooks');
 
 const router = express.Router();
 
@@ -128,9 +129,17 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
       emitTaskAssigned(req.teamId, task, null);
     }
 
+    // Webhook event dispatches
+    dispatchWebhookEvent(req.teamId, 'task.created', task);
+    if (task.assigneeId) {
+      dispatchWebhookEvent(req.teamId, 'task.assigned', task);
+    }
+
     res.status(201).json({ task });
   } catch (error) {
-    logger.error({ err: error }, 'POST /tasks failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'POST /tasks failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -214,7 +223,9 @@ router.get('/', async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error({ err: error }, 'GET /tasks failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'GET /tasks failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -256,7 +267,9 @@ router.patch('/reorder/batch', validate(schemas.tasksBatchReorder), async (req, 
 
     res.json({ success: true, count: updates.length });
   } catch (error) {
-    logger.error({ err: error }, 'PATCH /tasks/reorder/batch failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'PATCH /tasks/reorder/batch failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -457,7 +470,9 @@ router.get('/:id', async (req, res) => {
 
     res.json({ task });
   } catch (error) {
-    logger.error({ err: error }, 'GET /tasks/:id failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'GET /tasks/:id failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -492,7 +507,9 @@ router.post('/:id/watch', async (req, res) => {
 
     res.json({ watching: true, taskId: id });
   } catch (error) {
-    logger.error({ err: error }, 'POST /tasks/:id/watch failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'POST /tasks/:id/watch failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -525,7 +542,9 @@ router.delete('/:id/watch', async (req, res) => {
 
     res.json({ watching: false, taskId: id });
   } catch (error) {
-    logger.error({ err: error }, 'DELETE /tasks/:id/watch failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'DELETE /tasks/:id/watch failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -552,7 +571,9 @@ router.get('/:id/watchers', async (req, res) => {
 
     res.json({ watchers: watchers.map(w => w.user) });
   } catch (error) {
-    logger.error({ err: error }, 'GET /tasks/:id/watchers failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'GET /tasks/:id/watchers failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
@@ -674,8 +695,10 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       },
     });
 
+    const isAssigned = assigneeId !== undefined && assigneeId !== existingTask.assigneeId && Boolean(assigneeId);
+
     // ── Notifications ──────────────────────────────────────────────────────────
-    if (assigneeId !== undefined && assigneeId !== existingTask.assigneeId && assigneeId) {
+    if (isAssigned) {
       const isReassignment = Boolean(existingTask.assigneeId);
       await createNotification({
         userId:  assigneeId,
@@ -720,22 +743,26 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
 
       if (status === 'done') {
         emitTaskCompleted(req.teamId, task);
+        dispatchWebhookEvent(req.teamId, 'task.completed', task);
       }
     }
 
     emitTaskUpdated(req.teamId, task);
+    dispatchWebhookEvent(req.teamId, 'task.updated', task);
+    if (isAssigned) {
+      dispatchWebhookEvent(req.teamId, 'task.assigned', task);
+    }
 
     res.json({ task });
   } catch (error) {
-    logger.error({ err: error }, 'PATCH /tasks/:id failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'PATCH /tasks/:id failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
 
 // ─── DELETE /:id — delete a task ─────────────────────────────────────────────
-//
-// Allowed if:  user is the task creator  OR  user is admin/owner in this team.
-// A plain member cannot delete another member's task.
 
 router.delete('/:id', async (req, res) => {
   try {
@@ -765,7 +792,9 @@ router.delete('/:id', async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    logger.error({ err: error }, 'DELETE /tasks/:id failed');
+    if (logger && logger.error) {
+      logger.error({ err: error }, 'DELETE /tasks/:id failed');
+    }
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
