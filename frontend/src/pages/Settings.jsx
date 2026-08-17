@@ -75,6 +75,7 @@ const ALL_WEBHOOK_EVENTS = [
 export default function Settings() {
   const navigate = useNavigate();
 
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState('general'); // 'general' | 'developer'
 
   const [user] = useState(getCurrentUser);
@@ -374,7 +375,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="dashboard-layout" style={{ minHeight: '100vh', display: 'flex' }}>
+    <div className="app-shell">
       <Sidebar
         activeProjectId={null}
         onSelectProject={() => navigate('/dashboard')}
@@ -391,9 +392,11 @@ export default function Settings() {
         userEmail={user?.email}
         currentTeam={activeTeam}
         teams={teams}
+        isOpen={mobileSidebarOpen}
+        onClose={() => setMobileSidebarOpen(false)}
       />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="app-main">
         {/* Header */}
         <header
           style={{
@@ -407,6 +410,17 @@ export default function Settings() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => setMobileSidebarOpen((v) => !v)}
+              aria-expanded={mobileSidebarOpen}
+              aria-label="Toggle navigation menu"
+              className="btn-secondary md:hidden"
+              style={{ height: 32, width: 32, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path d="M2.5 4.5h13M2.5 9h13M2.5 13.5h13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-canvas-ink, #171717)' }}>
               Settings
             </span>
