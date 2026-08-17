@@ -13,6 +13,7 @@ const {
   emitProjectDeleted,
 } = require('../services/realtime');
 const { dispatchWebhookEvent } = require('../services/webhooks');
+const { dispatchChatEvent } = require('../services/chatIntegrations');
 
 const router = express.Router({ mergeParams: true });
 
@@ -405,6 +406,7 @@ router.patch('/:id', validate(schemas.projectUpdate), async (req, res) => {
     };
 
     emitProjectUpdated(req.teamId, responsePayload);
+    dispatchChatEvent(req.teamId, 'project_updated', { project: responsePayload, actor: req.user });
 
     res.json({ project: responsePayload });
   } catch (error) {

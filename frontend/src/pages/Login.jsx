@@ -3,24 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import ThemeToggle from '../components/ThemeToggle';
 import { API_URL } from '../api/config';
+import SyncTaskLogo from '../components/SyncTaskLogo';
 
 function Logo({ dark = false }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 28, height: 28, borderRadius: 7,
-        background: dark ? 'var(--color-canvas-ink, #0f1011)' : 'var(--color-sidebar-bg-active, #222427)',
-        color: dark ? 'var(--color-canvas-main, #ffffff)' : '#f0f1f3',
-        flexShrink: 0,
-      }}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M2 11L7 3L12 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-      <span style={{ fontWeight: 600, fontSize: 16, letterSpacing: '-0.4px', color: dark ? 'var(--color-canvas-ink, #0f1011)' : '#f0f1f3' }}>
-        TaskFlow
-      </span>
+    <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+      <SyncTaskLogo size={28} textColor={dark ? 'var(--color-canvas-ink, #0f1011)' : '#f0f1f3'} />
     </div>
   );
 }
@@ -91,7 +79,7 @@ export default function Login() {
               Your team's tasks,<br />one clean view.
             </p>
             <p style={{ margin: 0, fontSize: 14, color: '#8a8f98', lineHeight: '22px' }}>
-              TaskFlow keeps every task tracked, assigned, and visible — without the noise.
+              SyncTask keeps every task tracked, assigned, and visible — without the noise.
             </p>
           </div>
         </div>

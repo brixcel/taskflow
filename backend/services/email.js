@@ -86,8 +86,8 @@ function createTransporter() {
 async function sendViaBrevo({ from, to, subject, text, html }) {
   const apiKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
 
-  // Extract name and email from "TaskFlow <email@domain.com>" or fallback
-  let senderName = 'TaskFlow';
+  // Extract name and email from "SyncTask <email@domain.com>" or fallback
+  let senderName = 'SyncTask';
   let senderEmail = 'brexcel14@gmail.com';
 
   if (from) {
@@ -320,16 +320,16 @@ function logFallback(type, to, link) {
 async function sendPasswordResetEmail(to, resetToken) {
   const appUrl = process.env.APP_URL || 'http://localhost:5173';
   const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
-  const from = process.env.EMAIL_FROM || 'TaskFlow <brexcel14@gmail.com>';
+  const from = process.env.EMAIL_FROM || 'SyncTask <brexcel14@gmail.com>';
 
   await dispatchEmail({
     from,
     to,
-    subject: 'Reset your TaskFlow password',
+    subject: 'Reset your SyncTask password',
     linkType: 'Password reset email',
     link: resetLink,
     text: [
-      'You requested a password reset for your TaskFlow account.',
+      'You requested a password reset for your SyncTask account.',
       '',
       'Click the link below to choose a new password. This link expires in 1 hour.',
       '',
@@ -341,7 +341,7 @@ async function sendPasswordResetEmail(to, resetToken) {
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">
         <h2 style="margin-bottom:8px">Reset your password</h2>
         <p style="color:#555;margin-bottom:24px">
-          You requested a password reset for your TaskFlow account.
+          You requested a password reset for your SyncTask account.
           Click the button below to choose a new password.
           This link expires in <strong>1 hour</strong>.
         </p>
@@ -369,28 +369,28 @@ async function sendPasswordResetEmail(to, resetToken) {
 async function sendVerificationEmail(to, verifyToken) {
   const appUrl = process.env.APP_URL || 'http://localhost:5173';
   const verifyLink = `${appUrl}/verify-email?token=${verifyToken}`;
-  const from = process.env.EMAIL_FROM || 'TaskFlow <brexcel14@gmail.com>';
+  const from = process.env.EMAIL_FROM || 'SyncTask <brexcel14@gmail.com>';
 
   await dispatchEmail({
     from,
     to,
-    subject: 'Verify your TaskFlow email address',
+    subject: 'Verify your SyncTask email address',
     linkType: 'Email verification link',
     link: verifyLink,
     text: [
-      'Thanks for signing up for TaskFlow!',
+      'Thanks for signing up for SyncTask!',
       '',
       'Click the link below to verify your email address. This link expires in 24 hours.',
       '',
       verifyLink,
       '',
-      'If you did not create a TaskFlow account, you can safely ignore this email.',
+      'If you did not create a SyncTask account, you can safely ignore this email.',
     ].join('\n'),
     html: `
       <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">
         <h2 style="margin-bottom:8px">Verify your email address</h2>
         <p style="color:#555;margin-bottom:24px">
-          Thanks for signing up for TaskFlow!
+          Thanks for signing up for SyncTask!
           Click the button below to verify your email address.
           This link expires in <strong>24 hours</strong>.
         </p>
@@ -400,11 +400,12 @@ async function sendVerificationEmail(to, verifyToken) {
           Verify email address
         </a>
         <p style="color:#888;font-size:12px;margin-top:24px">
-          If you didn't create a TaskFlow account, you can safely ignore this email.
+          If you didn't create a SyncTask account, you can safely ignore this email.
         </p>
       </div>
     `,
   });
 }
+
 
 module.exports = { sendPasswordResetEmail, sendVerificationEmail };

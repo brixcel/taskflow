@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ThemeToggle from '../components/ThemeToggle';
+import SyncTaskLogo from '../components/SyncTaskLogo';
 import { API_URL } from '../api/config';
 
 function Onboarding() {
@@ -86,25 +87,10 @@ function Onboarding() {
       </div>
 
       {/* Wordmark */}
-      <div className="mb-8 flex items-center gap-2">
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-[6px] bg-[var(--color-canvas-ink,#171717)] text-[var(--color-canvas-main,#ffffff)]">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path
-              d="M2 11 L7 3 L12 11"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-        <span
-          className="text-[var(--color-canvas-ink,#171717)] font-semibold tracking-[-0.6px]"
-          style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: '18px' }}
-        >
-          TaskFlow
-        </span>
+      <div className="mb-8 flex items-center">
+        <SyncTaskLogo size={32} />
       </div>
+
 
       {/* Card */}
       <div
@@ -202,7 +188,7 @@ function Onboarding() {
       </div>
 
       <p className="mt-6 text-[var(--color-canvas-mute,#888888)]" style={{ fontSize: '12px' }}>
-        TaskFlow — team task manager
+        SyncTask — team task manager
       </p>
     </div>
   );

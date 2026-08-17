@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import NotificationBell from './NotificationBell';
+import SyncTaskLogo from './SyncTaskLogo';
 import { useRealtime } from '../context/RealtimeContext';
 
 // ── Logo mark ──────────────────────────────────────────────────────────────────
@@ -85,14 +86,9 @@ export default function Navbar({ teams = [], activeTeam = null, onTeamSwitch, on
             className="flex items-center gap-2 shrink-0 cursor-pointer bg-transparent border-0 p-0"
             aria-label="Go to dashboard"
           >
-            <LogoMark />
-            <span
-              className="text-[var(--color-canvas-ink,#171717)] font-semibold tracking-[-0.6px]"
-              style={{ fontSize: '15px' }}
-            >
-              TaskFlow
-            </span>
+            <SyncTaskLogo size={22} />
           </button>
+
 
           {/* Divider */}
           <span className="text-[var(--color-canvas-hairline-strong,#a1a1a1)] opacity-50 shrink-0" aria-hidden="true">/</span>

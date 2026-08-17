@@ -221,7 +221,7 @@ function generateFallbackTask(prompt, project) {
 
   let labels = [];
   let subtasks = [];
-  let description = `### Objective\n${prompt}\n\n### Implementation Details\n- Review technical requirements and system architecture.\n- Execute implementation following TaskFlow design guidelines.\n- Verify all features with automated unit & integration tests.`;
+  let description = `### Objective\n${prompt}\n\n### Implementation Details\n- Review technical requirements and system architecture.\n- Execute implementation following SyncTask design guidelines.\n- Verify all features with automated unit & integration tests.`;
 
   if (pLower.includes('login') || pLower.includes('auth') || pLower.includes('oauth')) {
     if (!title.toLowerCase().includes('auth') && !title.toLowerCase().includes('login')) {
@@ -312,7 +312,7 @@ async function generateTaskFromPrompt({ prompt, project = null, currentContext =
   const startTime = Date.now();
 
   try {
-    const systemInstructions = `You are an AI task assistant inside TaskFlow 2.0, an enterprise task management platform.
+    const systemInstructions = `You are ST AI, the intelligent task assistant inside SyncTask 2.0, an enterprise task management platform.
 Your job is to take the user's natural language task request and produce a complete, structured JSON task plan.
 
 Output MUST be a valid JSON object matching this schema:
@@ -490,7 +490,7 @@ async function breakdownTaskIntoSubtasks({ title = '', description = '', existin
   const startTime = Date.now();
 
   try {
-    const systemPrompt = `You are an expert technical lead and project manager inside TaskFlow 2.0.
+    const systemPrompt = `You are ST AI, an expert technical lead and project manager inside SyncTask 2.0.
 Your task is to break down a parent task into 4 to 8 sequential, concrete, highly actionable subtasks.
 
 Output MUST be a valid JSON object matching this schema:
@@ -891,7 +891,7 @@ async function generateProjectPlan({ prompt, timeframeWeeks = 4, teamContext = n
   const startTime = Date.now();
 
   try {
-    const systemPrompt = `You are a Principal Technical Architect and Project Director inside TaskFlow 2.0.
+    const systemPrompt = `You are ST AI, a Principal Technical Architect and Project Director inside SyncTask 2.0.
 Your task is to take a high-level project goal and decompose it into a complete, professional project plan with phases, tasks, and subtasks.
 
 Output MUST be a valid JSON object matching this schema:
@@ -1504,7 +1504,7 @@ async function generateProductivityInsights({
   const startTime = Date.now();
 
   try {
-    const systemPrompt = `You are a Principal Productivity Intelligence Analyst inside TaskFlow 2.0.
+    const systemPrompt = `You are ST AI, a Principal Productivity Intelligence Analyst inside SyncTask 2.0.
 Your task is to analyze aggregated productivity metrics and output structured JSON with concise, executive-grade insights.
 
 Output MUST be a valid JSON object matching this schema:
@@ -1883,7 +1883,7 @@ async function interpretNaturalSearchPrompt({
   const startTime = Date.now();
 
   try {
-    const systemPrompt = `You are an AI Natural Language Search Query Converter for TaskFlow 2.0.
+    const systemPrompt = `You are ST AI, an AI Natural Language Search Query Converter for SyncTask 2.0.
 Your job is to translate the user's natural language request into structured search filter JSON.
 
 Output MUST be a valid JSON object matching this schema:
@@ -1900,7 +1900,7 @@ Output MUST be a valid JSON object matching this schema:
     "sortBy": "relevance" | "dueDate" | "priority" | "createdAt" | "title",
     "sortOrder": "asc" | "desc"
   },
-  "searchExpression": "TaskFlow equivalent operator expression (e.g. assignee:me priority:high due:this_week)"
+  "searchExpression": "SyncTask equivalent operator expression (e.g. assignee:me priority:high due:this_week)"
 }
 
 Guidelines:

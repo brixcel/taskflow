@@ -1,26 +1,6 @@
 import { Link } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
-
-function Logo({ dark = false }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 28, height: 28, borderRadius: 7,
-        background: dark ? 'var(--color-canvas-ink, #0f1011)' : 'var(--color-sidebar-bg-active, #222427)',
-        color: dark ? 'var(--color-canvas-main, #ffffff)' : '#f0f1f3',
-        flexShrink: 0,
-      }}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M2 11L7 3L12 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-      <span style={{ fontWeight: 600, fontSize: 16, letterSpacing: '-0.4px', color: 'var(--color-canvas-ink, #0f1011)' }}>
-        TaskFlow
-      </span>
-    </div>
-  );
-}
+import SyncTaskLogo from '../components/SyncTaskLogo';
 
 export default function Terms() {
   return (
@@ -32,7 +12,7 @@ export default function Terms() {
       }}>
         <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link to="/" style={{ textDecoration: 'none' }}>
-            <Logo dark />
+            <SyncTaskLogo size={26} />
           </Link>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             <ThemeToggle variant="icon" size="sm" />
@@ -43,7 +23,7 @@ export default function Terms() {
               fontSize: 13, color: 'var(--color-canvas-ink, #0f1011)', background: 'var(--color-canvas-subtle, #f0f1f3)', padding: '6px 14px',
               borderRadius: 6, textDecoration: 'none', fontWeight: 500
             }}>
-              Back to TaskFlow
+              Back to SyncTask
             </Link>
           </div>
         </div>
@@ -62,14 +42,14 @@ export default function Terms() {
             Terms of Service
           </h1>
           <p style={{ fontSize: 13, color: 'var(--color-canvas-mute, #8a8f98)', margin: '0 0 32px', paddingBottom: 24, borderBottom: '1px solid var(--color-canvas-hairline, #f0f1f3)' }}>
-            Last updated: August 7, 2026
+            Last updated: August 17, 2026
           </p>
 
           <section style={{ display: 'flex', flexDirection: 'column', gap: 28, fontSize: 14, color: 'var(--color-canvas-body, #3d4148)', lineHeight: '22px' }}>
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>1. Acceptance of Terms</h2>
               <p style={{ margin: 0 }}>
-                By creating an account, accessing, or using TaskFlow, you agree to be bound by these Terms of Service.
+                By creating an account, accessing, or using SyncTask, you agree to be bound by these Terms of Service.
                 If you do not agree to these terms, you must not create an account or use the service.
               </p>
             </div>
@@ -77,25 +57,25 @@ export default function Terms() {
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>2. Account Registration & Responsibilities</h2>
               <p style={{ margin: '0 0 8px' }}>
-                To use TaskFlow, you must register with a valid email address and secure password. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.
+                To use SyncTask, you must register with a valid email address and secure password. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.
               </p>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 <li>You must provide accurate and complete registration information.</li>
                 <li>You may not share account credentials across multiple individuals.</li>
-                <li>You must notify TaskFlow immediately of any unauthorized access to your account.</li>
+                <li>You must notify SyncTask immediately of any unauthorized access to your account.</li>
               </ul>
             </div>
 
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>3. Multi-Tenant Workspaces & Content</h2>
               <p style={{ margin: 0 }}>
-                TaskFlow operates as a multi-tenant platform with isolated team workspaces. Tasks, comments, and project data authored within a workspace belong to that workspace environment. Workspace owners and administrators hold administrative authority over team memberships and permissions within their respective teams.
+                SyncTask operates as a multi-tenant platform with isolated team workspaces. Tasks, comments, and project data authored within a workspace belong to that workspace environment. Workspace owners and administrators hold administrative authority over team memberships and permissions within their respective teams.
               </p>
             </div>
 
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>4. Acceptable Use & Prohibited Actions</h2>
-              <p style={{ margin: '0 0 8px' }}>You agree not to use TaskFlow to:</p>
+              <p style={{ margin: '0 0 8px' }}>You agree not to use SyncTask to:</p>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 <li>Violate any applicable laws, regulations, or third-party rights.</li>
                 <li>Upload malicious code, viruses, or harmful payload attachments.</li>
@@ -107,7 +87,7 @@ export default function Terms() {
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>5. Service Availability & Modification</h2>
               <p style={{ margin: 0 }}>
-                TaskFlow strives for high availability and performance. However, services are provided on an "as is" and "as available" basis. We reserve the right to modify, update, or temporarily suspend features for maintenance or operational enhancements.
+                SyncTask strives for high availability and performance. However, services are provided on an "as is" and "as available" basis. We reserve the right to modify, update, or temporarily suspend features for maintenance or operational enhancements.
               </p>
             </div>
 
@@ -121,7 +101,7 @@ export default function Terms() {
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>7. Contact & Support</h2>
               <p style={{ margin: 0 }}>
-                For legal inquiries or terms clarification, please contact our support team at <a href="mailto:support@taskflow.local" style={{ color: 'var(--color-canvas-ink, #0f1011)', textDecoration: 'underline' }}>support@taskflow.local</a>.
+                For legal inquiries or terms clarification, please contact our support team at <a href="mailto:support@synctask.local" style={{ color: 'var(--color-canvas-ink, #0f1011)', textDecoration: 'underline' }}>support@synctask.local</a>.
               </p>
             </div>
           </section>

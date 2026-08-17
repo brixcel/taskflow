@@ -10,6 +10,7 @@ const { scopedTaskQuery } = require('../helpers/scopedQuery');
 const { createNotification, parseMentions } = require('../services/notifications');
 const { emitCommentCreated } = require('../services/realtime');
 const { dispatchWebhookEvent } = require('../services/webhooks');
+const { dispatchChatEvent } = require('../services/chatIntegrations');
 
 const router = express.Router({ mergeParams: true }); // inherit :taskId from parent
 
@@ -102,6 +103,7 @@ router.post('/', validate(schemas.commentCreate), async (req, res) => {
     // 3. Emit real-time comment event to team and task rooms
     emitCommentCreated(req.teamId, task.id, comment);
     dispatchWebhookEvent(req.teamId, 'comment.created', { ...comment, taskTitle: task.title });
+    dispatchChatEvent(req.teamId, 'comment_created', { task, comment, actor: comment.author });
 
     res.status(201).json({ comment });
   } catch (error) {

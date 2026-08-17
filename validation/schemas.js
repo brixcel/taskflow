@@ -554,6 +554,30 @@ const githubManualLink = z.object({
   metadata: z.any().optional().nullable(),
 });
 
+// ─── Slack / Discord Integration (Phase 33) ──────────────────────────────────
+
+const chatIntegrationCreate = z.object({
+  provider: z.enum(['slack', 'discord'], {
+    required_error: 'Provider must be either "slack" or "discord"',
+  }),
+  name: nonBlankString(100, { requiredMsg: 'Integration name is required' }),
+  webhookUrl: z.string().url('Must be a valid webhook URL').max(500),
+  channelName: z.string().max(100).optional().nullable(),
+  events: z.array(z.string()).min(1, 'At least one event must be selected'),
+  filterProjectId: z.string().uuid().optional().nullable(),
+  includePrivateDetails: z.boolean().optional().default(false),
+});
+
+const chatIntegrationUpdate = z.object({
+  name: z.string().min(1).max(100).optional(),
+  webhookUrl: z.string().url('Must be a valid webhook URL').max(500).optional(),
+  channelName: z.string().max(100).optional().nullable(),
+  events: z.array(z.string()).min(1).optional(),
+  filterProjectId: z.string().uuid().optional().nullable(),
+  includePrivateDetails: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+});
+
 module.exports = {
   register,
   login,
@@ -603,7 +627,10 @@ module.exports = {
   projectGitHubCreate,
   projectGitHubUpdate,
   githubManualLink,
+  chatIntegrationCreate,
+  chatIntegrationUpdate,
 };
+
 
 
 

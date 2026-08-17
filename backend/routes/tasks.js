@@ -18,6 +18,7 @@ const {
   emitTaskCompleted,
 } = require('../services/realtime');
 const { dispatchWebhookEvent } = require('../services/webhooks');
+const { dispatchChatEvent } = require('../services/chatIntegrations');
 
 const router = express.Router();
 
@@ -133,6 +134,7 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
     dispatchWebhookEvent(req.teamId, 'task.created', task);
     if (task.assigneeId) {
       dispatchWebhookEvent(req.teamId, 'task.assigned', task);
+      dispatchChatEvent(req.teamId, 'task_assigned', { task, actor: req.user });
     }
 
     res.status(201).json({ task });
@@ -744,6 +746,7 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       if (status === 'done') {
         emitTaskCompleted(req.teamId, task);
         dispatchWebhookEvent(req.teamId, 'task.completed', task);
+        dispatchChatEvent(req.teamId, 'task_completed', { task, actor: req.user });
       }
     }
 
@@ -751,6 +754,7 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
     dispatchWebhookEvent(req.teamId, 'task.updated', task);
     if (isAssigned) {
       dispatchWebhookEvent(req.teamId, 'task.assigned', task);
+      dispatchChatEvent(req.teamId, 'task_assigned', { task, actor: req.user });
     }
 
     res.json({ task });

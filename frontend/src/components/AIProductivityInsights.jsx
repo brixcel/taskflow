@@ -68,11 +68,12 @@ export default function AIProductivityInsights({
 
   const handleCopySummary = () => {
     if (!insights) return;
-    const textToCopy = `[TaskFlow AI Productivity Insights - ${insights.timeRange?.label || range}]\n\n${insights.summary}\n\nKey Highlights:\n${insights.highlights?.map(h => `• ${h}`).join('\n') || 'None'}\n\nBottlenecks & Alerts:\n${insights.bottlenecks?.map(b => `• ${b}`).join('\n') || 'None'}\n\nActionable Recommendations:\n${insights.recommendations?.map(r => `• ${r}`).join('\n') || 'None'}`;
+    const textToCopy = `[ST AI Productivity Insights - ${insights.timeRange?.label || range}]\n\n${insights.summary}\n\nKey Highlights:\n${insights.highlights?.map(h => `• ${h}`).join('\n') || 'None'}\n\nBottlenecks & Alerts:\n${insights.bottlenecks?.map(b => `• ${b}`).join('\n') || 'None'}\n\nActionable Recommendations:\n${insights.recommendations?.map(r => `• ${r}`).join('\n') || 'None'}`;
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
 
   const metrics = insights?.metrics || {};
 

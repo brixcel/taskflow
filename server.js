@@ -14,6 +14,7 @@ const aiRoutes = require('./routes/ai');
 const subtaskRoutes = require('./routes/subtasks');
 const developerRoutes = require('./routes/developer');
 const githubRoutes = require('./routes/github');
+const integrationsRoutes = require('./routes/integrations');
 const usersRoutes = require('./routes/users');
 
 const http = require('http');
@@ -47,6 +48,7 @@ app.use('/search', searchRoutes);
 app.use('/ai', aiRoutes);
 app.use('/subtasks', subtaskRoutes);
 app.use('/developer', developerRoutes);
+app.use('/developer', integrationsRoutes);
 app.use(githubRoutes);
 app.use('/api', githubRoutes);
 

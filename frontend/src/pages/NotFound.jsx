@@ -1,17 +1,16 @@
 import { Link } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+import SyncTaskLogo from '../components/SyncTaskLogo';
 
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-[var(--color-canvas-bg,#fafafa)] flex flex-col justify-between p-6">
       {/* Top Brand Bar */}
       <header className="max-w-6xl w-full mx-auto flex items-center justify-between py-4">
-        <Link to="/" className="flex items-center gap-2.5 group text-decoration-none">
-          <div className="w-8 h-8 rounded-lg bg-[var(--color-canvas-ink,#0f1011)] text-[var(--color-canvas-main,#ffffff)] flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-105">
-            TF
-          </div>
-          <span className="font-semibold text-lg tracking-tight text-[var(--color-canvas-ink,#0f1011)]">TaskFlow</span>
+        <Link to="/" className="flex items-center group text-decoration-none">
+          <SyncTaskLogo size={28} />
         </Link>
+
         <div className="flex items-center gap-3">
           <ThemeToggle variant="icon" size="sm" />
           <Link
@@ -71,7 +70,7 @@ export default function NotFound() {
       {/* Footer */}
       <footer className="max-w-6xl w-full mx-auto py-6 border-t border-[var(--color-canvas-hairline,#ebebeb)] flex flex-col sm:flex-row items-center justify-between text-xs text-[var(--color-canvas-mute,#8a8f98)] gap-4">
         <div>
-          &copy; {new Date().getFullYear()} TaskFlow. Production Multi-Tenant Platform.
+          &copy; {new Date().getFullYear()} SyncTask. Production Multi-Tenant Platform.
         </div>
         <div className="flex items-center gap-4">
           <Link to="/terms" className="hover:text-[var(--color-canvas-ink,#0f1011)] transition-colors text-decoration-none">Terms of Service</Link>

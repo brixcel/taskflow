@@ -1380,10 +1380,10 @@ export default function TaskDetailDrawer({
                         cursor: isGeneratingAiBreakdown ? 'not-allowed' : 'pointer',
                         transition: 'all 150ms ease',
                       }}
-                      title="Automatically break down this task into step-by-step actionable checklist items with TaskFlow AI"
+                      title="Automatically break down this task into step-by-step actionable checklist items with ST AI"
                     >
                       <Sparkles size={12} />
-                      {isGeneratingAiBreakdown ? 'Breaking down…' : 'Break down with AI'}
+                      {isGeneratingAiBreakdown ? 'Breaking down…' : 'Break down with ST AI'}
                     </button>
 
                     {totalSubtasks > 0 && (
@@ -1441,8 +1441,9 @@ export default function TaskDetailDrawer({
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Sparkles size={14} className="text-purple-600" />
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#5b21b6', letterSpacing: '-0.01em' }}>
-                          TaskFlow AI Breakdown
+                          ST AI Breakdown
                         </span>
+
                         <span
                           style={{
                             fontSize: 10,

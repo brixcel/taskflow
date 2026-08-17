@@ -1,26 +1,6 @@
 import { Link } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
-
-function Logo({ dark = false }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 28, height: 28, borderRadius: 7,
-        background: dark ? 'var(--color-canvas-ink, #0f1011)' : 'var(--color-sidebar-bg-active, #222427)',
-        color: dark ? 'var(--color-canvas-main, #ffffff)' : '#f0f1f3',
-        flexShrink: 0,
-      }}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M2 11L7 3L12 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-      <span style={{ fontWeight: 600, fontSize: 16, letterSpacing: '-0.4px', color: 'var(--color-canvas-ink, #0f1011)' }}>
-        TaskFlow
-      </span>
-    </div>
-  );
-}
+import SyncTaskLogo from '../components/SyncTaskLogo';
 
 export default function Privacy() {
   return (
@@ -32,7 +12,7 @@ export default function Privacy() {
       }}>
         <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link to="/" style={{ textDecoration: 'none' }}>
-            <Logo dark />
+            <SyncTaskLogo size={26} />
           </Link>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             <ThemeToggle variant="icon" size="sm" />
@@ -43,7 +23,7 @@ export default function Privacy() {
               fontSize: 13, color: 'var(--color-canvas-ink, #0f1011)', background: 'var(--color-canvas-subtle, #f0f1f3)', padding: '6px 14px',
               borderRadius: 6, textDecoration: 'none', fontWeight: 500
             }}>
-              Back to TaskFlow
+              Back to SyncTask
             </Link>
           </div>
         </div>
@@ -62,14 +42,14 @@ export default function Privacy() {
             Privacy Policy
           </h1>
           <p style={{ fontSize: 13, color: 'var(--color-canvas-mute, #8a8f98)', margin: '0 0 32px', paddingBottom: 24, borderBottom: '1px solid var(--color-canvas-hairline, #f0f1f3)' }}>
-            Last updated: August 7, 2026
+            Last updated: August 17, 2026
           </p>
 
           <section style={{ display: 'flex', flexDirection: 'column', gap: 28, fontSize: 14, color: 'var(--color-canvas-body, #3d4148)', lineHeight: '22px' }}>
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>1. Information We Collect</h2>
               <p style={{ margin: '0 0 8px' }}>
-                We collect personal information necessary to deliver TaskFlow's multi-tenant project management capabilities:
+                We collect personal information necessary to deliver SyncTask's multi-tenant project management capabilities:
               </p>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 <li><strong>Account Credentials:</strong> Full name, email address, and cryptographically hashed passwords (salted bcrypt). We never store plaintext passwords.</li>
@@ -80,7 +60,7 @@ export default function Privacy() {
 
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>2. How We Use Your Information</h2>
-              <p style={{ margin: '0 0 8px' }}>We process your data strictly to operate and secure TaskFlow:</p>
+              <p style={{ margin: '0 0 8px' }}>We process your data strictly to operate and secure SyncTask:</p>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 <li>Authenticating user access and maintaining JWT session security.</li>
                 <li>Scoping workspace resources to prevent cross-tenant data access.</li>
@@ -92,14 +72,14 @@ export default function Privacy() {
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>3. Data Sharing & Multi-Tenant Boundaries</h2>
               <p style={{ margin: 0 }}>
-                TaskFlow does not sell, rent, or trade your personal data to third parties. Data is visible only to authorized members of your team workspaces. Backend database queries are strictly enforced by team scoping (`teamId`) to ensure complete isolation.
+                SyncTask does not sell, rent, or trade your personal data to third parties. Data is visible only to authorized members of your team workspaces. Backend database queries are strictly enforced by team scoping (`teamId`) to ensure complete isolation.
               </p>
             </div>
 
             <div style={{ background: 'var(--color-banner-success-bg, #f8faf9)', border: '1px solid var(--color-banner-success-border, #dbe6e0)', borderRadius: 8, padding: 20 }}>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-banner-success-fg, #165c36)', margin: '0 0 10px' }}>4. GDPR Rights: Export & Account Deletion</h2>
               <p style={{ margin: '0 0 10px', color: 'var(--color-canvas-ink, #273b30)' }}>
-                In compliance with modern privacy standards (GDPR-Lite framework built into TaskFlow), you retain full rights over your data:
+                In compliance with modern privacy standards (GDPR-Lite framework built into SyncTask), you retain full rights over your data:
               </p>
               <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--color-canvas-ink, #273b30)' }}>
                 <li style={{ marginBottom: 6 }}>
@@ -121,7 +101,7 @@ export default function Privacy() {
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', margin: '0 0 10px' }}>6. Contact Us</h2>
               <p style={{ margin: 0 }}>
-                If you have questions about your privacy rights or this policy, please reach out to our privacy officer at <a href="mailto:privacy@taskflow.local" style={{ color: 'var(--color-canvas-ink, #0f1011)', textDecoration: 'underline' }}>privacy@taskflow.local</a>.
+                If you have questions about your privacy rights or this policy, please reach out to our privacy officer at <a href="mailto:privacy@synctask.local" style={{ color: 'var(--color-canvas-ink, #0f1011)', textDecoration: 'underline' }}>privacy@synctask.local</a>.
               </p>
             </div>
           </section>

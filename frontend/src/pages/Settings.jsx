@@ -11,6 +11,10 @@ import {
   Check,
   Copy,
   X,
+  MessageSquare,
+  Send,
+  ExternalLink,
+  MessageCircle,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
@@ -83,6 +87,15 @@ const ALL_WEBHOOK_EVENTS = [
   { id: 'project.created', label: 'Project Created' },
 ];
 
+const ALL_CHAT_EVENTS = [
+  { id: 'task_assigned', label: 'Task Assigned' },
+  { id: 'task_completed', label: 'Task Completed' },
+  { id: 'task_overdue', label: 'Task Overdue Alerts' },
+  { id: 'comment_created', label: 'New Comments' },
+  { id: 'project_updated', label: 'Project Updates' },
+];
+
+
 export default function Settings() {
   const navigate = useNavigate();
 
@@ -137,6 +150,22 @@ export default function Settings() {
   const [webhookError, setWebhookError] = useState('');
   const [pingStatus, setPingStatus] = useState({});
 
+  // ── Chat Integrations state (Phase 33) ──────────────────────────────────────
+  const [chatIntegrations, setChatIntegrations] = useState([]);
+  const [loadingChatIntegrations, setLoadingChatIntegrations] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatProvider, setChatProvider] = useState('slack');
+  const [chatName, setChatName] = useState('');
+  const [chatWebhookUrl, setChatWebhookUrl] = useState('');
+  const [chatChannelName, setChatChannelName] = useState('');
+  const [chatEvents, setChatEvents] = useState(['task_assigned', 'task_completed', 'task_overdue', 'comment_created', 'project_updated']);
+  const [chatFilterProjectId, setChatFilterProjectId] = useState('');
+  const [chatIncludePrivateDetails, setChatIncludePrivateDetails] = useState(false);
+  const [savingChat, setSavingChat] = useState(false);
+  const [chatError, setChatError] = useState('');
+  const [chatPingStatus, setChatPingStatus] = useState({});
+  const [projectsList, setProjectsList] = useState([]);
+
   // ── Webhook Deliveries Modal ────────────────────────────────────────────────
   const [viewingDeliveriesWebhook, setViewingDeliveriesWebhook] = useState(null);
   const [deliveries, setDeliveries] = useState([]);
@@ -161,8 +190,11 @@ export default function Settings() {
     if (activeSettingsTab === 'developer' && activeTeam?.id) {
       fetchApiKeys();
       fetchWebhooks();
+      fetchChatIntegrations();
+      fetchProjects();
     }
   }, [activeSettingsTab, activeTeam?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const fetchTeams = async () => {
     try {
@@ -214,6 +246,100 @@ export default function Settings() {
       setLoadingWebhooks(false);
     }
   };
+
+  const fetchChatIntegrations = async () => {
+    if (!activeTeam?.id) return;
+    setLoadingChatIntegrations(true);
+    try {
+      const res = await axios.get(`${API}/developer/chat-integrations`, { headers });
+      setChatIntegrations(res.data.integrations || []);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingChatIntegrations(false);
+    }
+  };
+
+  const fetchProjects = async () => {
+    if (!activeTeam?.id) return;
+    try {
+      const res = await axios.get(`${API}/projects`, { headers });
+      setProjectsList(res.data.projects || []);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSaveChatIntegration = async (e) => {
+    e.preventDefault();
+    if (!chatName.trim() || !chatWebhookUrl.trim() || chatEvents.length === 0) return;
+    setSavingChat(true);
+    setChatError('');
+    try {
+      await axios.post(
+        `${API}/developer/chat-integrations`,
+        {
+          provider: chatProvider,
+          name: chatName.trim(),
+          webhookUrl: chatWebhookUrl.trim(),
+          channelName: chatChannelName.trim() || null,
+          events: chatEvents,
+          filterProjectId: chatFilterProjectId || null,
+          includePrivateDetails: chatIncludePrivateDetails,
+        },
+        { headers }
+      );
+      setShowChatModal(false);
+      setChatName('');
+      setChatWebhookUrl('');
+      setChatChannelName('');
+      setChatFilterProjectId('');
+      setChatIncludePrivateDetails(false);
+      fetchChatIntegrations();
+    } catch (err) {
+      setChatError(err.response?.data?.error || 'Failed to connect chat integration');
+    } finally {
+      setSavingChat(false);
+    }
+  };
+
+  const handleDeleteChatIntegration = async (id) => {
+    if (!window.confirm('Are you sure you want to disconnect this chat integration?')) return;
+    try {
+      await axios.delete(`${API}/developer/chat-integrations/${id}`, { headers });
+      fetchChatIntegrations();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to disconnect integration');
+    }
+  };
+
+  const handleTestPingChat = async (id) => {
+    setChatPingStatus((prev) => ({ ...prev, [id]: 'sending' }));
+    try {
+      const res = await axios.post(`${API}/developer/chat-integrations/${id}/test`, {}, { headers });
+      setChatPingStatus((prev) => ({
+        ...prev,
+        [id]: 'success',
+      }));
+      setTimeout(() => {
+        setChatPingStatus((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }, 4000);
+    } catch (err) {
+      setChatPingStatus((prev) => ({ ...prev, [id]: 'failed' }));
+      setTimeout(() => {
+        setChatPingStatus((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }, 4000);
+    }
+  };
+
 
   const handleCreateApiKey = async (e) => {
     e.preventDefault();
@@ -351,7 +477,7 @@ export default function Settings() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `taskflow-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `synctask-data-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -851,8 +977,164 @@ export default function Settings() {
                   </div>
                 )}
               </Card>
+
+              {/* ── Chat Integrations (Slack & Discord) Section (Phase 33) ── */}
+              <Card>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div>
+                    <SectionTitle>Team Chat Integrations</SectionTitle>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--color-canvas-mute, #888888)' }}>
+                      Connect Slack channels and Discord servers for real-time task alerts, completion updates, and project broadcasts.
+                    </p>
+                  </div>
+                  <button
+                    className="btn-primary"
+                    onClick={() => {
+                      setChatName('');
+                      setChatWebhookUrl('');
+                      setChatChannelName('');
+                      setChatFilterProjectId('');
+                      setChatIncludePrivateDetails(false);
+                      setChatError('');
+                      setShowChatModal(true);
+                    }}
+                    style={{ fontSize: 12, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 5 }}
+                  >
+                    <MessageSquare size={13} />
+                    + Connect Slack / Discord
+                  </button>
+                </div>
+
+                {loadingChatIntegrations ? (
+                  <p style={{ fontSize: 13, color: 'var(--color-canvas-mute, #888888)' }}>Loading chat integrations…</p>
+                ) : chatIntegrations.length === 0 ? (
+                  <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--color-canvas-mute, #888888)', fontSize: 13 }}>
+                    No Slack or Discord channels connected to this workspace yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {chatIntegrations.map((ci) => {
+                      const isDiscord = ci.provider === 'discord';
+                      return (
+                        <div
+                          key={ci.id}
+                          style={{
+                            padding: '12px 16px',
+                            borderRadius: 8,
+                            border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                            background: 'var(--color-canvas-main, #fafafa)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 8,
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span
+                                style={{
+                                  padding: '3px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                  background: isDiscord ? 'rgba(88, 101, 242, 0.15)' : 'rgba(74, 21, 75, 0.15)',
+                                  color: isDiscord ? '#5865f2' : '#ecb22e',
+                                  border: `1px solid ${isDiscord ? 'rgba(88, 101, 242, 0.3)' : 'rgba(74, 21, 75, 0.3)'}`,
+                                }}
+                              >
+                                {isDiscord ? 'Discord' : 'Slack'}
+                              </span>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-canvas-ink, #171717)' }}>
+                                {ci.name}
+                              </span>
+                              {ci.channelName && (
+                                <span style={{ fontSize: 11, color: 'var(--color-canvas-mute, #888888)' }}>
+                                  ({ci.channelName})
+                                </span>
+                              )}
+                              {ci.project && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    padding: '1px 6px',
+                                    borderRadius: 4,
+                                    background: 'var(--color-canvas-subtle, #f0f1f3)',
+                                    color: 'var(--color-canvas-body, #50545c)',
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  Filtered: {ci.project.name}
+                                </span>
+                              )}
+                            </div>
+
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                padding: '2px 8px',
+                                borderRadius: 12,
+                                background: ci.lastStatus === 'failed' ? 'rgba(229, 72, 77, 0.12)' : 'rgba(48, 164, 108, 0.12)',
+                                color: ci.lastStatus === 'failed' ? '#e5484d' : '#30a46c',
+                              }}
+                            >
+                              {ci.lastStatus === 'failed' ? 'Error' : 'Active'}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                            <div>
+                              <div style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--color-canvas-mute, #888888)' }}>
+                                Webhook: {ci.maskedWebhookUrl}
+                              </div>
+                              <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                                {ci.events.map((ev) => (
+                                  <span
+                                    key={ev}
+                                    style={{
+                                      fontSize: 10,
+                                      padding: '1px 6px',
+                                      borderRadius: 4,
+                                      background: 'var(--color-canvas-card, #fff)',
+                                      border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                                      color: 'var(--color-canvas-body, #50545c)',
+                                    }}
+                                  >
+                                    {ev.replace('_', ' ')}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <button
+                                onClick={() => handleTestPingChat(ci.id)}
+                                disabled={chatPingStatus[ci.id] === 'sending'}
+                                className="btn-secondary"
+                                style={{ fontSize: 11, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
+                              >
+                                <Zap size={11} />
+                                {chatPingStatus[ci.id] === 'sending' ? 'Sending…' : chatPingStatus[ci.id] === 'success' ? 'Ping Sent!' : chatPingStatus[ci.id] === 'failed' ? 'Failed' : 'Send Test Ping'}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteChatIntegration(ci.id)}
+                                className="btn-danger"
+                                style={{ fontSize: 11, padding: '4px 8px' }}
+                              >
+                                Disconnect
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
             </>
           )}
+
         </main>
       </div>
 
@@ -1192,6 +1474,253 @@ export default function Settings() {
           </div>
         </div>
       )}
+      {/* ── Connect Slack / Discord Modal (Phase 33) ── */}
+      {showChatModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowChatModal(false); }}
+        >
+          <div
+            style={{
+              background: 'var(--color-canvas-card, #fff)',
+              borderRadius: 12,
+              maxWidth: 540,
+              width: '100%',
+              border: '1px solid var(--color-canvas-hairline, #ebebeb)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+              padding: 24,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+          >
+            <form onSubmit={handleSaveChatIntegration} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #171717)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <MessageSquare size={16} />
+                Connect Team Chat Notification
+              </h3>
+
+              {chatError && <div className="error-banner" style={{ fontSize: 13 }}>{chatError}</div>}
+
+              {/* Provider Selector */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #50545c)' }}>
+                  Platform Provider:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setChatProvider('slack')}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      border: `1.5px solid ${chatProvider === 'slack' ? '#0070f3' : 'var(--color-canvas-hairline, #ebebeb)'}`,
+                      background: chatProvider === 'slack' ? 'rgba(0, 112, 243, 0.06)' : 'var(--color-canvas-main, #fafafa)',
+                      fontWeight: 600,
+                      fontSize: 13,
+                      color: 'var(--color-canvas-ink, #171717)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span style={{ color: '#ecb22e', fontWeight: 800 }}>#</span>
+                    Slack Channel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatProvider('discord')}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      border: `1.5px solid ${chatProvider === 'discord' ? '#0070f3' : 'var(--color-canvas-hairline, #ebebeb)'}`,
+                      background: chatProvider === 'discord' ? 'rgba(0, 112, 243, 0.06)' : 'var(--color-canvas-main, #fafafa)',
+                      fontWeight: 600,
+                      fontSize: 13,
+                      color: 'var(--color-canvas-ink, #171717)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span style={{ color: '#5865f2', fontWeight: 800 }}>🎮</span>
+                    Discord Server
+                  </button>
+                </div>
+              </div>
+
+              {/* Integration Name */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #50545c)' }}>
+                  Integration Name:
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={chatProvider === 'slack' ? 'e.g. #engineering-alerts' : 'e.g. #dev-updates'}
+                  value={chatName}
+                  onChange={(e) => setChatName(e.target.value)}
+                  className="field-input"
+                  autoFocus
+                />
+              </div>
+
+              {/* Webhook URL */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #50545c)' }}>
+                  Incoming Webhook URL:
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder={
+                    chatProvider === 'slack'
+                      ? 'https://hooks.slack.com/services/T00/B00/XXXX'
+                      : 'https://discord.com/api/webhooks/00000/XXXXX'
+                  }
+                  value={chatWebhookUrl}
+                  onChange={(e) => setChatWebhookUrl(e.target.value)}
+                  className="field-input"
+                />
+                <span style={{ fontSize: 11, color: 'var(--color-canvas-mute, #888888)' }}>
+                  {chatProvider === 'slack'
+                    ? 'Generated from Slack App incoming webhooks configuration'
+                    : 'Generated from Discord Channel Settings -> Integrations -> Webhooks'}
+                </span>
+              </div>
+
+              {/* Channel name hint */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #50545c)' }}>
+                  Channel Name (optional label):
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. #tasks-feed"
+                  value={chatChannelName}
+                  onChange={(e) => setChatChannelName(e.target.value)}
+                  className="field-input"
+                />
+              </div>
+
+              {/* Project Scope */}
+              {projectsList.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #50545c)' }}>
+                    Project Scope:
+                  </label>
+                  <select
+                    value={chatFilterProjectId}
+                    onChange={(e) => setChatFilterProjectId(e.target.value)}
+                    className="field-input"
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <option value="">All Projects in Workspace</option>
+                    {projectsList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Subscribed Events */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #50545c)' }}>
+                  Trigger Events:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {ALL_CHAT_EVENTS.map((ev) => {
+                    const isChecked = chatEvents.includes(ev.id);
+                    return (
+                      <label
+                        key={ev.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          fontSize: 12,
+                          color: 'var(--color-canvas-ink, #171717)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setChatEvents(chatEvents.filter((e) => e !== ev.id));
+                            } else {
+                              setChatEvents([...chatEvents, ev.id]);
+                            }
+                          }}
+                        />
+                        <span>{ev.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Privacy Setting Toggle */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  fontSize: 12,
+                  color: 'var(--color-canvas-body, #50545c)',
+                  cursor: 'pointer',
+                  padding: '8px 10px',
+                  borderRadius: 6,
+                  background: 'var(--color-canvas-subtle, #f0f1f3)',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={chatIncludePrivateDetails}
+                  onChange={(e) => setChatIncludePrivateDetails(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <div>
+                  <strong style={{ color: 'var(--color-canvas-ink, #171717)' }}>Include Task Description</strong>
+                  <div style={{ fontSize: 11, color: 'var(--color-canvas-mute, #888888)' }}>
+                    When checked, message blocks will include full task markdown details. Otherwise, only task titles and status pills will be posted.
+                  </div>
+                </div>
+              </label>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowChatModal(false)}
+                  style={{ fontSize: 13, padding: '8px 14px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={savingChat || !chatName.trim() || !chatWebhookUrl.trim()}
+                  style={{ fontSize: 13, padding: '8px 16px' }}
+                >
+                  {savingChat ? 'Connecting…' : `Connect ${chatProvider === 'slack' ? 'Slack' : 'Discord'}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

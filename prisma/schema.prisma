@@ -42,6 +42,7 @@ model User {
   apiKeys                  ApiKey[]
   webhooksCreated          Webhook[]
   githubIntegrationsCreated ProjectGitHubIntegration[]
+  chatIntegrationsCreated  TeamChatIntegration[]
 
   @@map("users")
 }
@@ -64,6 +65,7 @@ model Team {
   apiKeys       ApiKey[]
   webhooks      Webhook[]
   githubIntegrations ProjectGitHubIntegration[]
+  chatIntegrations TeamChatIntegration[]
 
   @@map("teams")
 }
@@ -106,6 +108,7 @@ model Project {
   githubIntegration ProjectGitHubIntegration?
   githubResourceLinks GitHubResourceLink[]
   githubEvents        GitHubEvent[]
+  chatIntegrations    TeamChatIntegration[]
 
   @@index([teamId, status])
   @@index([teamId, isArchived])
@@ -477,4 +480,54 @@ model GitHubEvent {
   @@index([integrationId, createdAt])
   @@map("github_events")
 }
+
+// ─── Slack / Discord Integrations (Phase 33) ──────────────────────────────────
+
+model TeamChatIntegration {
+  id                    String    @id @default(uuid())
+  teamId                String
+  provider              String    // slack | discord
+  name                  String
+  webhookUrl            String
+  channelName           String?
+  events                String[]  @default(["task_assigned", "task_completed", "task_overdue", "project_updated", "comment_created"])
+  filterProjectId       String?
+  includePrivateDetails Boolean   @default(false)
+  isActive              Boolean   @default(true)
+  lastTriggeredAt       DateTime?
+  lastStatus            String?   // success | failed
+  lastError             String?
+  createdById           String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  project     Project?  @relation(fields: [filterProjectId], references: [id], onDelete: SetNull)
+  deliveries  ChatIntegrationDelivery[]
+
+  @@index([teamId, isActive])
+  @@index([provider])
+  @@map("team_chat_integrations")
+}
+
+model ChatIntegrationDelivery {
+  id            String    @id @default(uuid())
+  integrationId String
+  event         String
+  payload       Json
+  statusCode    Int?
+  responseBody  String?
+  durationMs    Int?
+  status        String    @default("pending") // success | failed
+  error         String?
+  deliveredAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  integration TeamChatIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, createdAt])
+  @@map("chat_integration_deliveries")
+}
+
 

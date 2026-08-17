@@ -13,32 +13,17 @@ import {
 import ThemeToggle from './ThemeToggle';
 import ProjectIcon from './ProjectIcon';
 
+import SyncTaskLogo from './SyncTaskLogo';
+
 // ── Wordmark ───────────────────────────────────────────────────────────────
 function Logo() {
   return (
-    <div className="flex items-center gap-2.5 px-4 py-5">
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 26,
-          height: 26,
-          borderRadius: 6,
-          background: '#f0f1f3',
-          flexShrink: 0,
-        }}
-      >
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M2 11L7 3L12 11" stroke="#0f1011" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-      <span style={{ fontWeight: 600, fontSize: 15, color: '#f0f1f3', letterSpacing: '-0.4px', lineHeight: '20px' }}>
-        TaskFlow
-      </span>
+    <div className="flex items-center px-4 py-5">
+      <SyncTaskLogo size={24} textColor="#f0f1f3" />
     </div>
   );
 }
+
 
 // ── Team Switcher ──────────────────────────────────────────────────────────
 function TeamSwitcher({ teams, activeTeam, onTeamSwitch }) {
