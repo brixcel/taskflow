@@ -1,6 +1,7 @@
 const xss = require('xss');
 const { GoogleGenAI } = require('@google/genai');
 const prisma = require('../prisma');
+const logger = require('../middleware/logger');
 const {
   aiTaskGenerateResponse,
   aiProjectPlanResponse,
@@ -8,6 +9,177 @@ const {
   aiSearchResponse,
 } = require('../validation/schemas');
 const { parseSearchQuery, buildPrismaWhereClause } = require('./searchParser');
+
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const DEFAULT_GEMINI_TIMEOUT_MS = 10000;
+
+function getGeminiModel() {
+  return process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+}
+
+function getGeminiTimeoutMs() {
+  const customTimeout = parseInt(process.env.GEMINI_TIMEOUT_MS, 10);
+  return Number.isFinite(customTimeout) && customTimeout > 0
+    ? customTimeout
+    : DEFAULT_GEMINI_TIMEOUT_MS;
+}
+
+function categorizeGeminiError(error) {
+  if (!error) return 'UNKNOWN';
+  if (error.name === 'MissingApiKeyError' || error.isMissingKey) {
+    return 'MISSING_API_KEY';
+  }
+  if (error.name === 'TestEnvError') {
+    return 'TEST_ENVIRONMENT';
+  }
+
+  const msg = (error.message || '').toLowerCase();
+  const status = error.status || error.statusCode || error.code;
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    msg.includes('api key') ||
+    msg.includes('unauthenticated') ||
+    msg.includes('permission denied')
+  ) {
+    return 'AUTHENTICATION_FAILED';
+  }
+  if (
+    status === 429 ||
+    msg.includes('quota') ||
+    msg.includes('rate limit') ||
+    msg.includes('resource_exhausted')
+  ) {
+    return 'RATE_LIMIT_EXCEEDED';
+  }
+  if (
+    status === 503 ||
+    status === 404 ||
+    msg.includes('not found') ||
+    msg.includes('unavailable') ||
+    msg.includes('high demand') ||
+    msg.includes('is not supported') ||
+    msg.includes('is no longer available')
+  ) {
+    return 'MODEL_UNAVAILABLE';
+  }
+  if (
+    error.name === 'AbortError' ||
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('deadline exceeded')
+  ) {
+    return 'TIMEOUT';
+  }
+  if (msg.includes('json') || msg.includes('parse')) {
+    return 'PARSE_ERROR';
+  }
+  if (error.name === 'ZodError') {
+    return 'SCHEMA_VALIDATION_ERROR';
+  }
+  return 'UPSTREAM_ERROR';
+}
+
+function logGeminiDiagnostic({ feature, model, elapsedMs, error, fallbackReason }) {
+  if (process.env.NODE_ENV === 'test' && error?.name === 'TestEnvError') {
+    return;
+  }
+
+  const errorCategory = categorizeGeminiError(error);
+  const sanitizedMessage = error?.message
+    ? String(error.message)
+        .replace(/AIza[0-9A-Za-z-_]{35}/g, '[REDACTED_API_KEY]')
+        .slice(0, 300)
+    : 'Unknown error';
+
+  const diagnostic = {
+    feature,
+    model: model || getGeminiModel(),
+    errorCategory,
+    status: error?.status || error?.statusCode || null,
+    errorName: error?.name || 'Error',
+    errorMessage: sanitizedMessage,
+    elapsedMs,
+    fallbackReason: fallbackReason || errorCategory,
+  };
+
+  if (logger && typeof logger.warn === 'function') {
+    logger.warn(diagnostic, `[Gemini AI] Fallback triggered for ${feature}: ${errorCategory}`);
+  } else {
+    console.warn(`[Gemini AI] Fallback triggered for ${feature}:`, diagnostic);
+  }
+}
+
+function parseGeminiJsonResponse(responseText) {
+  const text = (responseText || '').trim();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    if (!cleaned) return {};
+    return JSON.parse(cleaned);
+  }
+}
+
+async function callGeminiGenerate({
+  contents,
+  systemInstruction = null,
+  responseMimeType = 'application/json',
+  timeoutMs = getGeminiTimeoutMs(),
+  modelOverride = null,
+}) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const isTestEnv = process.env.NODE_ENV === 'test';
+
+  if (!apiKey) {
+    const err = new Error('GEMINI_API_KEY is not configured');
+    err.name = 'MissingApiKeyError';
+    err.isMissingKey = true;
+    throw err;
+  }
+
+  if (isTestEnv) {
+    const err = new Error('Gemini API call bypassed in test environment');
+    err.name = 'TestEnvError';
+    throw err;
+  }
+
+  const model = modelOverride || getGeminiModel();
+  const ai = new GoogleGenAI({ apiKey });
+
+  let timerId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => {
+      const timeoutErr = new Error(`Gemini request to model '${model}' timed out after ${timeoutMs}ms`);
+      timeoutErr.name = 'AbortError';
+      reject(timeoutErr);
+    }, timeoutMs);
+  });
+
+  const requestConfig = {
+    responseMimeType,
+  };
+  if (systemInstruction) {
+    requestConfig.systemInstruction = systemInstruction;
+  }
+
+  const requestPromise = ai.models.generateContent({
+    model,
+    contents,
+    config: requestConfig,
+  });
+
+  try {
+    const response = await Promise.race([requestPromise, timeoutPromise]);
+    clearTimeout(timerId);
+    return response.text?.trim() || '{}';
+  } catch (err) {
+    clearTimeout(timerId);
+    throw err;
+  }
+}
 
 /**
  * Sanitize prompt text to strip HTML/scripts and normalize whitespace
@@ -136,24 +308,10 @@ async function generateTaskFromPrompt({ prompt, project = null, currentContext =
     throw new Error('Prompt cannot be empty');
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  const isTestEnv = process.env.NODE_ENV === 'test';
-
-  if (!apiKey || isTestEnv) {
-    const rawResult = generateFallbackTask(cleanPrompt, project);
-    const dueDate = new Date();
-    dueDate.setUTCDate(dueDate.getUTCDate() + rawResult.suggestedDeadlineDays);
-    const suggestedDueDate = dueDate.toISOString().slice(0, 10);
-
-    return aiTaskGenerateResponse.parse({
-      ...rawResult,
-      suggestedDueDate,
-    });
-  }
+  const model = getGeminiModel();
+  const startTime = Date.now();
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-
     const systemInstructions = `You are an AI task assistant inside TaskFlow 2.0, an enterprise task management platform.
 Your job is to take the user's natural language task request and produce a complete, structured JSON task plan.
 
@@ -186,22 +344,11 @@ Guidelines:
 
     const fullPrompt = `${systemInstructions}\n${contextSnippet}\n\nUser Request: "${cleanPrompt}"`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
+    const responseText = await callGeminiGenerate({
       contents: fullPrompt,
-      config: {
-        responseMimeType: 'application/json',
-      },
     });
 
-    const responseText = response.text?.trim() || '{}';
-    let parsedJson;
-    try {
-      parsedJson = JSON.parse(responseText);
-    } catch {
-      const cleaned = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      parsedJson = JSON.parse(cleaned);
-    }
+    const parsedJson = parseGeminiJsonResponse(responseText);
 
     const deadlineDays = typeof parsedJson.suggestedDeadlineDays === 'number' && parsedJson.suggestedDeadlineDays > 0
       ? Math.min(parsedJson.suggestedDeadlineDays, 60)
@@ -223,6 +370,14 @@ Guidelines:
 
     return validated;
   } catch (error) {
+    const elapsedMs = Date.now() - startTime;
+    logGeminiDiagnostic({
+      feature: 'generateTaskFromPrompt',
+      model,
+      elapsedMs,
+      error,
+    });
+
     const rawResult = generateFallbackTask(cleanPrompt, project);
     const dueDate = new Date();
     dueDate.setUTCDate(dueDate.getUTCDate() + rawResult.suggestedDeadlineDays);
@@ -331,21 +486,10 @@ async function breakdownTaskIntoSubtasks({ title = '', description = '', existin
     throw new Error('Task title or description is required for AI breakdown');
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  const isTestEnv = process.env.NODE_ENV === 'test';
-
-  if (!apiKey || isTestEnv) {
-    const fallbackList = generateFallbackBreakdown({
-      title: cleanTitle,
-      description: cleanDesc,
-      existingSubtasks,
-    });
-    return { subtasks: fallbackList };
-  }
+  const model = getGeminiModel();
+  const startTime = Date.now();
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-
     const systemPrompt = `You are an expert technical lead and project manager inside TaskFlow 2.0.
 Your task is to break down a parent task into 4 to 8 sequential, concrete, highly actionable subtasks.
 
@@ -377,22 +521,11 @@ Guidelines:
 
     const fullPrompt = `${systemPrompt}\n\n${contextText}`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
+    const responseText = await callGeminiGenerate({
       contents: fullPrompt,
-      config: {
-        responseMimeType: 'application/json',
-      },
     });
 
-    const responseText = response.text?.trim() || '{}';
-    let parsedJson;
-    try {
-      parsedJson = JSON.parse(responseText);
-    } catch {
-      const cleaned = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      parsedJson = JSON.parse(cleaned);
-    }
+    const parsedJson = parseGeminiJsonResponse(responseText);
 
     if (!parsedJson.subtasks || !Array.isArray(parsedJson.subtasks) || parsedJson.subtasks.length === 0) {
       throw new Error('Invalid subtasks format returned by AI');
@@ -406,6 +539,14 @@ Guidelines:
 
     return { subtasks };
   } catch (err) {
+    const elapsedMs = Date.now() - startTime;
+    logGeminiDiagnostic({
+      feature: 'breakdownTaskIntoSubtasks',
+      model,
+      elapsedMs,
+      error: err,
+    });
+
     const fallbackList = generateFallbackBreakdown({
       title: cleanTitle,
       description: cleanDesc,
@@ -746,17 +887,10 @@ async function generateProjectPlan({ prompt, timeframeWeeks = 4, teamContext = n
   }
 
   const weeks = Math.max(1, Math.min(Number(timeframeWeeks) || 4, 52));
-  const apiKey = process.env.GEMINI_API_KEY;
-  const isTestEnv = process.env.NODE_ENV === 'test';
-
-  if (!apiKey || isTestEnv) {
-    const rawResult = generateFallbackProjectPlan(cleanPrompt, weeks);
-    return aiProjectPlanResponse.parse(rawResult);
-  }
+  const model = getGeminiModel();
+  const startTime = Date.now();
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-
     const systemPrompt = `You are a Principal Technical Architect and Project Director inside TaskFlow 2.0.
 Your task is to take a high-level project goal and decompose it into a complete, professional project plan with phases, tasks, and subtasks.
 
@@ -798,22 +932,13 @@ Guidelines:
       contextSnippet += `\nOrganization/Team: ${teamContext.name}`;
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
-      contents: `${systemPrompt}\n\n${contextSnippet}`,
-      config: {
-        responseMimeType: 'application/json',
-      },
+    const fullPrompt = `${systemPrompt}\n\n${contextSnippet}`;
+
+    const responseText = await callGeminiGenerate({
+      contents: fullPrompt,
     });
 
-    const responseText = response.text?.trim() || '{}';
-    let parsedJson;
-    try {
-      parsedJson = JSON.parse(responseText);
-    } catch {
-      const cleaned = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      parsedJson = JSON.parse(cleaned);
-    }
+    const parsedJson = parseGeminiJsonResponse(responseText);
 
     const validated = aiProjectPlanResponse.parse({
       name: parsedJson.name || cleanPrompt.slice(0, 50),
@@ -827,6 +952,14 @@ Guidelines:
 
     return validated;
   } catch (err) {
+    const elapsedMs = Date.now() - startTime;
+    logGeminiDiagnostic({
+      feature: 'generateProjectPlan',
+      model,
+      elapsedMs,
+      error: err,
+    });
+
     const rawResult = generateFallbackProjectPlan(cleanPrompt, weeks);
     return aiProjectPlanResponse.parse(rawResult);
   }
@@ -1367,17 +1500,10 @@ async function generateProductivityInsights({
   });
 
   const scopeName = userId ? 'You' : (teamName || 'Your team');
-  const apiKey = process.env.GEMINI_API_KEY;
-  const isTestEnv = process.env.NODE_ENV === 'test';
-
-  if (!apiKey || isTestEnv) {
-    const fallback = generateFallbackInsights(metrics, scopeName);
-    return aiProductivityInsightsResponse.parse(fallback);
-  }
+  const model = getGeminiModel();
+  const startTime = Date.now();
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-
     const systemPrompt = `You are a Principal Productivity Intelligence Analyst inside TaskFlow 2.0.
 Your task is to analyze aggregated productivity metrics and output structured JSON with concise, executive-grade insights.
 
@@ -1411,22 +1537,11 @@ Guidelines:
 
     const fullPrompt = `${systemPrompt}\n\nAggregated Data:\n${JSON.stringify(contextData, null, 2)}`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
+    const responseText = await callGeminiGenerate({
       contents: fullPrompt,
-      config: {
-        responseMimeType: 'application/json',
-      },
     });
 
-    const responseText = response.text?.trim() || '{}';
-    let parsedJson;
-    try {
-      parsedJson = JSON.parse(responseText);
-    } catch {
-      const cleaned = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      parsedJson = JSON.parse(cleaned);
-    }
+    const parsedJson = parseGeminiJsonResponse(responseText);
 
     const fallback = generateFallbackInsights(metrics, scopeName);
 
@@ -1467,6 +1582,14 @@ Guidelines:
 
     return aiProductivityInsightsResponse.parse(result);
   } catch (err) {
+    const elapsedMs = Date.now() - startTime;
+    logGeminiDiagnostic({
+      feature: 'generateProductivityInsights',
+      model,
+      elapsedMs,
+      error: err,
+    });
+
     const fallback = generateFallbackInsights(metrics, scopeName);
     return aiProductivityInsightsResponse.parse(fallback);
   }
@@ -1756,16 +1879,10 @@ async function interpretNaturalSearchPrompt({
     }));
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  const isTestEnv = process.env.NODE_ENV === 'test';
-
-  if (!apiKey || isTestEnv) {
-    return fallbackNaturalSearchInterpreter(cleanPrompt, context);
-  }
+  const model = getGeminiModel();
+  const startTime = Date.now();
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-
     const systemPrompt = `You are an AI Natural Language Search Query Converter for TaskFlow 2.0.
 Your job is to translate the user's natural language request into structured search filter JSON.
 
@@ -1794,23 +1911,11 @@ Guidelines:
     const contextSnippet = `Available Team Projects: ${context.projects.map(p => p.name).join(', ') || 'None'}\nAvailable Members: ${context.members.map(m => m.name).join(', ') || 'None'}`;
     const fullPrompt = `${systemPrompt}\n\n${contextSnippet}\n\nUser Query: "${cleanPrompt}"`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
+    const responseText = await callGeminiGenerate({
       contents: fullPrompt,
-      config: {
-        responseMimeType: 'application/json',
-      },
     });
 
-    const responseText = response.text?.trim() || '{}';
-    let parsedJson;
-    try {
-      parsedJson = JSON.parse(responseText);
-    } catch {
-      const cleaned = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      parsedJson = JSON.parse(cleaned);
-    }
-
+    const parsedJson = parseGeminiJsonResponse(responseText);
     const fallback = fallbackNaturalSearchInterpreter(cleanPrompt, context);
 
     return {
@@ -1830,6 +1935,14 @@ Guidelines:
       searchExpression: parsedJson.searchExpression || fallback.searchExpression,
     };
   } catch (err) {
+    const elapsedMs = Date.now() - startTime;
+    logGeminiDiagnostic({
+      feature: 'interpretNaturalSearchPrompt',
+      model,
+      elapsedMs,
+      error: err,
+    });
+
     return fallbackNaturalSearchInterpreter(cleanPrompt, context);
   }
 }
@@ -1944,6 +2057,14 @@ async function executeNaturalSearch({
 }
 
 module.exports = {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_TIMEOUT_MS,
+  getGeminiModel,
+  getGeminiTimeoutMs,
+  categorizeGeminiError,
+  logGeminiDiagnostic,
+  parseGeminiJsonResponse,
+  callGeminiGenerate,
   generateTaskFromPrompt,
   breakdownTaskIntoSubtasks,
   generateProjectPlan,
