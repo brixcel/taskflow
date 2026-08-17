@@ -2,6 +2,21 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import * as Sentry from '@sentry/react';
+import {
+  Search,
+  Plus,
+  Kanban,
+  ListTodo,
+  Calendar,
+  Menu,
+  Sparkles,
+  AlertTriangle,
+  X,
+  Check,
+  Clock,
+  Trash2,
+  MessageSquare,
+} from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TaskSkeleton from '../components/TaskSkeleton';
 import TaskDetailDrawer from '../components/TaskDetailDrawer';
@@ -17,6 +32,7 @@ import ProjectAnalytics from '../components/ProjectAnalytics';
 import ProjectGitHubView from '../components/ProjectGitHubView';
 import CalendarView from '../components/CalendarView';
 import GlobalSearchModal from '../components/GlobalSearchModal';
+import ProjectIcon from '../components/ProjectIcon';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 
@@ -111,53 +127,6 @@ function PriorityBadge({ priority }) {
   );
 }
 
-function SearchIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{ color: '#adb2ba' }}>
-      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M7 2.5V11.5M2.5 7H11.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconList() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-      <line x1="2" y1="4" x2="12" y2="4" />
-      <line x1="2" y1="7" x2="12" y2="7" />
-      <line x1="2" y1="10" x2="12" y2="10" />
-    </svg>
-  );
-}
-
-function IconBoard() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="2" width="3" height="10" rx="0.8" />
-      <rect x="5.5" y="2" width="3" height="6" rx="0.8" />
-      <rect x="9" y="2" width="3" height="8" rx="0.8" />
-    </svg>
-  );
-}
-
-function IconCalendar() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="2.5" width="10" height="9.5" rx="1" />
-      <line x1="2" y1="5.5" x2="12" y2="5.5" />
-      <line x1="4.5" y1="1.5" x2="4.5" y2="3.5" />
-      <line x1="9.5" y1="1.5" x2="9.5" y2="3.5" />
-    </svg>
-  );
-}
 
 // ── New Task Modal (Enhanced with AI Task Assistant) ─────────────────────────
 function NewTaskModal({
@@ -339,7 +308,7 @@ function NewTaskModal({
             }}
             title="Toggle AI Task Assistant"
           >
-            <span>✨</span>
+            <Sparkles size={13} />
             <span>{showAi ? 'Close AI' : 'Create with AI'}</span>
           </button>
         </div>
@@ -352,7 +321,7 @@ function NewTaskModal({
             borderRadius: 10, padding: 14, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#4f46e5' }}>
-              <span>✨</span>
+              <Sparkles size={14} />
               <span>AI Task Assistant (Powered by Gemini)</span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -401,8 +370,8 @@ function NewTaskModal({
             </div>
 
             {aiError && (
-              <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 500 }}>
-                ⚠️ {aiError}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#ef4444', fontWeight: 500 }}>
+                <AlertTriangle size={13} /> {aiError}
               </div>
             )}
           </div>
@@ -481,10 +450,10 @@ function NewTaskModal({
                     <button
                       type="button"
                       onClick={() => handleRemoveSubtask(idx)}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 14 }}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 2 }}
                       title="Delete subtask"
                     >
-                      ✕
+                      <X size={13} />
                     </button>
                   </div>
                 ))}
@@ -551,7 +520,7 @@ function NewTaskModal({
                   <option value="">No Project (Unassigned)</option>
                   {projects.map(p => (
                     <option key={p.id} value={p.id}>
-                      {p.icon || '📁'} {p.name}
+                      {p.name}
                     </option>
                   ))}
                 </select>
@@ -618,7 +587,7 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '9px 16px',
+        padding: '10px 16px',
         borderBottom: isLast ? 'none' : '1px solid var(--color-canvas-hairline, #ebebeb)',
         background: hovered ? 'var(--color-canvas-hover, #fafafa)' : 'var(--color-canvas-card, #ffffff)',
         transition: 'background 100ms ease',
@@ -640,9 +609,7 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
         }}
       >
         {task.status === 'done' && (
-          <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-            <path d="M1.5 4L3 5.5L6.5 2" stroke="#0070f3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <Check size={10} strokeWidth={3} style={{ color: '#0070f3' }} />
         )}
       </button>
 
@@ -676,7 +643,7 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
 
       {/* Label chips in list row */}
       {Array.isArray(task.labels) && task.labels.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        <div className="hidden sm:flex" style={{ gap: 4, flexShrink: 0 }}>
           {task.labels.slice(0, 2).map((lbl, idx) => (
             <span
               key={idx}
@@ -704,8 +671,8 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         {formattedDate && (
           overdue ? (
-            <span className="badge badge-overdue" title={`Due ${formattedDate}`}>
-              Overdue
+            <span className="badge badge-overdue flex items-center gap-1" title={`Due ${formattedDate}`}>
+              <AlertTriangle size={11} /> Overdue
             </span>
           ) : (
             <span style={{ fontSize: 11, color: task.status === 'done' ? 'var(--color-canvas-mute, #888888)' : 'var(--color-canvas-body, #4d4d4d)', fontFamily: 'var(--font-mono, monospace)' }}>
@@ -742,19 +709,17 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
         <button
           onClick={() => onSelect?.(task)}
           aria-label={`Open details and comments for ${task.title}`}
-          className="btn-secondary"
+          className="btn-secondary hidden sm:inline-flex"
           style={{
             height: 24, padding: '0 8px', fontSize: 11, fontWeight: 500,
             borderRadius: 4, gap: 4,
           }}
         >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
+          <MessageSquare size={11} />
           Details
         </button>
 
-        {/* Delete — sleek icon button */}
+        {/* Delete button */}
         <button
           onClick={() => onDelete(task.id)}
           aria-label={`Delete ${task.title}`}
@@ -774,15 +739,13 @@ function TaskRow({ task, onStatusChange, onDelete, onSelect, isLast }) {
             e.currentTarget.style.borderColor = '';
           }}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          </svg>
+          <Trash2 size={12} />
         </button>
       </div>
     </div>
   );
 }
+
 
 // ── Dashboard ──────────────────────────────────────────────────────────────
 export default function Dashboard() {
@@ -1370,12 +1333,10 @@ export default function Dashboard() {
               onClick={() => setMobileSidebarOpen(v => !v)}
               aria-expanded={mobileSidebarOpen}
               aria-label="Toggle navigation menu"
-              className="btn-secondary"
-              style={{ height: 32, width: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              className="btn-secondary mobile-nav-toggle"
+              style={{ height: 32, width: 32, padding: 0 }}
             >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                <path d="M2.5 4.5h13M2.5 9h13M2.5 13.5h13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+              <Menu size={16} />
             </button>
 
             {/* Tabs */}
@@ -1419,7 +1380,7 @@ export default function Dashboard() {
                 role="radio"
                 title="Kanban Board View"
               >
-                <IconBoard />
+                <Kanban size={13} />
                 Board
               </button>
               <button
@@ -1430,7 +1391,7 @@ export default function Dashboard() {
                 role="radio"
                 title="List View"
               >
-                <IconList />
+                <ListTodo size={13} />
                 List
               </button>
               <button
@@ -1441,7 +1402,7 @@ export default function Dashboard() {
                 role="radio"
                 title="Calendar View"
               >
-                <IconCalendar />
+                <Calendar size={13} />
                 Calendar
               </button>
             </div>
@@ -1471,7 +1432,7 @@ export default function Dashboard() {
               title="Global Search (/ or ⌘K)"
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--color-canvas-body, #4d4d4d)' }}>
-                <SearchIcon />
+                <Search size={14} style={{ color: '#adb2ba', flexShrink: 0 }} />
                 <span style={{ fontSize: 13, color: searchInput ? 'var(--color-canvas-ink, #171717)' : 'var(--color-canvas-mute, #888888)' }}>
                   {searchInput ? searchInput : 'Search…'}
                 </span>
@@ -1495,7 +1456,7 @@ export default function Dashboard() {
               }}
               style={{ height: 32, fontSize: 13, gap: 5 }}
             >
-              <PlusIcon />
+              <Plus size={14} />
               New task
             </button>
           </div>

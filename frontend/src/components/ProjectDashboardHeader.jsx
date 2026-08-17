@@ -1,4 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
+import {
+  Plus,
+  MoreHorizontal,
+  Edit2,
+  Kanban,
+  ListTodo,
+  Calendar,
+  BarChart3,
+} from 'lucide-react';
+import ProjectIcon, { GithubIcon } from './ProjectIcon';
 
 const STATUS_COLORS = {
   active:      { bg: '#dbeafe', text: '#1d4ed8', border: '#bfdbfe' },
@@ -72,8 +82,9 @@ export default function ProjectDashboardHeader({
       style={{
         background: 'var(--color-canvas-card, #ffffff)',
         borderBottom: '1px solid var(--color-canvas-hairline, #ebebeb)',
-        padding: '20px 28px 16px 28px',
+        padding: '20px 24px 16px 24px',
         marginBottom: 20,
+        borderRadius: 8,
       }}
     >
       {/* Top Banner Row */}
@@ -97,12 +108,11 @@ export default function ProjectDashboardHeader({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 22,
               flexShrink: 0,
               boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
             }}
           >
-            {project.icon || '📁'}
+            <ProjectIcon icon={project.icon} size={22} color="#ffffff" />
           </span>
 
           {/* Project Title, Description & Status */}
@@ -190,9 +200,7 @@ export default function ProjectDashboardHeader({
               boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M7 2v10M2 7h10" strokeLinecap="round" />
-            </svg>
+            <Plus size={14} />
             Add Task
           </button>
 
@@ -215,11 +223,7 @@ export default function ProjectDashboardHeader({
               }}
               aria-label="Project options"
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="8" cy="4" r="1" />
-                <circle cx="8" cy="8" r="1" />
-                <circle cx="8" cy="12" r="1" />
-              </svg>
+              <MoreHorizontal size={16} />
             </button>
 
             {menuOpen && (
@@ -259,9 +263,7 @@ export default function ProjectDashboardHeader({
                     gap: 8,
                   }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M10 2l2 2-7 7H3v-2l7-7z" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <Edit2 size={14} />
                   Edit Project
                 </button>
               </div>
@@ -284,7 +286,7 @@ export default function ProjectDashboardHeader({
         }}
       >
         {/* Progress & Task counts */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 260 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 260, flexWrap: 'wrap' }}>
           <div style={{ width: 140, flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
               <span style={{ fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)' }}>
@@ -330,10 +332,7 @@ export default function ProjectDashboardHeader({
                 border: '1px solid var(--color-canvas-hairline, #ebebeb)',
               }}
             >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="2" y="3" width="10" height="9" rx="1.5" />
-                <path d="M2 6h10M4 1.5v2M10 1.5v2" strokeLinecap="round" />
-              </svg>
+              <Calendar size={13} />
               <span>
                 {startDateFormatted ? `${startDateFormatted} → ` : 'Target: '}
                 {targetDateFormatted || 'No end date'}
@@ -397,6 +396,7 @@ export default function ProjectDashboardHeader({
 
         {/* View Switcher Tabs */}
         <div
+          className="view-switcher-pill"
           style={{
             display: 'inline-flex',
             borderRadius: 6,
@@ -408,6 +408,7 @@ export default function ProjectDashboardHeader({
           <button
             type="button"
             onClick={() => onViewModeChange('board')}
+            className={`view-switcher-btn ${viewMode === 'board' ? 'active' : ''}`}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -423,16 +424,14 @@ export default function ProjectDashboardHeader({
               cursor: 'pointer',
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="2" y="2" width="4" height="10" rx="1" />
-              <rect x="8" y="2" width="4" height="6" rx="1" />
-            </svg>
+            <Kanban size={13} />
             Board
           </button>
 
           <button
             type="button"
             onClick={() => onViewModeChange('list')}
+            className={`view-switcher-btn ${viewMode === 'list' ? 'active' : ''}`}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -448,15 +447,14 @@ export default function ProjectDashboardHeader({
               cursor: 'pointer',
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M2 4h10M2 7h10M2 10h10" strokeLinecap="round" />
-            </svg>
+            <ListTodo size={13} />
             List
           </button>
 
           <button
             type="button"
             onClick={() => onViewModeChange('calendar')}
+            className={`view-switcher-btn ${viewMode === 'calendar' ? 'active' : ''}`}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -472,18 +470,14 @@ export default function ProjectDashboardHeader({
               cursor: 'pointer',
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="2.5" width="10" height="9.5" rx="1" />
-              <line x1="2" y1="5.5" x2="12" y2="5.5" />
-              <line x1="4.5" y1="1.5" x2="4.5" y2="3.5" />
-              <line x1="9.5" y1="1.5" x2="9.5" y2="3.5" />
-            </svg>
+            <Calendar size={13} />
             Calendar
           </button>
 
           <button
             type="button"
             onClick={() => onViewModeChange('analytics')}
+            className={`view-switcher-btn ${viewMode === 'analytics' ? 'active' : ''}`}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -499,15 +493,14 @@ export default function ProjectDashboardHeader({
               cursor: 'pointer',
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M2 12V8M6 12V4M10 12V6M12 12H2" strokeLinecap="round" />
-            </svg>
+            <BarChart3 size={13} />
             Analytics
           </button>
 
           <button
             type="button"
             onClick={() => onViewModeChange('github')}
+            className={`view-switcher-btn ${viewMode === 'github' ? 'active' : ''}`}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -523,9 +516,7 @@ export default function ProjectDashboardHeader({
               cursor: 'pointer',
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-            </svg>
+            <GithubIcon size={13} />
             GitHub
           </button>
         </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 
 const COLUMNS = [
@@ -105,204 +106,204 @@ export default function KanbanBoard({
   };
 
   return (
-    <div
-      className="kanban-board"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
-        gap: 16,
-        alignItems: 'start',
-        width: '100%',
-      }}
-    >
-      {COLUMNS.map((col) => {
-        const colList = columnTasks[col.id] || [];
-        const isColumnOver = dragOverCol === col.id;
+    <div className="kanban-scroll-wrapper">
+      <div
+        className="kanban-board"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(280px, 1fr))',
+          gap: 16,
+          alignItems: 'start',
+          width: '100%',
+        }}
+      >
+        {COLUMNS.map((col) => {
+          const colList = columnTasks[col.id] || [];
+          const isColumnOver = dragOverCol === col.id;
 
-        return (
-          <div
-            key={col.id}
-            onDragOver={(e) => handleDragOverColumn(e, col.id)}
-            onDrop={(e) => handleDrop(e, col.id)}
-            className={`kanban-column ${isColumnOver ? 'drag-over' : ''}`}
-            style={{
-              background: 'var(--color-canvas-subtle, #f9fafa)',
-              border: `1px solid ${isColumnOver ? 'var(--color-input-focus-border, #0070f3)' : 'var(--color-canvas-hairline, #ebebeb)'}`,
-              borderRadius: 10,
-              padding: '12px 10px',
-              display: 'flex',
-              flexDirection: 'column',
-              minHeight: 480,
-              transition: 'border-color 120ms ease, background-color 120ms ease',
-            }}
-          >
-            {/* Column Header */}
+          return (
             <div
+              key={col.id}
+              onDragOver={(e) => handleDragOverColumn(e, col.id)}
+              onDrop={(e) => handleDrop(e, col.id)}
+              className={`kanban-column ${isColumnOver ? 'drag-over' : ''}`}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '4px 6px 12px',
-                borderBottom: '1px solid var(--color-canvas-hairline, #ebebeb)',
-                marginBottom: 10,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: col.color,
-                  }}
-                />
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    color: 'var(--color-canvas-ink, #0f1011)',
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  {col.label}
-                </h3>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    padding: '1px 6px',
-                    borderRadius: 999,
-                    background: 'var(--color-canvas-card, #ffffff)',
-                    border: '1px solid var(--color-canvas-hairline, #e8eaec)',
-                    color: 'var(--color-canvas-body, #4d4d4d)',
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
-                >
-                  {colList.length}
-                </span>
-              </div>
-
-              {/* Quick Add button on column header */}
-              <button
-                type="button"
-                onClick={() => onQuickAdd?.(col.id)}
-                title={`Add task to ${col.label}`}
-                aria-label={`Add task to ${col.label}`}
-                className="btn-secondary"
-                style={{
-                  width: 24,
-                  height: 24,
-                  padding: 0,
-                  borderRadius: 4,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M7 2.5V11.5M2.5 7H11.5" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Column Cards Container */}
-            <div
-              style={{
-                flex: 1,
+                background: 'var(--color-canvas-subtle, #f9fafa)',
+                border: `1px solid ${isColumnOver ? 'var(--color-input-focus-border, #0070f3)' : 'var(--color-canvas-hairline, #ebebeb)'}`,
+                borderRadius: 10,
+                padding: '12px 10px',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: 120,
+                minHeight: 480,
+                transition: 'border-color 120ms ease, background-color 120ms ease',
               }}
             >
-              {colList.length === 0 ? (
-                <div
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '32px 16px',
-                    border: '1px dashed var(--color-canvas-hairline, #e8eaec)',
-                    borderRadius: 6,
-                    color: 'var(--color-canvas-mute, #888888)',
-                    textAlign: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <p style={{ margin: 0, fontSize: 12, fontWeight: 500 }}>
-                    No tasks in {col.label}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => onQuickAdd?.(col.id)}
+              {/* Column Header */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '4px 6px 12px',
+                  borderBottom: '1px solid var(--color-canvas-hairline, #ebebeb)',
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      fontSize: 11.5,
-                      color: '#0070f3',
-                      cursor: 'pointer',
-                      fontWeight: 500,
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: col.color,
+                    }}
+                  />
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      color: 'var(--color-canvas-ink, #0f1011)',
+                      letterSpacing: '-0.01em',
                     }}
                   >
-                    + Add a task
-                  </button>
+                    {col.label}
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: '1px 6px',
+                      borderRadius: 999,
+                      background: 'var(--color-canvas-card, #ffffff)',
+                      border: '1px solid var(--color-canvas-hairline, #e8eaec)',
+                      color: 'var(--color-canvas-body, #4d4d4d)',
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  >
+                    {colList.length}
+                  </span>
                 </div>
-              ) : (
-                colList.map((task, idx) => {
-                  const showIndicatorAbove = isColumnOver && dropIndex === idx;
-                  const showIndicatorBelow = isColumnOver && dropIndex === idx + 1 && idx === colList.length - 1;
 
-                  return (
-                    <div
-                      key={task.id}
-                      onDragOver={(e) => handleCardDragOver(e, col.id, idx)}
+                {/* Quick Add button on column header */}
+                <button
+                  type="button"
+                  onClick={() => onQuickAdd?.(col.id)}
+                  title={`Add task to ${col.label}`}
+                  aria-label={`Add task to ${col.label}`}
+                  className="btn-secondary"
+                  style={{
+                    width: 24,
+                    height: 24,
+                    padding: 0,
+                    borderRadius: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
+
+              {/* Column Cards Container */}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: 120,
+                }}
+              >
+                {colList.length === 0 ? (
+                  <div
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '32px 16px',
+                      border: '1px dashed var(--color-canvas-hairline, #e8eaec)',
+                      borderRadius: 6,
+                      color: 'var(--color-canvas-mute, #888888)',
+                      textAlign: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 500 }}>
+                      No tasks in {col.label}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onQuickAdd?.(col.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        fontSize: 11.5,
+                        color: '#0070f3',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                      }}
                     >
-                      {showIndicatorAbove && (
-                        <div
-                          className="kanban-drop-indicator"
-                          style={{
-                            height: 3,
-                            background: '#0070f3',
-                            borderRadius: 2,
-                            margin: '4px 0',
-                            boxShadow: '0 0 6px rgba(0, 112, 243, 0.5)',
-                          }}
-                        />
-                      )}
+                      + Add a task
+                    </button>
+                  </div>
+                ) : (
+                  colList.map((task, idx) => {
+                    const showIndicatorAbove = isColumnOver && dropIndex === idx;
+                    const showIndicatorBelow = isColumnOver && dropIndex === idx + 1 && idx === colList.length - 1;
 
-                      <KanbanCard
-                        task={task}
-                        isDragging={draggedTask?.id === task.id}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                        onSelect={onSelectTask}
-                        onStatusChange={onStatusChange}
-                        onDelete={onDeleteTask}
-                      />
+                    return (
+                      <div
+                        key={task.id}
+                        onDragOver={(e) => handleCardDragOver(e, col.id, idx)}
+                      >
+                        {showIndicatorAbove && (
+                          <div
+                            className="kanban-drop-indicator"
+                            style={{
+                              height: 3,
+                              background: '#0070f3',
+                              borderRadius: 2,
+                              margin: '4px 0',
+                              boxShadow: '0 0 6px rgba(0, 112, 243, 0.5)',
+                            }}
+                          />
+                        )}
 
-                      {showIndicatorBelow && (
-                        <div
-                          className="kanban-drop-indicator"
-                          style={{
-                            height: 3,
-                            background: '#0070f3',
-                            borderRadius: 2,
-                            margin: '4px 0',
-                            boxShadow: '0 0 6px rgba(0, 112, 243, 0.5)',
-                          }}
+                        <KanbanCard
+                          task={task}
+                          isDragging={draggedTask?.id === task.id}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          onSelect={onSelectTask}
+                          onStatusChange={onStatusChange}
+                          onDelete={onDeleteTask}
                         />
-                      )}
-                    </div>
-                  );
-                })
-              )}
+
+                        {showIndicatorBelow && (
+                          <div
+                            className="kanban-drop-indicator"
+                            style={{
+                              height: 3,
+                              background: '#0070f3',
+                              borderRadius: 2,
+                              margin: '4px 0',
+                              boxShadow: '0 0 6px rgba(0, 112, 243, 0.5)',
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

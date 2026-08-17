@@ -999,7 +999,43 @@ textarea {
   background: var(--color-canvas-hover, #f0f1f3) !important;
 }
 
-/* ── Responsive adjustments (Mobile viewports <= 768px) ──────────────────── */
+/* ── Responsive adjustments ─────────────────────────────────────────────── */
+.mobile-nav-toggle {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 1024px) {
+  .mobile-nav-toggle {
+    display: none !important;
+  }
+}
+
+.kanban-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 16px;
+  scroll-snap-type: x mandatory;
+}
+
+.kanban-board {
+  min-width: min-content;
+}
+
+@media (max-width: 640px) {
+  .drawer-container {
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  .modal-dialog-shell {
+    width: calc(100vw - 24px) !important;
+    margin: 12px !important;
+    padding: 16px !important;
+  }
+}
+
 @media (max-width: 900px) {
   .calendar-toolbar {
     flex-direction: column;

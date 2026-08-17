@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { X, Check, Trash2 } from 'lucide-react';
 import { API_BASE } from '../api/config';
+import ProjectIcon, { PROJECT_ICON_KEYS } from './ProjectIcon';
 
 const COLOR_PRESETS = [
   '#6366f1', // Indigo
@@ -11,8 +13,6 @@ const COLOR_PRESETS = [
   '#ec4899', // Pink
   '#8b5cf6', // Violet
 ];
-
-const ICON_PRESETS = ['📁', '🚀', '⚡', '🎨', '🛠️', '📊', '🎯', '💡', '🛡️', '🌐', '📦', '✨'];
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active', color: '#3b82f6' },
@@ -37,7 +37,7 @@ export default function ProjectModal({
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [icon, setIcon] = useState('📁');
+  const [icon, setIcon] = useState('folder');
   const [color, setColor] = useState('#6366f1');
   const [status, setStatus] = useState('active');
   const [startDate, setStartDate] = useState('');
@@ -55,7 +55,7 @@ export default function ProjectModal({
       if (project) {
         setName(project.name || '');
         setDescription(project.description || '');
-        setIcon(project.icon || '📁');
+        setIcon(project.icon || 'folder');
         setColor(project.color || '#6366f1');
         setStatus(project.status || 'active');
         setStartDate(project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '');
@@ -65,7 +65,7 @@ export default function ProjectModal({
       } else {
         setName('');
         setDescription('');
-        setIcon('📁');
+        setIcon('folder');
         setColor('#6366f1');
         setStatus('active');
         setStartDate('');
@@ -189,6 +189,7 @@ export default function ProjectModal({
       onClick={onClose}
     >
       <div
+        className="modal-dialog-shell"
         style={{
           width: '100%',
           maxWidth: '560px',
@@ -224,11 +225,10 @@ export default function ProjectModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 16,
                 boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
               }}
             >
-              {icon}
+              <ProjectIcon icon={icon} size={16} color="#ffffff" />
             </span>
             <div>
               <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)' }}>
@@ -255,9 +255,7 @@ export default function ProjectModal({
             }}
             aria-label="Close modal"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
-            </svg>
+            <X size={16} />
           </button>
         </div>
 
@@ -285,7 +283,7 @@ export default function ProjectModal({
               Icon & Theme Color
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-              {ICON_PRESETS.map((ic) => (
+              {PROJECT_ICON_KEYS.map((ic) => (
                 <button
                   key={ic}
                   type="button"
@@ -297,13 +295,13 @@ export default function ProjectModal({
                     border: icon === ic ? `2px solid ${color}` : '1px solid var(--color-canvas-hairline, #ebebeb)',
                     background: icon === ic ? 'var(--color-canvas-hover, #f0f1f3)' : 'transparent',
                     cursor: 'pointer',
-                    fontSize: 16,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
+                  title={ic}
                 >
-                  {ic}
+                  <ProjectIcon icon={ic} size={15} color={icon === ic ? color : 'var(--color-canvas-mute, #8a8f98)'} />
                 </button>
               ))}
             </div>
@@ -380,7 +378,7 @@ export default function ProjectModal({
           </div>
 
           {/* Status & Dates Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-canvas-ink, #0f1011)', marginBottom: 6 }}>
                 Status
@@ -490,7 +488,7 @@ export default function ProjectModal({
                       }}
                     >
                       <span>{m.user?.name || m.name || m.email}</span>
-                      {isSelected && <span>✓</span>}
+                      {isSelected && <Check size={12} />}
                     </button>
                   );
                 })}
@@ -535,8 +533,12 @@ export default function ProjectModal({
                     borderRadius: 6,
                     fontSize: 12,
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
                   }}
                 >
+                  <Trash2 size={13} />
                   Delete Project...
                 </button>
               ) : (

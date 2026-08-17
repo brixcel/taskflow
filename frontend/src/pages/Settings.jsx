@@ -1,6 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import {
+  Settings as SettingsIcon,
+  Code,
+  RefreshCw,
+  Zap,
+  ScrollText,
+  Key,
+  Check,
+  Copy,
+  X,
+} from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
@@ -460,9 +471,13 @@ export default function Settings() {
               borderRight: 0,
               cursor: 'pointer',
               transition: 'color 120ms',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            ⚙️ General & Preferences
+            <SettingsIcon size={14} />
+            General & Preferences
           </button>
           <button
             onClick={() => setActiveSettingsTab('developer')}
@@ -478,9 +493,13 @@ export default function Settings() {
               borderRight: 0,
               cursor: 'pointer',
               transition: 'color 120ms',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            🔌 Developer & API Keys
+            <Code size={14} />
+            Developer & API Keys
           </button>
         </div>
 
@@ -700,10 +719,11 @@ export default function Settings() {
                             <button
                               onClick={() => handleRotateApiKey(k.id)}
                               className="btn-secondary"
-                              style={{ fontSize: 11, padding: '4px 8px' }}
+                              style={{ fontSize: 11, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
                               title="Rotate secret key"
                             >
-                              🔄 Rotate
+                              <RefreshCw size={11} />
+                              Rotate
                             </button>
                             <button
                               onClick={() => handleRevokeApiKey(k.id)}
@@ -804,16 +824,18 @@ export default function Settings() {
                               onClick={() => handleTestPingWebhook(w.id)}
                               disabled={pingStatus[w.id] === 'sending'}
                               className="btn-secondary"
-                              style={{ fontSize: 11, padding: '4px 8px' }}
+                              style={{ fontSize: 11, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
                             >
-                              {pingStatus[w.id] ? `Ping: ${pingStatus[w.id]}` : '⚡ Ping test'}
+                              <Zap size={11} />
+                              {pingStatus[w.id] ? `Ping: ${pingStatus[w.id]}` : 'Ping test'}
                             </button>
                             <button
                               onClick={() => handleViewDeliveries(w)}
                               className="btn-secondary"
-                              style={{ fontSize: 11, padding: '4px 8px' }}
+                              style={{ fontSize: 11, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
                             >
-                              📜 Logs
+                              <ScrollText size={11} />
+                              Logs
                             </button>
                             <button
                               onClick={() => handleDeleteWebhook(w.id)}
@@ -857,8 +879,9 @@ export default function Settings() {
           >
             {createdSecretKey ? (
               <div>
-                <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: '#30a46c' }}>
-                  🔑 API Key Generated!
+                <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: '#30a46c', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Key size={16} />
+                  API Key Generated!
                 </h3>
                 <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--color-canvas-mute, #888888)', lineHeight: '18px' }}>
                   Please copy and store your API secret key now. For security reasons, <strong>it will never be shown again</strong>.
@@ -888,8 +911,9 @@ export default function Settings() {
                       setCopiedKey(true);
                       setTimeout(() => setCopiedKey(false), 2000);
                     }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5 }}
                   >
-                    {copiedKey ? '✓ Copied!' : '📋 Copy to Clipboard'}
+                    {copiedKey ? <><Check size={12} /> Copied!</> : <><Copy size={12} /> Copy to Clipboard</>}
                   </button>
                   <button
                     className="btn-primary"
@@ -1116,9 +1140,9 @@ export default function Settings() {
               <button
                 className="btn-secondary"
                 onClick={() => setViewingDeliveriesWebhook(null)}
-                style={{ fontSize: 12, padding: '4px 8px' }}
+                style={{ fontSize: 12, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
               >
-                ✕ Close
+                <X size={12} /> Close
               </button>
             </div>
 

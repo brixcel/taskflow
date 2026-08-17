@@ -1,6 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
+import {
+  Search,
+  Sparkles,
+  User,
+  AlertTriangle,
+  Flame,
+  Calendar,
+  Clock,
+  CheckSquare,
+  Bookmark,
+  X,
+  ExternalLink,
+  ListTodo,
+  Folder,
+} from 'lucide-react';
 import { API_URL } from '../api/config';
+import ProjectIcon from './ProjectIcon';
 
 function useDebounce(value, delay = 200) {
   const [debounced, setDebounced] = useState(value);
@@ -13,12 +29,12 @@ function useDebounce(value, delay = 200) {
 
 const PRESET_CHIPS = [
   { label: 'All Tasks', query: '' },
-  { label: '👤 Assigned to me', query: 'assignee:me' },
-  { label: '🚨 Urgent & High', query: 'priority:urgent,high' },
-  { label: '📅 Due Today', query: 'due:today' },
-  { label: '⚠️ Overdue', query: 'due:overdue' },
-  { label: '📋 To Do', query: 'status:todo' },
-  { label: '🔄 In Progress', query: 'status:in_progress' },
+  { label: 'Assigned to me', icon: User, query: 'assignee:me' },
+  { label: 'Urgent & High', icon: Flame, query: 'priority:urgent,high' },
+  { label: 'Due Today', icon: Calendar, query: 'due:today' },
+  { label: 'Overdue', icon: AlertTriangle, query: 'due:overdue' },
+  { label: 'To Do', icon: ListTodo, query: 'status:todo' },
+  { label: 'In Progress', icon: Clock, query: 'status:in_progress' },
 ];
 
 const OPERATOR_HINTS = [
@@ -34,7 +50,6 @@ const OPERATOR_HINTS = [
 
 function highlightMatch(text, query) {
   if (!text || !query || !query.trim()) return text;
-  // Clean query of operators for text highlighting
   const cleanTerms = query
     .replace(/[a-zA-Z_-]+:(?:"[^"]+"|'[^']+'|[^\s]+)/g, '')
     .trim()
@@ -360,18 +375,7 @@ export default function GlobalSearchModal({
       >
         {/* ── Search Input Header ── */}
         <div className="p-4 border-b border-[var(--color-canvas-hairline,#ebebeb)] flex items-center gap-3 bg-[var(--color-canvas-main,#fafafa)]">
-          <svg
-            className="w-5 h-5 text-[var(--color-canvas-mute,#888888)] shrink-0"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="9" cy="9" r="6" />
-            <path d="M15 15l4 4" />
-          </svg>
+          <Search className="w-5 h-5 text-[var(--color-canvas-mute,#888888)] shrink-0" />
 
           <input
             ref={inputRef}
@@ -401,7 +405,7 @@ export default function GlobalSearchModal({
             }`}
             title="Toggle Natural-Language AI Search"
           >
-            <span>✨</span>
+            <Sparkles size={13} />
             <span className="hidden sm:inline">{isAiMode ? 'AI Search' : 'AI Search'}</span>
           </button>
 
@@ -415,9 +419,7 @@ export default function GlobalSearchModal({
               title="Clear search"
               aria-label="Clear search"
             >
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
-              </svg>
+              <X size={16} />
             </button>
           )}
 
@@ -430,7 +432,7 @@ export default function GlobalSearchModal({
         {isAiMode && aiExplanation && (
           <div className="px-4 py-2 border-b border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/70 dark:bg-indigo-950/30 flex flex-wrap items-center justify-between gap-2 text-[12px] text-indigo-900 dark:text-indigo-200 animate-fade-in">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="text-base shrink-0">✨</span>
+              <Sparkles size={14} className="text-indigo-600 shrink-0" />
               <span className="font-medium truncate">{aiExplanation}</span>
             </div>
             {aiSearchExpression && (
@@ -443,7 +445,7 @@ export default function GlobalSearchModal({
                 title="Convert to standard expression"
               >
                 <span>Filter: {aiSearchExpression}</span>
-                <span>↗</span>
+                <ExternalLink size={11} />
               </button>
             )}
           </div>
@@ -467,7 +469,8 @@ export default function GlobalSearchModal({
                 onClick={() => setIsSaving(true)}
                 className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--color-canvas-card,#ffffff)] border border-[var(--color-canvas-hairline,#ebebeb)] text-[var(--color-canvas-ink,#171717)] hover:bg-[var(--color-canvas-hover,#ebebeb)] transition-colors cursor-pointer"
               >
-                💾 Save filter
+                <Bookmark size={11} />
+                <span>Save filter</span>
               </button>
             )}
           </div>
@@ -510,17 +513,19 @@ export default function GlobalSearchModal({
         <div className="px-4 py-2 border-b border-[var(--color-canvas-hairline,#ebebeb)] flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[12px]">
           {PRESET_CHIPS.map((chip, idx) => {
             const isActive = query === chip.query;
+            const Icon = chip.icon;
             return (
               <button
                 key={idx}
                 onClick={() => handleApplyPreset(chip.query)}
-                className={`px-2.5 py-1 rounded-full whitespace-nowrap font-medium transition-colors cursor-pointer border ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full whitespace-nowrap font-medium transition-colors cursor-pointer border ${
                   isActive
                     ? 'bg-[var(--color-canvas-ink,#171717)] text-[var(--color-canvas-main,#ffffff)] border-transparent'
                     : 'bg-[var(--color-canvas-card,#ffffff)] text-[var(--color-canvas-body,#4d4d4d)] border-[var(--color-canvas-hairline,#ebebeb)] hover:border-[var(--color-canvas-hairline-strong,#a1a1a1)] hover:text-[var(--color-canvas-ink,#171717)]'
                 }`}
               >
-                {chip.label}
+                {Icon && <Icon size={12} />}
+                <span>{chip.label}</span>
               </button>
             );
           })}
@@ -557,7 +562,7 @@ export default function GlobalSearchModal({
                           className="opacity-0 group-hover:opacity-100 p-1 text-[var(--color-canvas-mute,#888888)] hover:text-red-500 transition-opacity cursor-pointer border-0 bg-transparent"
                           title="Delete saved filter"
                         >
-                          ✕
+                          <X size={13} />
                         </button>
                       </div>
                     ))}
@@ -582,9 +587,9 @@ export default function GlobalSearchModal({
                       <button
                         key={rs.id}
                         onClick={() => handleApplyPreset(rs.query)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[12px] bg-[var(--color-canvas-hover,#f5f5f5)] text-[var(--color-canvas-body,#4d4d4d)] hover:text-[var(--color-canvas-ink,#171717)] hover:bg-[var(--color-canvas-hairline,#ebebeb)] transition-colors cursor-pointer border-0"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] bg-[var(--color-canvas-hover,#f5f5f5)] text-[var(--color-canvas-body,#4d4d4d)] hover:text-[var(--color-canvas-ink,#171717)] hover:bg-[var(--color-canvas-hairline,#ebebeb)] transition-colors cursor-pointer border-0"
                       >
-                        <span className="opacity-60">🕒</span>
+                        <Clock size={12} className="opacity-60" />
                         <span>{rs.query}</span>
                       </button>
                     ))}
@@ -663,9 +668,9 @@ export default function GlobalSearchModal({
                               onSelectProject?.(task.project.id);
                               onClose();
                             }}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-[var(--color-canvas-hover,#f5f5f5)] text-[var(--color-canvas-ink,#171717)] hover:bg-[var(--color-canvas-hairline,#ebebeb)] transition-colors"
+                            className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-medium bg-[var(--color-canvas-hover,#f5f5f5)] text-[var(--color-canvas-ink,#171717)] hover:bg-[var(--color-canvas-hairline,#ebebeb)] transition-colors"
                           >
-                            <span>{task.project.icon || '📁'}</span>
+                            <ProjectIcon icon={task.project.icon} size={11} color={task.project.color} />
                             <span className="truncate max-w-[120px]">{task.project.name}</span>
                           </span>
                         )}
@@ -699,13 +704,13 @@ export default function GlobalSearchModal({
                     <div className="flex items-center gap-3 shrink-0 text-[12px] text-[var(--color-canvas-mute,#888888)]">
                       {task.dueDate && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium">
-                          📅 {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          <Calendar size={11} /> {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                         </span>
                       )}
 
                       {task.subtasks?.length > 0 && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium">
-                          ✓ {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
+                          <CheckSquare size={11} /> {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
                         </span>
                       )}
 
@@ -742,9 +747,9 @@ export default function GlobalSearchModal({
                       onSelectProject?.(p.id);
                       onClose();
                     }}
-                    className="p-2.5 rounded-lg border border-[var(--color-canvas-hairline,#ebebeb)] bg-[var(--color-canvas-main,#fafafa)] hover:bg-[var(--color-canvas-hover,#f0f0f0)] cursor-pointer flex items-center gap-2"
+                    className="p-2.5 rounded-lg border border-[var(--color-canvas-hairline,#ebebeb)] bg-[var(--color-canvas-main,#fafafa)] hover:bg-[var(--color-canvas-hover,#f0f0f0)] cursor-pointer flex items-center gap-2.5"
                   >
-                    <span className="text-base">{p.icon || '📁'}</span>
+                    <ProjectIcon icon={p.icon} size={14} color={p.color} />
                     <div className="min-w-0 flex-1">
                       <div className="text-[13px] font-medium text-[var(--color-canvas-ink,#171717)] truncate">
                         {p.name}
@@ -763,8 +768,8 @@ export default function GlobalSearchModal({
           {/* Empty State */}
           {!isLoading && query.trim() && results.length === 0 && (
             <div className="py-12 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-[var(--color-canvas-hover,#f5f5f5)] text-[var(--color-canvas-mute,#888888)] flex items-center justify-center mx-auto text-xl">
-                🔍
+              <div className="w-12 h-12 rounded-full bg-[var(--color-canvas-hover,#f5f5f5)] text-[var(--color-canvas-mute,#888888)] flex items-center justify-center mx-auto">
+                <Search size={22} />
               </div>
               <div className="space-y-1">
                 <p className="text-[15px] font-semibold text-[var(--color-canvas-ink,#171717)]">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
+import { ListTodo } from 'lucide-react';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 import { formatRelativeTime, getNotificationTypeMeta } from './NotificationBell';
@@ -492,7 +493,7 @@ export default function NotificationCenter({
                       {/* Associated Task Pill */}
                       {item.task && (
                         <div className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--color-canvas-ink,#171717)] bg-[var(--color-canvas-hover,#f0f1f3)] px-2 py-1 rounded-[6px] border border-[var(--color-canvas-hairline,#ebebeb)] hover:bg-[var(--color-canvas-card,#ffffff)] transition-colors">
-                          <span>📋</span>
+                          <ListTodo size={13} />
                           <span className="truncate max-w-xs">{item.task.title}</span>
                           <span className="text-[10px] text-[var(--color-canvas-mute,#8a8f98)] uppercase font-mono">
                             {item.task.status}

@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { RefreshCw, Settings, Check, Link, ExternalLink } from 'lucide-react';
+import { GithubIcon } from './ProjectIcon';
 import { API_BASE } from '../api/config';
 
 export default function ProjectGitHubView({ projectId, teamId, token, project, onSelectTask }) {
@@ -497,24 +499,26 @@ export default function ProjectGitHubView({ projectId, teamId, token, project, o
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={handleSync}
                 disabled={syncing}
                 className="btn-secondary"
-                style={{ fontSize: 12, padding: '7px 12px' }}
+                style={{ fontSize: 12, padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                {syncing ? 'Verifying...' : '🔄 Verify Connection'}
+                <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+                {syncing ? 'Verifying...' : 'Verify Connection'}
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowSettingsModal(true)}
                 className="btn-secondary"
-                style={{ fontSize: 12, padding: '7px 12px' }}
+                style={{ fontSize: 12, padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                ⚙️ Settings
+                <Settings size={13} />
+                Settings
               </button>
 
               <button
@@ -544,7 +548,7 @@ export default function ProjectGitHubView({ projectId, teamId, token, project, o
               To receive live PR merges, commits, and issues, add this webhook endpoint in your GitHub repo under <strong>Settings &gt; Webhooks &gt; Add Webhook</strong>.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
               {/* Payload URL */}
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--color-canvas-mute, #8a8f98)', marginBottom: 4 }}>
@@ -569,9 +573,9 @@ export default function ProjectGitHubView({ projectId, teamId, token, project, o
                     type="button"
                     className="btn-secondary"
                     onClick={() => copyToClipboard(integration.webhookUrl, 'url')}
-                    style={{ fontSize: 11, padding: '6px 10px' }}
+                    style={{ fontSize: 11, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
                   >
-                    {copiedField === 'url' ? '✓ Copied' : 'Copy'}
+                    {copiedField === 'url' ? <><Check size={11} /> Copied</> : 'Copy'}
                   </button>
                 </div>
               </div>
@@ -608,14 +612,15 @@ export default function ProjectGitHubView({ projectId, teamId, token, project, o
                     type="button"
                     className="btn-secondary"
                     onClick={() => copyToClipboard(integration.webhookSecret, 'secret')}
-                    style={{ fontSize: 11, padding: '6px 10px' }}
+                    style={{ fontSize: 11, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
                   >
-                    {copiedField === 'secret' ? '✓ Copied' : 'Copy'}
+                    {copiedField === 'secret' ? <><Check size={11} /> Copied</> : 'Copy'}
                   </button>
                 </div>
               </div>
             </div>
           </div>
+
 
           {/* Activity Feed Section */}
           <div
@@ -762,7 +767,7 @@ export default function ProjectGitHubView({ projectId, teamId, token, project, o
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          🔗 Task: {item.task.title.substring(0, 24)}…
+                          <Link size={11} /> Task: {item.task.title.substring(0, 24)}…
                         </button>
                       )}
                     </div>

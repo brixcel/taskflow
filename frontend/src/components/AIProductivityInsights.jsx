@@ -1,4 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
+import {
+  Sparkles,
+  Check,
+  AlertTriangle,
+  Zap,
+  Calendar,
+  TrendingUp,
+  Users,
+  Lightbulb,
+  Copy,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { API_BASE } from '../api/config';
 
 export default function AIProductivityInsights({
@@ -55,7 +68,7 @@ export default function AIProductivityInsights({
 
   const handleCopySummary = () => {
     if (!insights) return;
-    const textToCopy = `✨ TaskFlow AI Productivity Insights (${insights.timeRange?.label || range})\n\n${insights.summary}\n\n🚀 Highlights:\n${insights.highlights?.map(h => `• ${h}`).join('\n') || 'None'}\n\n⚠️ Bottlenecks:\n${insights.bottlenecks?.map(b => `• ${b}`).join('\n') || 'None'}\n\n💡 Recommendations:\n${insights.recommendations?.map(r => `• ${r}`).join('\n') || 'None'}`;
+    const textToCopy = `[TaskFlow AI Productivity Insights - ${insights.timeRange?.label || range}]\n\n${insights.summary}\n\nKey Highlights:\n${insights.highlights?.map(h => `• ${h}`).join('\n') || 'None'}\n\nBottlenecks & Alerts:\n${insights.bottlenecks?.map(b => `• ${b}`).join('\n') || 'None'}\n\nActionable Recommendations:\n${insights.recommendations?.map(r => `• ${r}`).join('\n') || 'None'}`;
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -340,7 +353,8 @@ export default function AIProductivityInsights({
                         color: 'var(--color-badge-done-fg, #0761d1)',
                       }}
                     >
-                      <span>✓ {metrics.tasksCompleted} Completed</span>
+                      <Check size={11} />
+                      <span>{metrics.tasksCompleted} Completed</span>
                       {metrics.velocityChangePct !== undefined && metrics.velocityChangePct !== 0 && (
                         <span style={{ opacity: 0.85, fontSize: 10 }}>
                           ({metrics.velocityChangePct > 0 ? `+${metrics.velocityChangePct}%` : `${metrics.velocityChangePct}%`})
@@ -363,7 +377,8 @@ export default function AIProductivityInsights({
                         color: 'var(--color-btn-danger-fg, #c50000)',
                       }}
                     >
-                      <span>⚠️ {metrics.overdueCount} Overdue</span>
+                      <AlertTriangle size={11} />
+                      <span>{metrics.overdueCount} Overdue</span>
                     </div>
                   )}
 
@@ -381,7 +396,8 @@ export default function AIProductivityInsights({
                         color: 'var(--color-badge-progress-fg, #ab570a)',
                       }}
                     >
-                      <span>⚡ Heavy Load: {metrics.highestWorkloadMember.name}</span>
+                      <Zap size={11} />
+                      <span>Heavy Load: {metrics.highestWorkloadMember.name}</span>
                     </div>
                   )}
 
@@ -399,7 +415,8 @@ export default function AIProductivityInsights({
                         color: 'var(--color-canvas-body, #4d4d4d)',
                       }}
                     >
-                      <span>📅 Peak: {metrics.peakProductivityDay}s</span>
+                      <Calendar size={11} />
+                      <span>Peak: {metrics.peakProductivityDay}s</span>
                     </div>
                   )}
                 </div>
@@ -433,7 +450,8 @@ export default function AIProductivityInsights({
                       marginBottom: 8,
                     }}
                   >
-                    <span>🚀 Velocity & Highlights</span>
+                    <TrendingUp size={13} />
+                    <span>Velocity & Highlights</span>
                   </div>
                   <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'var(--color-canvas-body, #4d4d4d)', lineHeight: '18px' }}>
                     {insights.highlights?.map((h, i) => (
@@ -462,7 +480,8 @@ export default function AIProductivityInsights({
                       marginBottom: 8,
                     }}
                   >
-                    <span>⚠️ Bottlenecks & Alerts</span>
+                    <AlertTriangle size={13} />
+                    <span>Bottlenecks & Alerts</span>
                   </div>
                   <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'var(--color-canvas-body, #4d4d4d)', lineHeight: '18px' }}>
                     {insights.bottlenecks?.map((b, i) => (
@@ -491,7 +510,8 @@ export default function AIProductivityInsights({
                       marginBottom: 8,
                     }}
                   >
-                    <span>👥 Team Workload</span>
+                    <Users size={13} />
+                    <span>Team Workload</span>
                   </div>
                   <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'var(--color-canvas-body, #4d4d4d)', lineHeight: '18px' }}>
                     {insights.workloadAnalysis?.map((w, i) => (
@@ -520,7 +540,8 @@ export default function AIProductivityInsights({
                       marginBottom: 8,
                     }}
                   >
-                    <span>💡 Recommendations</span>
+                    <Lightbulb size={13} />
+                    <span>Recommendations</span>
                   </div>
                   <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: 'var(--color-canvas-body, #4d4d4d)', lineHeight: '18px' }}>
                     {insights.recommendations?.map((r, i) => (
@@ -531,6 +552,7 @@ export default function AIProductivityInsights({
               </div>
             </div>
           )}
+
         </>
       )}
     </div>

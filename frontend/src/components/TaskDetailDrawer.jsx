@@ -1,7 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import {
+  X,
+  Sparkles,
+  AlertTriangle,
+  CheckSquare,
+  Plus,
+  Trash2,
+  Edit2,
+  Check,
+  Calendar,
+  Clock,
+  MessageSquare,
+  Activity,
+  Eye,
+  Link,
+} from 'lucide-react';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
+import ProjectIcon, { GithubIcon } from './ProjectIcon';
 
 const API = API_URL;
 
@@ -894,7 +911,7 @@ export default function TaskDetailDrawer({
                   style={{ height: 22, fontSize: 10.5, padding: '0 6px' }}
                   onClick={() => setEditingSubtaskId(null)}
                 >
-                  ✕
+                  <X size={11} />
                 </button>
               </div>
             ) : (
@@ -925,7 +942,7 @@ export default function TaskDetailDrawer({
               {/* Due Date pill */}
               {formattedDueDate ? (
                 <span
-                  className={`badge ${overdue ? 'badge-overdue' : ''}`}
+                  className={`badge ${overdue ? 'badge-overdue flex items-center gap-1' : ''}`}
                   style={{
                     fontSize: 10,
                     padding: '1px 5px',
@@ -933,9 +950,11 @@ export default function TaskDetailDrawer({
                   }}
                   title={overdue ? `Overdue (${formattedDueDate})` : `Due ${formattedDueDate}`}
                 >
-                  {overdue ? '⚠ ' : ''}{formattedDueDate}
+                  {overdue && <AlertTriangle size={10} />}
+                  {formattedDueDate}
                 </span>
               ) : null}
+
 
               {/* Assignee Avatar / Picker */}
               <select
@@ -1089,6 +1108,7 @@ export default function TaskDetailDrawer({
 
       {/* Workspace Drawer Panel */}
       <aside
+        className="drawer-container"
         style={{
           position: 'fixed', top: 0, right: 0, bottom: 0,
           width: '100%', maxWidth: 760,
@@ -1123,10 +1143,7 @@ export default function TaskDetailDrawer({
               className="btn-secondary"
               style={{ height: 24, padding: '0 7px', fontSize: 11, gap: 4 }}
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
+              <Link size={11} />
               {copySuccess ? 'Copied!' : 'Copy link'}
             </button>
 
@@ -1177,10 +1194,7 @@ export default function TaskDetailDrawer({
               }}
               title={isWatching ? 'Stop watching this task' : 'Watch this task for updates'}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
+              <Eye size={13} />
               {isWatching ? 'Following' : 'Watch'}
               {watchers.length > 0 && (
                 <span style={{ fontSize: 10.5, opacity: 0.8, fontFamily: "'JetBrains Mono', monospace" }}>
@@ -1211,9 +1225,7 @@ export default function TaskDetailDrawer({
               title="Close (Esc)"
               aria-label="Close task workspace"
             >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <path d="M3 3l8 8M11 3l-8 8" />
-              </svg>
+              <X size={14} />
             </button>
           </div>
         </header>
@@ -1222,7 +1234,7 @@ export default function TaskDetailDrawer({
         {error && (
           <div style={{ margin: '12px 20px 0', padding: '8px 12px', background: 'var(--color-banner-error-bg, #f7d4d6)', color: 'var(--color-banner-error-fg, #c50000)', borderRadius: 6, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>{error}</span>
-            <button onClick={() => setError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>✕</button>
+            <button onClick={() => setError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 2 }}><X size={12} /></button>
           </div>
         )}
 
@@ -1370,7 +1382,7 @@ export default function TaskDetailDrawer({
                       }}
                       title="Automatically break down this task into step-by-step actionable checklist items with TaskFlow AI"
                     >
-                      <span style={{ fontSize: 12 }}>✨</span>
+                      <Sparkles size={12} />
                       {isGeneratingAiBreakdown ? 'Breaking down…' : 'Break down with AI'}
                     </button>
 
@@ -1427,7 +1439,7 @@ export default function TaskDetailDrawer({
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 14 }}>✨</span>
+                        <Sparkles size={14} className="text-purple-600" />
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#5b21b6', letterSpacing: '-0.01em' }}>
                           TaskFlow AI Breakdown
                         </span>
@@ -1453,15 +1465,17 @@ export default function TaskDetailDrawer({
                           border: 'none',
                           padding: '2px 4px',
                           color: '#7c3aed',
-                          fontSize: 12,
                           cursor: 'pointer',
                           borderRadius: 4,
+                          display: 'flex',
+                          alignItems: 'center',
                         }}
                         title="Close AI suggestions"
                       >
-                        ✕
+                        <X size={13} />
                       </button>
                     </div>
+
 
                     {/* Loading State */}
                     {isGeneratingAiBreakdown && (
@@ -2100,12 +2114,13 @@ export default function TaskDetailDrawer({
                                 border: 'none',
                                 color: 'var(--color-canvas-mute, #888888)',
                                 cursor: 'pointer',
-                                fontSize: 13,
                                 padding: 4,
+                                display: 'flex',
+                                alignItems: 'center',
                               }}
                               title="Unlink resource"
                             >
-                              ✕
+                              <X size={13} />
                             </button>
                           </div>
                         );
@@ -2262,7 +2277,7 @@ export default function TaskDetailDrawer({
                   <option value="">No Project (Unassigned)</option>
                   {projects.map(p => (
                     <option key={p.id} value={p.id}>
-                      {p.icon || '📁'} {p.name}
+                      {p.name}
                     </option>
                   ))}
                 </select>
@@ -2327,13 +2342,14 @@ export default function TaskDetailDrawer({
                       <button
                         type="button"
                         onClick={() => handleRemoveLabel(lbl)}
-                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-canvas-mute, #888888)', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-canvas-mute, #888888)', display: 'flex', alignItems: 'center' }}
                       >
-                        ✕
+                        <X size={11} />
                       </button>
                     </span>
                   ))}
                 </div>
+
 
                 {showAddLabel && (
                   <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>

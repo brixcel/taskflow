@@ -1,5 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
+import {
+  Sparkles,
+  AlertTriangle,
+  X,
+  Check,
+  CheckSquare,
+  Plus,
+  Trash2,
+  Edit2,
+  ShoppingCart,
+  Smartphone,
+  Cloud,
+  Rocket,
+  Layers,
+  Calendar,
+} from 'lucide-react';
 import { API_BASE } from '../api/config';
+import ProjectIcon, { PROJECT_ICON_KEYS } from './ProjectIcon';
 
 const COLOR_PRESETS = [
   '#6366f1', // Indigo
@@ -12,31 +29,34 @@ const COLOR_PRESETS = [
   '#8b5cf6', // Violet
 ];
 
-const ICON_PRESETS = ['🚀', '🛒', '📱', '☁️', '🎨', '⚡', '📊', '🛡️', '🎯', '💡', '📦', '✨'];
-
 const PROMPT_TEMPLATES = [
   {
-    title: '🛒 E-Commerce Platform',
+    title: 'E-Commerce Platform',
+    icon: ShoppingCart,
     prompt: 'Build a modern e-commerce platform with product catalog, cart, Stripe payment checkout, and order fulfillment',
     weeks: 4,
   },
   {
-    title: '📱 Mobile App MVP',
+    title: 'Mobile App MVP',
+    icon: Smartphone,
     prompt: 'Design and launch an iOS & Android cross-platform mobile app MVP with offline sync and push notifications',
     weeks: 6,
   },
   {
-    title: '☁️ Cloud & CI/CD Migration',
+    title: 'Cloud & CI/CD Migration',
+    icon: Cloud,
     prompt: 'Migrate database and backend services to AWS with Docker, Kubernetes, and automated GitHub Actions CI/CD',
     weeks: 4,
   },
   {
-    title: '✨ AI Assistant Integration',
+    title: 'AI Assistant Integration',
+    icon: Sparkles,
     prompt: 'Build an AI assistant integration with natural language processing, automated prompt routing, and vector search',
     weeks: 3,
   },
   {
-    title: '🚀 SaaS Product Launch',
+    title: 'SaaS Product Launch',
+    icon: Rocket,
     prompt: 'Execute a 30-day SaaS product marketing launch with landing page, analytics tracking, and social campaigns',
     weeks: 4,
   },
@@ -65,7 +85,7 @@ export default function AIProjectPlannerModal({
   // Generated Plan State
   const [planName, setPlanName] = useState('');
   const [planDescription, setPlanDescription] = useState('');
-  const [planIcon, setPlanIcon] = useState('🚀');
+  const [planIcon, setPlanIcon] = useState('rocket');
   const [planColor, setPlanColor] = useState('#6366f1');
   const [planPhases, setPlanPhases] = useState([]);
   const [planTasks, setPlanTasks] = useState([]);
@@ -78,18 +98,19 @@ export default function AIProjectPlannerModal({
       setPromptText('');
       setTimeframeWeeks(4);
       setError('');
-      setLoading(false);
+      setPlanPhases([]);
       setPlanTasks([]);
-      setSavingProgress('');
+      setSelectedPhase('All');
     }
   }, [isOpen]);
 
-  const handleGenerate = async (customPrompt, customWeeks) => {
-    const activePrompt = (customPrompt || promptText).trim();
-    const activeWeeks = customWeeks || timeframeWeeks;
+  // Generate Plan Handler
+  const handleGenerate = async (customPrompt = null, customWeeks = null) => {
+    const text = (customPrompt || promptText).trim();
+    const weeks = customWeeks || timeframeWeeks;
 
-    if (!activePrompt) {
-      setError('Please describe your project idea or select a template');
+    if (!text) {
+      setError('Please provide a project description or select a template');
       return;
     }
 
@@ -105,144 +126,63 @@ export default function AIProjectPlannerModal({
           'X-Team-Id': teamId,
         },
         body: JSON.stringify({
-          prompt: activePrompt,
-          timeframeWeeks: activeWeeks,
+          prompt: text,
+          timeframeWeeks: weeks,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || (data.errors && data.errors[0]?.message) || 'Failed to generate project plan');
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate project plan');
       }
 
-      const plan = data.plan;
+      const { plan } = data;
       setPlanName(plan.name || 'New Project');
-      setPlanDescription(plan.description || '');
-      setPlanIcon(plan.icon || '🚀');
+      setPlanDescription(plan.description || text);
+      setPlanIcon(plan.icon || 'rocket');
       setPlanColor(plan.color || '#6366f1');
-      setPlanPhases(plan.phases || ['Planning', 'UI/UX', 'Development', 'Testing', 'Deployment']);
+      setPlanPhases(plan.phases || []);
 
-      // Annotate tasks with UI selection and unique client-side IDs
-      const mappedTasks = (plan.tasks || []).map((t, idx) => ({
-        id: `task-gen-${idx}`,
-        title: t.title,
-        description: t.description || '',
-        phase: t.phase || 'Development',
-        priority: t.priority || 'medium',
-        suggestedDeadlineOffsetDays: t.suggestedDeadlineOffsetDays || 7,
-        labels: Array.isArray(t.labels) ? t.labels : [],
-        selected: true,
-        subtasks: Array.isArray(t.subtasks)
-          ? t.subtasks.map((st, sidx) => ({
-              id: `st-gen-${idx}-${sidx}`,
-              title: st.title,
-              estimatedMinutes: st.estimatedMinutes || 30,
-              order: (sidx + 1) * 1000,
-              selected: true,
-            }))
-          : [],
-      }));
-
-      setPlanTasks(mappedTasks);
-      setSelectedPhase('All');
-      setStep('review');
-    } catch (err) {
-      setError(err.message || 'An error occurred during AI project planning');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleApplyPlan = async () => {
-    const selectedTasks = planTasks.filter((t) => t.selected);
-    if (selectedTasks.length === 0) {
-      setError('Please select at least one task to create the project');
-      return;
-    }
-
-    if (!planName.trim()) {
-      setError('Project name is required');
-      return;
-    }
-
-    setStep('saving');
-    setLoading(true);
-    setError('');
-    setSavingProgress('Establishing project roadmap and hierarchy...');
-
-    try {
-      const now = new Date();
-      const targetDate = new Date(now.getTime() + timeframeWeeks * 7 * 24 * 60 * 60 * 1000);
-
-      const payload = {
-        name: planName.trim(),
-        description: planDescription.trim() || null,
-        icon: planIcon,
-        color: planColor,
-        startDate: now.toISOString(),
-        targetDate: targetDate.toISOString(),
-        tasks: selectedTasks.map((t) => {
-          let taskDueDate = null;
-          if (t.suggestedDeadlineOffsetDays) {
-            const due = new Date(now.getTime() + t.suggestedDeadlineOffsetDays * 24 * 60 * 60 * 1000);
-            taskDueDate = due.toISOString();
-          }
-
-          const activeSubtasks = (t.subtasks || []).filter((st) => st.selected);
-
-          return {
-            title: t.title.trim(),
-            description: t.description ? t.description.trim() : null,
+      // Flatten and prepare tasks with selection state
+      const tasks = [];
+      (plan.phases || []).forEach((phase, phaseIdx) => {
+        (phase.tasks || []).forEach((t, taskIdx) => {
+          tasks.push({
+            id: `gen-${phaseIdx}-${taskIdx}-${Date.now()}`,
+            phaseName: phase.name,
+            phaseOrder: phase.order || phaseIdx + 1,
+            title: t.title,
+            description: t.description || '',
             priority: t.priority || 'medium',
-            status: 'todo',
-            dueDate: taskDueDate,
-            labels: t.labels || [],
-            subtasks: activeSubtasks.map((st, sidx) => ({
-              title: st.title.trim(),
-              estimatedMinutes: st.estimatedMinutes || 30,
-              order: (sidx + 1) * 1000,
+            estimatedDays: t.estimatedDays || 2,
+            subtasks: (t.subtasks || []).map((st, stIdx) => ({
+              id: `sub-${phaseIdx}-${taskIdx}-${stIdx}`,
+              title: st.title,
+              selected: true,
             })),
-          };
-        }),
-      };
-
-      setSavingProgress('Persisting project, tasks, and checklists...');
-
-      const res = await fetch(`${API_BASE}/ai/apply-project-plan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          'X-Team-Id': teamId,
-        },
-        body: JSON.stringify(payload),
+            selected: true,
+          });
+        });
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || (data.errors && data.errors[0]?.message) || 'Failed to create project from plan');
-      }
-
-      if (onProjectCreated) {
-        onProjectCreated(data.project);
-      }
-
-      onClose();
-    } catch (err) {
-      setError(err.message || 'Failed to apply project plan');
+      setPlanTasks(tasks);
       setStep('review');
+    } catch (err) {
+      setError(err.message || 'AI Roadmap Generation failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleTaskSelection = (taskId) => {
+  // Task & Subtask Toggle Handlers
+  const handleToggleTask = (taskId) => {
     setPlanTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, selected: !t.selected } : t))
     );
   };
 
-  const toggleSubtaskSelection = (taskId, subtaskId) => {
+  const handleToggleSubtask = (taskId, subtaskId) => {
     setPlanTasks((prev) =>
       prev.map((t) => {
         if (t.id !== taskId) return t;
@@ -256,74 +196,200 @@ export default function AIProjectPlannerModal({
     );
   };
 
-  const updateTaskTitle = (taskId, newTitle) => {
+  const handleTaskTitleChange = (taskId, newTitle) => {
     setPlanTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, title: newTitle } : t))
     );
   };
 
-  const updateTaskPriority = (taskId, newPriority) => {
+  const handleTaskPriorityChange = (taskId, newPriority) => {
     setPlanTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, priority: newPriority } : t))
     );
   };
 
+  const handleRemoveTask = (taskId) => {
+    setPlanTasks((prev) => prev.filter((t) => t.id !== taskId));
+  };
+
+  const handleAddSubtask = (taskId) => {
+    setPlanTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t,
+          subtasks: [
+            ...t.subtasks,
+            { id: `sub-manual-${Date.now()}`, title: 'New action item', selected: true },
+          ],
+        };
+      })
+    );
+  };
+
+  const handleRemoveSubtask = (taskId, subtaskId) => {
+    setPlanTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t,
+          subtasks: t.subtasks.filter((st) => st.id !== subtaskId),
+        };
+      })
+    );
+  };
+
+  // Create Project in Database
+  const handleApplyPlan = async () => {
+    const selectedTasks = planTasks.filter((t) => t.selected && t.title.trim());
+    if (selectedTasks.length === 0) {
+      setError('Please select at least one task to create the project');
+      return;
+    }
+
+    setStep('saving');
+    setLoading(true);
+    setError('');
+    setSavingProgress('Creating project workspace...');
+
+    try {
+      // 1. Calculate Target Date based on timeframe
+      const startDate = new Date();
+      const targetDate = new Date();
+      targetDate.setDate(startDate.getDate() + timeframeWeeks * 7);
+
+      // 2. Create Project
+      const projectRes = await fetch(`${API_BASE}/projects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'X-Team-Id': teamId,
+        },
+        body: JSON.stringify({
+          name: planName.trim() || 'AI Generated Project',
+          description: planDescription.trim() || null,
+          icon: planIcon,
+          color: planColor,
+          status: 'planning',
+          startDate: startDate.toISOString(),
+          targetDate: targetDate.toISOString(),
+        }),
+      });
+
+      const projectData = await projectRes.json();
+      if (!projectRes.ok || !projectData.project) {
+        throw new Error(projectData.error || 'Failed to initialize project record');
+      }
+
+      const createdProject = projectData.project;
+
+      // 3. Batch Create Tasks with Phase Labels & Subtasks
+      setSavingProgress(`Populating ${selectedTasks.length} roadmap tasks & checklist items...`);
+
+      let daysOffset = 1;
+      for (let i = 0; i < selectedTasks.length; i++) {
+        const task = selectedTasks[i];
+        const taskDueDate = new Date();
+        taskDueDate.setDate(startDate.getDate() + daysOffset);
+        daysOffset += task.estimatedDays || 1;
+
+        const subtaskPayload = task.subtasks
+          .filter((st) => st.selected && st.title.trim())
+          .map((st, idx) => ({
+            title: st.title.trim(),
+            order: (idx + 1) * 1000,
+          }));
+
+        await fetch(`${API_BASE}/tasks`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'X-Team-Id': teamId,
+          },
+          body: JSON.stringify({
+            title: task.title.trim(),
+            description: task.description ? `${task.description}\n\n[Phase: ${task.phaseName}]` : `[Phase: ${task.phaseName}]`,
+            status: 'todo',
+            priority: task.priority,
+            projectId: createdProject.id,
+            dueDate: taskDueDate.toISOString().split('T')[0],
+            labels: [task.phaseName.toLowerCase().replace(/\s+/g, '-'), 'ai-plan'],
+            subtasks: subtaskPayload.length > 0 ? subtaskPayload : undefined,
+          }),
+        });
+      }
+
+      // Done
+      if (onProjectCreated) {
+        onProjectCreated(createdProject);
+      }
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to save generated project');
+      setStep('review');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredTasks = useMemo(() => {
     if (selectedPhase === 'All') return planTasks;
-    return planTasks.filter((t) => t.phase === selectedPhase);
+    return planTasks.filter((t) => t.phaseName === selectedPhase);
   }, [planTasks, selectedPhase]);
 
   const totalSelectedTasks = planTasks.filter((t) => t.selected).length;
   const totalSelectedSubtasks = planTasks
     .filter((t) => t.selected)
-    .reduce((sum, t) => sum + (t.subtasks || []).filter((st) => st.selected).length, 0);
+    .reduce((acc, t) => acc + t.subtasks.filter((st) => st.selected).length, 0);
 
   if (!isOpen) return null;
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="ai-planner-title"
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: 60,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: 'var(--color-modal-backdrop, rgba(0, 0, 0, 0.6))',
+        backdropFilter: 'blur(5px)',
         padding: '16px',
-        backgroundColor: 'rgba(0, 0, 0, 0.65)',
-        backdropFilter: 'blur(8px)',
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !loading) onClose();
-      }}
+      onClick={loading ? undefined : onClose}
     >
       <div
+        className="modal-dialog-shell"
         style={{
           width: '100%',
-          maxWidth: step === 'review' ? '860px' : '640px',
-          maxHeight: '90vh',
+          maxWidth: step === 'review' ? '920px' : '680px',
+          backgroundColor: 'var(--color-modal-bg, #1a1b1e)',
+          border: '1px solid var(--color-modal-border, #2c2f35)',
+          borderRadius: '16px',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.45)',
+          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: 'var(--color-canvas-card, #1c1d20)',
-          borderRadius: '16px',
-          border: '1px solid var(--color-canvas-hairline, #2c2f35)',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1)',
-          overflow: 'hidden',
-          transition: 'max-width 0.25s ease',
+          maxHeight: '92vh',
+          transition: 'max-width 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-planner-title"
       >
-        {/* Modal Header */}
+        {/* Header */}
         <div
           style={{
-            padding: '20px 24px',
+            padding: '18px 24px',
             borderBottom: '1px solid var(--color-canvas-hairline, #2c2f35)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, transparent 100%)',
+            background: 'var(--color-canvas-subtle, #141517)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -336,11 +402,10 @@ export default function AIProjectPlannerModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '18px',
                 boxShadow: '0 4px 12px rgba(99, 102, 241, 0.35)',
               }}
             >
-              ✨
+              <Sparkles size={18} color="#ffffff" />
             </span>
             <div>
               <h2
@@ -378,7 +443,6 @@ export default function AIProjectPlannerModal({
               background: 'transparent',
               border: 'none',
               color: 'var(--color-canvas-muted, #8a8f98)',
-              fontSize: '20px',
               cursor: loading ? 'not-allowed' : 'pointer',
               padding: '6px',
               borderRadius: '6px',
@@ -387,7 +451,7 @@ export default function AIProjectPlannerModal({
               justifyContent: 'center',
             }}
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 
@@ -408,7 +472,7 @@ export default function AIProjectPlannerModal({
                 gap: '8px',
               }}
             >
-              <span>⚠️</span>
+              <AlertTriangle size={15} />
               <span>{error}</span>
             </div>
           )}
@@ -427,32 +491,33 @@ export default function AIProjectPlannerModal({
                     marginBottom: '8px',
                   }}
                 >
-                  What do you want to build or achieve?
+                  Describe what you want to build or launch:
                 </label>
                 <textarea
                   id="ai-project-prompt"
+                  rows={4}
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
-                  placeholder="e.g. Build an e-commerce website with Stripe payments, product catalog, cart drawer, and order tracking..."
-                  rows={4}
+                  placeholder="e.g. Build an AI-powered SaaS customer feedback analytics platform with dashboard, sentiment analysis, and email alerts..."
                   style={{
                     width: '100%',
                     padding: '12px 14px',
                     borderRadius: '10px',
-                    backgroundColor: 'var(--color-canvas-subtle, #141517)',
                     border: '1px solid var(--color-canvas-hairline, #2c2f35)',
+                    backgroundColor: 'var(--color-canvas-subtle, #141517)',
                     color: 'var(--color-canvas-ink, #ffffff)',
                     fontSize: '14px',
-                    fontFamily: 'inherit',
-                    lineHeight: 1.5,
-                    resize: 'vertical',
+                    lineHeight: '1.5',
                     outline: 'none',
+                    resize: 'vertical',
                     boxSizing: 'border-box',
+                    fontFamily: 'inherit',
                   }}
+                  autoFocus
                 />
               </div>
 
-              {/* Timeframe Presets */}
+              {/* Timeframe Selector */}
               <div>
                 <label
                   style={{
@@ -518,49 +583,56 @@ export default function AIProjectPlannerModal({
                     gap: '10px',
                   }}
                 >
-                  {PROMPT_TEMPLATES.map((tmpl) => (
-                    <div
-                      key={tmpl.title}
-                      onClick={() => {
-                        setPromptText(tmpl.prompt);
-                        setTimeframeWeeks(tmpl.weeks);
-                        handleGenerate(tmpl.prompt, tmpl.weeks);
-                      }}
-                      style={{
-                        padding: '12px',
-                        borderRadius: '10px',
-                        backgroundColor: 'var(--color-canvas-subtle, #141517)',
-                        border: '1px solid var(--color-canvas-hairline, #2c2f35)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = '#6366f1';
-                        e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.08)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--color-canvas-hairline, #2c2f35)';
-                        e.currentTarget.style.backgroundColor = 'var(--color-canvas-subtle, #141517)';
-                      }}
-                    >
-                      <div style={{ fontWeight: 600, fontSize: '13px', color: '#f0f1f3', marginBottom: '4px' }}>
-                        {tmpl.title}
-                      </div>
+                  {PROMPT_TEMPLATES.map((tmpl) => {
+                    const TmplIcon = tmpl.icon;
+                    return (
                       <div
+                        key={tmpl.title}
+                        onClick={() => {
+                          setPromptText(tmpl.prompt);
+                          setTimeframeWeeks(tmpl.weeks);
+                          handleGenerate(tmpl.prompt, tmpl.weeks);
+                        }}
                         style={{
-                          fontSize: '11px',
-                          color: 'var(--color-canvas-muted, #8a8f98)',
-                          lineHeight: 1.4,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
+                          padding: '12px',
+                          borderRadius: '10px',
+                          backgroundColor: 'var(--color-canvas-subtle, #141517)',
+                          border: '1px solid var(--color-canvas-hairline, #2c2f35)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#6366f1';
+                          e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.08)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--color-canvas-hairline, #2c2f35)';
+                          e.currentTarget.style.backgroundColor = 'var(--color-canvas-subtle, #141517)';
                         }}
                       >
-                        {tmpl.prompt}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: '13px', color: '#f0f1f3', marginBottom: '4px' }}>
+                          <TmplIcon size={14} className="text-indigo-400 shrink-0" />
+                          <span>{tmpl.title}</span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--color-canvas-muted, #8a8f98)',
+                            lineHeight: 1.4,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {tmpl.prompt}
+                        </div>
+                        <div style={{ marginTop: '8px', fontSize: '10px', color: '#6366f1', fontWeight: 600 }}>
+                          {tmpl.weeks} Weeks Plan
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -568,7 +640,7 @@ export default function AIProjectPlannerModal({
 
           {step === 'review' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Project Meta Card */}
+              {/* Project Meta Editor Banner */}
               <div
                 style={{
                   padding: '16px',
@@ -592,11 +664,10 @@ export default function AIProjectPlannerModal({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '22px',
                         flexShrink: 0,
                       }}
                     >
-                      {planIcon}
+                      <ProjectIcon icon={planIcon} size={22} color="#ffffff" />
                     </span>
                   </div>
 
@@ -643,7 +714,7 @@ export default function AIProjectPlannerModal({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '8px', borderTop: '1px solid var(--color-canvas-hairline, #2c2f35)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--color-canvas-muted, #8a8f98)', marginRight: '4px' }}>Icon:</span>
-                    {ICON_PRESETS.map((ic) => (
+                    {PROJECT_ICON_KEYS.map((ic) => (
                       <button
                         key={ic}
                         type="button"
@@ -652,12 +723,14 @@ export default function AIProjectPlannerModal({
                           background: planIcon === ic ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                           border: planIcon === ic ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid transparent',
                           borderRadius: '4px',
-                          padding: '2px 4px',
+                          padding: '3px 5px',
                           cursor: 'pointer',
-                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
                       >
-                        {ic}
+                        <ProjectIcon icon={ic} size={13} color={planIcon === ic ? planColor : 'var(--color-canvas-muted, #8a8f98)'} />
                       </button>
                     ))}
                   </div>
@@ -700,165 +773,175 @@ export default function AIProjectPlannerModal({
                     color: selectedPhase === 'All' ? '#ffffff' : 'var(--color-canvas-muted, #8a8f98)',
                   }}
                 >
-                  All ({planTasks.length})
+                  All Phases ({planTasks.length})
                 </button>
                 {planPhases.map((phase) => {
-                  const count = planTasks.filter((t) => t.phase === phase).length;
+                  const phaseTaskCount = planTasks.filter((t) => t.phaseName === phase.name).length;
                   return (
                     <button
-                      key={phase}
+                      key={phase.name}
                       type="button"
-                      onClick={() => setSelectedPhase(phase)}
+                      onClick={() => setSelectedPhase(phase.name)}
                       style={{
                         padding: '6px 12px',
                         borderRadius: '6px',
                         fontSize: '12px',
-                        fontWeight: 600,
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
                         cursor: 'pointer',
                         border: 'none',
-                        backgroundColor: selectedPhase === phase ? '#6366f1' : 'var(--color-canvas-subtle, #141517)',
-                        color: selectedPhase === phase ? '#ffffff' : 'var(--color-canvas-muted, #8a8f98)',
-                        whiteSpace: 'nowrap',
+                        backgroundColor: selectedPhase === phase.name ? '#6366f1' : 'var(--color-canvas-subtle, #141517)',
+                        color: selectedPhase === phase.name ? '#ffffff' : 'var(--color-canvas-muted, #8a8f98)',
                       }}
                     >
-                      {phase} ({count})
+                      {phase.name} ({phaseTaskCount})
                     </button>
                   );
                 })}
               </div>
 
-              {/* Task Items List */}
+              {/* Tasks Review Checklist List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {filteredTasks.map((task) => (
+                {filteredTasks.map((t) => (
                   <div
-                    key={task.id}
+                    key={t.id}
                     style={{
-                      padding: '14px 16px',
+                      padding: '14px',
                       borderRadius: '10px',
-                      backgroundColor: task.selected
-                        ? 'var(--color-canvas-subtle, #141517)'
-                        : 'rgba(255, 255, 255, 0.02)',
-                      border: task.selected
+                      backgroundColor: 'var(--color-canvas-subtle, #141517)',
+                      border: t.selected
                         ? '1px solid var(--color-canvas-hairline, #2c2f35)'
-                        : '1px dashed rgba(255, 255, 255, 0.1)',
-                      opacity: task.selected ? 1 : 0.6,
-                      transition: 'all 0.15s ease',
+                        : '1px dashed rgba(255,255,255,0.1)',
+                      opacity: t.selected ? 1 : 0.5,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <input
                         type="checkbox"
-                        checked={task.selected}
-                        onChange={() => toggleTaskSelection(task.id)}
-                        style={{ marginTop: '4px', cursor: 'pointer', accentColor: '#6366f1' }}
+                        checked={t.selected}
+                        onChange={() => handleToggleTask(t.id)}
+                        style={{ width: 16, height: 16, cursor: 'pointer' }}
                       />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                          <input
-                            type="text"
-                            value={task.title}
-                            onChange={(e) => updateTaskTitle(task.id, e.target.value)}
-                            disabled={!task.selected}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--color-canvas-ink, #ffffff)',
-                              fontSize: '14px',
-                              fontWeight: 600,
-                              outline: 'none',
-                              flex: 1,
-                            }}
-                          />
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
+                      <input
+                        type="text"
+                        value={t.title}
+                        onChange={(e) => handleTaskTitleChange(t.id, e.target.value)}
+                        style={{
+                          flex: 1,
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--color-canvas-ink, #ffffff)',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          outline: 'none',
+                        }}
+                      />
+
+                      <select
+                        value={t.priority}
+                        onChange={(e) => handleTaskPriorityChange(t.id, e.target.value)}
+                        style={{
+                          fontSize: '11px',
+                          padding: '3px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--color-canvas-card, #1a1b1e)',
+                          color: '#a5b4fc',
+                          border: '1px solid #2c2f35',
+                        }}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTask(t.id)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--color-canvas-muted, #8a8f98)',
+                          cursor: 'pointer',
+                          padding: 4,
+                          display: 'flex',
+                        }}
+                        title="Remove Task"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+
+                    {/* Subtasks Checklist */}
+                    {t.subtasks && t.subtasks.length > 0 && (
+                      <div
+                        style={{
+                          marginLeft: '26px',
+                          paddingLeft: '10px',
+                          borderLeft: '2px solid var(--color-canvas-hairline, #2c2f35)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                          marginTop: '4px',
+                        }}
+                      >
+                        {t.subtasks.map((st) => (
+                          <div key={st.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                              type="checkbox"
+                              checked={st.selected}
+                              onChange={() => handleToggleSubtask(t.id, st.id)}
+                              style={{ width: 14, height: 14, cursor: 'pointer' }}
+                            />
                             <span
                               style={{
-                                fontSize: '10px',
-                                textTransform: 'uppercase',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                background: 'rgba(99, 102, 241, 0.15)',
-                                color: '#a5b4fc',
-                                fontWeight: 700,
+                                fontSize: '12px',
+                                color: st.selected ? 'var(--color-canvas-ink, #ffffff)' : 'var(--color-canvas-muted, #8a8f98)',
+                                textDecoration: st.selected ? 'none' : 'line-through',
+                                flex: 1,
                               }}
                             >
-                              {task.phase}
+                              {st.title}
                             </span>
-                            <select
-                              value={task.priority}
-                              onChange={(e) => updateTaskPriority(task.id, e.target.value)}
-                              disabled={!task.selected}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSubtask(t.id, st.id)}
                               style={{
-                                background: 'var(--color-canvas-card, #1c1d20)',
-                                border: '1px solid var(--color-canvas-hairline, #2c2f35)',
-                                color: 'var(--color-canvas-ink, #ffffff)',
-                                fontSize: '11px',
-                                borderRadius: '4px',
-                                padding: '2px 4px',
-                                outline: 'none',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#64748b',
+                                cursor: 'pointer',
+                                padding: 2,
+                                display: 'flex',
                               }}
                             >
-                              <option value="low">Low</option>
-                              <option value="medium">Medium</option>
-                              <option value="high">High</option>
-                              <option value="urgent">Urgent</option>
-                            </select>
+                              <X size={11} />
+                            </button>
                           </div>
-                        </div>
+                        ))}
 
-                        {task.description && (
-                          <p
-                            style={{
-                              fontSize: '12px',
-                              color: 'var(--color-canvas-muted, #8a8f98)',
-                              margin: '4px 0 8px 0',
-                              lineHeight: 1.4,
-                            }}
-                          >
-                            {task.description}
-                          </p>
-                        )}
-
-                        {/* Nested Subtasks */}
-                        {Array.isArray(task.subtasks) && task.subtasks.length > 0 && (
-                          <div
-                            style={{
-                              marginTop: '8px',
-                              paddingLeft: '12px',
-                              borderLeft: '2px solid var(--color-canvas-hairline, #2c2f35)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px',
-                            }}
-                          >
-                            {task.subtasks.map((st) => (
-                              <label
-                                key={st.id}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  fontSize: '12px',
-                                  color: st.selected ? 'var(--color-canvas-ink, #c8ccd2)' : '#6b7280',
-                                  cursor: task.selected ? 'pointer' : 'default',
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={st.selected && task.selected}
-                                  disabled={!task.selected}
-                                  onChange={() => toggleSubtaskSelection(task.id, st.id)}
-                                  style={{ cursor: 'pointer', accentColor: '#6366f1' }}
-                                />
-                                <span>{st.title}</span>
-                                <span style={{ fontSize: '10px', color: '#6b7280' }}>
-                                  ({st.estimatedMinutes}m)
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleAddSubtask(t.id)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#6366f1',
+                            fontSize: '11px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            padding: '2px 0',
+                            marginTop: '2px',
+                          }}
+                        >
+                          + Add subtask
+                        </button>
                       </div>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -872,32 +955,30 @@ export default function AIProjectPlannerModal({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '48px 24px',
+                padding: '60px 20px',
                 textAlign: 'center',
+                gap: '16px',
               }}
             >
               <div
                 style={{
                   width: 48,
                   height: 48,
-                  border: '3px solid rgba(99, 102, 241, 0.2)',
-                  borderTopColor: '#6366f1',
+                  border: '3px solid #6366f1',
+                  borderTopColor: 'transparent',
                   borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite',
-                  marginBottom: '20px',
+                  animation: 'spin 1s linear infinite',
                 }}
               />
-              <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#ffffff', margin: 0 }}>
-                {savingProgress || 'Building project structure...'}
-              </h3>
-              <p style={{ fontSize: '13px', color: '#8a8f98', marginTop: '6px' }}>
-                Executing atomic database transaction with RBAC & team permissions
+              <h3 style={{ margin: 0, fontSize: '16px', color: '#ffffff' }}>Building Your Workspace</h3>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-canvas-muted, #8a8f98)' }}>
+                {savingProgress}
               </p>
             </div>
           )}
         </div>
 
-        {/* Modal Footer */}
+        {/* Footer */}
         <div
           style={{
             padding: '16px 24px',
@@ -905,7 +986,7 @@ export default function AIProjectPlannerModal({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: 'var(--color-canvas-subtle, #141517)',
+            background: 'var(--color-canvas-subtle, #141517)',
           }}
         >
           {step === 'prompt' && (
@@ -913,7 +994,6 @@ export default function AIProjectPlannerModal({
               <button
                 type="button"
                 onClick={onClose}
-                disabled={loading}
                 style={{
                   padding: '8px 16px',
                   borderRadius: '8px',
@@ -921,8 +1001,8 @@ export default function AIProjectPlannerModal({
                   fontWeight: 500,
                   backgroundColor: 'transparent',
                   border: '1px solid var(--color-canvas-hairline, #2c2f35)',
-                  color: 'var(--color-canvas-ink, #ffffff)',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  color: 'var(--color-canvas-muted, #8a8f98)',
+                  cursor: 'pointer',
                 }}
               >
                 Cancel
@@ -933,11 +1013,11 @@ export default function AIProjectPlannerModal({
                 onClick={() => handleGenerate()}
                 disabled={loading || !promptText.trim()}
                 style={{
-                  padding: '9px 20px',
+                  padding: '9px 22px',
                   borderRadius: '8px',
                   fontSize: '13px',
                   fontWeight: 600,
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
                   border: 'none',
                   color: '#ffffff',
                   cursor: loading || !promptText.trim() ? 'not-allowed' : 'pointer',
@@ -964,7 +1044,10 @@ export default function AIProjectPlannerModal({
                     Generating Roadmap...
                   </>
                 ) : (
-                  <>✨ Generate Project Plan</>
+                  <>
+                    <Sparkles size={14} />
+                    Generate Project Plan
+                  </>
                 )}
               </button>
             </>
@@ -1015,7 +1098,8 @@ export default function AIProjectPlannerModal({
                   boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
                 }}
               >
-                ✓ Create Project with {totalSelectedTasks} Tasks
+                <Check size={14} />
+                Create Project with {totalSelectedTasks} Tasks
               </button>
             </>
           )}

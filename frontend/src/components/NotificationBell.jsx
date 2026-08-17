@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
+import { ListTodo } from 'lucide-react';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 import NotificationCenter from './NotificationCenter';
@@ -492,8 +493,8 @@ export default function NotificationBell({ onSelectTask = null }) {
                       </p>
 
                       {item.task && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--color-canvas-mute,#8a8f98)] bg-[var(--color-canvas-hover,#f0f1f3)] px-1.5 py-0.5 rounded-[4px] truncate max-w-full">
-                          📋 {item.task.title}
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-canvas-mute,#8a8f98)] bg-[var(--color-canvas-hover,#f0f1f3)] px-1.5 py-0.5 rounded-[4px] truncate max-w-full">
+                          <ListTodo size={11} /> {item.task.title}
                         </span>
                       )}
                     </div>
