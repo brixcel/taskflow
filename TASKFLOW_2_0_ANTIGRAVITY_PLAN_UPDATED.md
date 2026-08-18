@@ -45,8 +45,8 @@
 | **Tier 1: Enterprise Core** | **Phase 40** | **Performance Engineering & DB Query Optimization**<br>• Compound indexes, cursor pagination, slow query logging | ✅ **COMPLETE** | `phase40-performance.test.js` (18/18 passed) |
 | **Tier 2: Power UX** | **Phase 42** | **Universal Command Palette (`Cmd+K` / `Ctrl+K`)**<br>• Fast keyboard navigation, quick actions, global search | ✅ **COMPLETE** | `phase42-command-palette.test.js` (11/11 passed) |
 | **Tier 2: Power UX** | **Phase 43** | **Task Templates & Workflow Automation**<br>• Reusable project templates & automated triggers (auto-assign, auto-tag) | ✅ **COMPLETE** | `phase43-templates.test.js` (13/13 passed) |
-| **Tier 2: Power UX** | **Phase 44** | **Custom Views & Saved Filters**<br>• Save custom search/sort filter combinations with 1-click access | ⏳ **NEXT** | `phase44-custom-views.test.js` |
-| **Tier 2: Power UX** | **Phase 45** | **Time Tracking & Work Estimates**<br>• Log hours, stopwatch timers, estimated vs actual hours, team capacity | ⏳ Pending | `phase45-time-tracking.test.js` |
+| **Tier 2: Power UX** | **Phase 44** | **Custom Views & Saved Filters**<br>• Save custom search/sort filter combinations with 1-click access | ✅ **COMPLETE** | `phase44-custom-views.test.js` (13/13 passed) |
+| **Tier 2: Power UX** | **Phase 45** | **Time Tracking & Work Estimates**<br>• Log hours, stopwatch timers, estimated vs actual hours, team capacity | ⏳ **NEXT** | `phase45-time-tracking.test.js` |
 | **Tier 3: Growth & Polish** | **Phase 46** | **Export & Reporting Engine (CSV / PDF / JSON)**<br>• Export task boards & team velocity summaries for executive reporting | ⏳ Pending | `phase46-exports.test.js` |
 | **Tier 3: Growth & Polish** | **Phase 47** | **Interactive Demo Mode & Instant Sandbox Workspaces**<br>• 1-click test drive environment pre-populated with realistic workspaces | ⏳ Pending | `phase47-demo.test.js` |
 | **Tier 3: Growth & Polish** | **Phase 48** | **UI Modernization & TypeScript Migration**<br>• Incremental UI component refinement (shadcn/ui / Tailwind tokens) followed by full TypeScript migration | ⏳ Pending | `phase48-modernization.test.js` |

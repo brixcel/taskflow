@@ -581,53 +581,6 @@ const chatIntegrationUpdate = z.object({
   isActive: z.boolean().optional(),
 });
 
-module.exports = {
-  register,
-  login,
-  forgotPassword,
-  resetPassword,
-  verifyEmail,
-  resendVerification,
-  taskCreate,
-  taskUpdate,
-  taskOrder,
-  tasksBatchReorder,
-  projectCreate,
-  projectUpdate,
-  projectMemberAdd,
-  subtaskCreate,
-  subtaskUpdate,
-  subtasksBatchReorder,
-  subtasksBatchCreate,
-  commentCreate,
-  commentUpdate,
-  teamCreate,
-  teamJoin,
-  memberAdd,
-  memberRoleUpdate,
-  analyticsQuery,
-  notificationPreferencesUpdate,
-  notificationQuery,
-  taskDueDateUpdate,
-  calendarQuery,
-  searchQuery,
-  savedSearchCreate,
-  recentSearchCreate,
-  aiTaskGenerateRequest,
-  aiTaskGenerateResponse,
-  aiTaskBreakdownRequest,
-  aiTaskBreakdownResponse,
-  aiProjectPlanRequest,
-  aiProjectPlanResponse,
-  aiProjectApplyRequest,
-  aiProductivityInsightsQuery,
-  aiProductivityInsightsResponse,
-  aiSearchRequest,
-  aiSearchResponse,
-  apiKeyCreate,
-  webhookCreate,
-  webhookUpdate,
-  projectGitHubCreate,
 const taskTemplateCreate = z.object({
   name: nonBlankString(100, { requiredMsg: 'Template name is required', maxMsg: 'Template name must be 100 characters or fewer' }),
   description: z.string().trim().max(1000, 'Description must be 1000 characters or fewer').optional(),
@@ -673,11 +626,57 @@ const taskTemplateApply = z.object({
   status: z.enum(['todo', 'in_progress', 'done']).optional(),
 });
 
+// ─── Custom Views & Saved Filters (Phase 44) ──────────────────────────────────
+
+const customViewFiltersSchema = z.object({
+  status: z.array(z.string()).optional(),
+  priority: z.array(z.string()).optional(),
+  assignee: z.string().optional(),
+  projectId: z.string().uuid().optional().nullable(),
+  labels: z.array(z.string()).optional(),
+  isOverdue: z.boolean().optional(),
+  dueRange: z.enum(['today', 'tomorrow', 'this_week', 'next_week', 'overdue', 'no_date', 'all']).optional(),
+  search: z.string().max(200).optional(),
+}).passthrough();
+
+const customViewSortSchema = z.object({
+  field: z.enum(['dueDate', 'priority', 'order', 'createdAt', 'title', 'status']).optional().default('order'),
+  direction: z.enum(['asc', 'desc']).optional().default('asc'),
+}).optional();
+
+const customViewCreate = z.object({
+  name: nonBlankString(100, { requiredMsg: 'View name is required', maxMsg: 'View name must be 100 characters or fewer' }),
+  description: z.string().max(500, 'Description must be 500 characters or fewer').optional().nullable(),
+  icon: z.string().max(50).optional().default('👁️'),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color code').optional().default('#6366f1'),
+  viewType: z.enum(['board', 'list', 'calendar'], {
+    errorMap: () => ({ message: 'viewType must be board, list, or calendar' }),
+  }).optional().default('board'),
+  filters: customViewFiltersSchema.optional().default({}),
+  sort: customViewSortSchema.nullable().optional(),
+  isShared: z.boolean().optional().default(false),
+  isPinned: z.boolean().optional().default(false),
+});
+
+const customViewUpdate = z.object({
+  name: z.string().trim().min(1, 'View name cannot be empty').max(100, 'View name must be 100 characters or fewer').optional(),
+  description: z.string().max(500, 'Description must be 500 characters or fewer').optional().nullable(),
+  icon: z.string().max(50).optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color code').optional(),
+  viewType: z.enum(['board', 'list', 'calendar']).optional(),
+  filters: customViewFiltersSchema.optional(),
+  sort: customViewSortSchema.nullable().optional(),
+  isShared: z.boolean().optional(),
+  isPinned: z.boolean().optional(),
+  position: z.number().optional(),
+});
+
 module.exports = {
   register,
   login,
   forgotPassword,
   resetPassword,
+  verifyEmail,
   resendVerification,
   taskCreate,
   taskUpdate,
@@ -726,7 +725,10 @@ module.exports = {
   taskTemplateCreate,
   taskTemplateUpdate,
   taskTemplateApply,
+  customViewCreate,
+  customViewUpdate,
 };
+
 
 
 

@@ -17,6 +17,7 @@ import {
   Trash2,
   MessageSquare,
   Zap,
+  Bookmark,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TaskSkeleton from '../components/TaskSkeleton';
@@ -35,6 +36,7 @@ import CalendarView from '../components/CalendarView';
 import GlobalSearchModal from '../components/GlobalSearchModal';
 import CommandPalette from '../components/CommandPalette';
 import TaskTemplateModal from '../components/TaskTemplateModal';
+import CustomViewModal from '../components/CustomViewModal';
 import ProjectIcon from '../components/ProjectIcon';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
@@ -780,6 +782,10 @@ export default function Dashboard() {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [savedViews, setSavedViews] = useState([]);
+  const [activeView, setActiveView] = useState(null);
+  const [showCustomViewModal, setShowCustomViewModal] = useState(false);
+  const [editingView, setEditingView] = useState(null);
   const searchInputRef = useRef(null);
 
   const activeProject = projects.find(p => p.id === activeProjectId) || null;
@@ -811,6 +817,46 @@ export default function Dashboard() {
     if (mode === 'board') nextParams.delete('view');
     else nextParams.set('view', mode);
     setSearchParams(nextParams);
+  };
+
+  const fetchViews = useCallback(async () => {
+    if (!token || !activeTeam?.id) return;
+    try {
+      const res = await axios.get(`${API}/views`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Team-Id': activeTeam.id,
+        },
+      });
+      const all = [...(res.data.presets || []), ...(res.data.custom || [])];
+      setSavedViews(all);
+    } catch (err) {
+      console.error('Error fetching custom views:', err);
+    }
+  }, [token, activeTeam?.id]);
+
+  useEffect(() => {
+    fetchViews();
+  }, [fetchViews]);
+
+  const handleSelectView = (view) => {
+    setActiveView(view);
+    if (view.viewType && view.viewType !== viewMode) {
+      handleViewModeChange(view.viewType);
+    }
+    const f = view.filters || {};
+    if (f.assignee === 'me') {
+      handleTabChange('mine');
+    } else {
+      handleTabChange('all');
+    }
+    if (f.search) {
+      setSearchInput(f.search);
+    }
+  };
+
+  const handleClearActiveView = () => {
+    setActiveView(null);
   };
 
   const handleTaskReschedule = async (taskId, newDueDate) => {
@@ -1324,6 +1370,13 @@ export default function Dashboard() {
         onClose={() => setMobileSidebarOpen(false)}
         activeTab={activeTab}
         onTabChange={handleTabChange}
+        savedViews={savedViews}
+        activeViewId={activeView?.id}
+        onSelectView={handleSelectView}
+        onNewView={() => {
+          setEditingView(null);
+          setShowCustomViewModal(true);
+        }}
       />
 
       <div className="app-main">
@@ -1474,6 +1527,19 @@ export default function Dashboard() {
             </button>
 
             <button
+              onClick={() => {
+                setEditingView(null);
+                setShowCustomViewModal(true);
+              }}
+              className="btn-secondary"
+              style={{ height: 32, fontSize: 13, gap: 5 }}
+              title="Save View"
+            >
+              <Bookmark size={14} className="text-amber-400" />
+              Save View
+            </button>
+
+            <button
               className="btn-primary"
               onClick={() => {
                 setModalDefaultStatus('todo');
@@ -1489,6 +1555,57 @@ export default function Dashboard() {
 
         {/* ── Main content ─────────────────────────────────────────────────── */}
         <main id="main-content" style={{ flex: 1, padding: '24px 24px 40px' }}>
+
+          {/* Active Saved View Banner (Phase 44) */}
+          {activeView && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 16px',
+                background: 'var(--color-canvas-card, #1a1d21)',
+                border: '1px solid var(--color-canvas-hairline, #2e3238)',
+                borderRadius: 8,
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 16 }}>{activeView.icon || '👁️'}</span>
+                <div>
+                  <strong style={{ fontSize: 13, color: 'var(--color-canvas-fg, #f3f4f6)' }}>
+                    {activeView.name}
+                  </strong>
+                  {activeView.description && (
+                    <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--color-canvas-muted, #9ca3af)' }}>
+                      {activeView.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {!activeView.isPreset && (
+                  <button
+                    onClick={() => {
+                      setEditingView(activeView);
+                      setShowCustomViewModal(true);
+                    }}
+                    className="btn-secondary"
+                    style={{ height: 26, fontSize: 11, padding: '0 8px' }}
+                  >
+                    Edit View
+                  </button>
+                )}
+                <button
+                  onClick={handleClearActiveView}
+                  className="btn-secondary"
+                  style={{ height: 26, fontSize: 11, padding: '0 8px' }}
+                >
+                  Clear View
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Dev Sentry test tools */}
           {import.meta.env.DEV && (
@@ -1865,6 +1982,8 @@ export default function Dashboard() {
           setSearchInput(initialQuery || '');
           setShowGlobalSearch(true);
         }}
+        views={savedViews}
+        onSelectView={handleSelectView}
       />
 
       {/* Task Templates & Workflow Automation Modal (Phase 43) */}
@@ -1879,6 +1998,27 @@ export default function Dashboard() {
             setTasks((prev) => [data.task, ...prev]);
             handleOpenTaskById(data.task.id);
           }
+        }}
+      />
+
+      {/* Custom Views & Saved Filters Modal (Phase 44) */}
+      <CustomViewModal
+        isOpen={showCustomViewModal}
+        onClose={() => {
+          setShowCustomViewModal(false);
+          setEditingView(null);
+        }}
+        activeFilters={{
+          search: searchInput || undefined,
+          status: activeTab === 'mine' ? undefined : undefined,
+          assignee: activeTab === 'mine' ? 'me' : undefined,
+          projectId: activeProjectId || undefined,
+        }}
+        editingView={editingView}
+        userRole={userRole}
+        onViewSaved={(savedView) => {
+          fetchViews();
+          handleSelectView(savedView);
         }}
       />
     </div>

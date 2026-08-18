@@ -45,6 +45,7 @@ model User {
   chatIntegrationsCreated  TeamChatIntegration[]
   attachmentsUploaded      TaskAttachment[]
   taskTemplatesCreated     TaskTemplate[]
+  customViews              CustomView[]
 
   @@map("users")
 }
@@ -73,6 +74,7 @@ model Team {
   chatIntegrations   TeamChatIntegration[]
   attachments        TaskAttachment[]
   taskTemplates      TaskTemplate[]
+  customViews        CustomView[]
 
   @@map("teams")
 }
@@ -590,6 +592,33 @@ model TaskTemplate {
   @@index([teamId])
   @@index([createdById])
   @@map("task_templates")
+}
+
+// ─── Custom Views & Saved Filters (Phase 44) ──────────────────────────────────
+
+model CustomView {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  icon        String?  @default("👁️")
+  color       String?  @default("#6366f1")
+  viewType    String   @default("board") // board | list | calendar
+  filters     Json     // Structured filters: { status?: string[], priority?: string[], assignee?: string, projectId?: string, labels?: string[], isOverdue?: boolean, dueRange?: string }
+  sort        Json?    // { field: string, direction: "asc" | "desc" }
+  isShared    Boolean  @default(false)
+  isPinned    Boolean  @default(false)
+  position    Float    @default(0)
+  userId      String
+  teamId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([userId, teamId])
+  @@index([teamId, isShared])
+  @@map("custom_views")
 }
 
 

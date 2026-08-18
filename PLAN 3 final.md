@@ -1,18 +1,17 @@
 # TaskFlow — Full Production Plan
 
 > ## 🎯 Current Focus (read this first)
-> **Active phase: Phase 44 — Custom Views & Saved Filters**
+> **Active phase: Phase 45 — Time Tracking & Work Estimates**
 >
-> **Prior Progress: Phases 0–43 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
-> - 445+ automated tests passing with 100% success rate across 28 test suites.
-> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search, Universal Freelancer Agent & BYOK), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Turnstile CAPTCHA, Optimized Attachments, Postgres Row-Level Security (RLS), Global Input Sanitization, Server-Side Redis Sessions, Backend Redis Cache-Aside Layer, Compound Indexes, Cursor Pagination, Slow Query Performance Monitoring, Production Observability & Prometheus Metrics (`/metrics`, `/health/live`, `/health/ready`), Universal Command Palette (`Cmd+K` / `Ctrl+K`), and Task Templates & Workflow Automation.
+> **Prior Progress: Phases 0–44 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
+> - 458+ automated tests passing with 100% success rate across 29 test suites.
+> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search, Universal Freelancer Agent & BYOK), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Turnstile CAPTCHA, Optimized Attachments, Postgres Row-Level Security (RLS), Global Input Sanitization, Server-Side Redis Sessions, Backend Redis Cache-Aside Layer, Compound Indexes, Cursor Pagination, Slow Query Performance Monitoring, Production Observability & Prometheus Metrics (`/metrics`, `/health/live`, `/health/ready`), Universal Command Palette (`Cmd+K` / `Ctrl+K`), Task Templates & Workflow Automation, and Custom Views & Saved Filters.
 >
 > **Prioritized Next Steps (Tier 2 Execution):**
-> 1. **Phase 44: Custom Views & Saved Filters**.
-> 2. **Phase 45: Time Tracking & Work Estimates**.
-> 3. **Phase 46: Export & Reporting Engine (CSV / PDF / JSON)**.
-> 4. **Phase 47: Interactive Demo Mode & Instant Sandbox Workspaces**.
-> 5. **Phase 48: UI Modernization & TypeScript Migration**.
+> 1. **Phase 45: Time Tracking & Work Estimates**.
+> 2. **Phase 46: Export & Reporting Engine (CSV / PDF / JSON)**.
+> 3. **Phase 47: Interactive Demo Mode & Instant Sandbox Workspaces**.
+> 4. **Phase 48: UI Modernization & TypeScript Migration**.
 >
 > **This file is used across tools (Kiro and Antigravity).** See "Agent Reference" below for conventions.
 >

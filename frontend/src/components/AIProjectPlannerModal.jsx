@@ -130,30 +130,75 @@ export default function AIProjectPlannerModal({
       setPlanDescription(plan.description || text);
       setPlanIcon(plan.icon || 'rocket');
       setPlanColor(plan.color || '#6366f1');
-      setPlanPhases(plan.phases || []);
 
-      // Flatten and prepare tasks with selection state
+      // Normalize phases and tasks
+      const normalizedPhases = [];
       const tasks = [];
-      (plan.phases || []).forEach((phase, phaseIdx) => {
-        (phase.tasks || []).forEach((t, taskIdx) => {
+
+      // 1. Process plan.phases
+      if (Array.isArray(plan.phases)) {
+        plan.phases.forEach((p, idx) => {
+          if (typeof p === 'string') {
+            normalizedPhases.push({ name: p, order: idx + 1 });
+          } else if (p && typeof p === 'object') {
+            normalizedPhases.push({ name: p.name || `Phase ${idx + 1}`, order: p.order || idx + 1 });
+            if (Array.isArray(p.tasks)) {
+              p.tasks.forEach((t, taskIdx) => {
+                tasks.push({
+                  id: `gen-${idx}-${taskIdx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  phaseName: p.name || `Phase ${idx + 1}`,
+                  phaseOrder: p.order || idx + 1,
+                  title: t.title || 'Task',
+                  description: t.description || '',
+                  priority: t.priority || 'medium',
+                  estimatedDays: t.estimatedDays || t.suggestedDeadlineOffsetDays || 2,
+                  subtasks: (t.subtasks || []).map((st, stIdx) => ({
+                    id: `sub-${idx}-${taskIdx}-${stIdx}`,
+                    title: typeof st === 'string' ? st : (st.title || 'Subtask'),
+                    selected: true,
+                  })),
+                  selected: true,
+                });
+              });
+            }
+          }
+        });
+      }
+
+      // 2. Process plan.tasks (if tasks are returned in top-level array)
+      if (Array.isArray(plan.tasks) && tasks.length === 0) {
+        plan.tasks.forEach((t, taskIdx) => {
+          const phaseName = t.phase || (normalizedPhases[0]?.name) || 'General';
           tasks.push({
-            id: `gen-${phaseIdx}-${taskIdx}-${Date.now()}`,
-            phaseName: phase.name,
-            phaseOrder: phase.order || phaseIdx + 1,
-            title: t.title,
+            id: `gen-${taskIdx}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            phaseName,
+            phaseOrder: normalizedPhases.findIndex((np) => np.name === phaseName) + 1 || 1,
+            title: t.title || 'Task',
             description: t.description || '',
             priority: t.priority || 'medium',
-            estimatedDays: t.estimatedDays || 2,
+            estimatedDays: t.suggestedDeadlineOffsetDays || t.estimatedDays || 2,
             subtasks: (t.subtasks || []).map((st, stIdx) => ({
-              id: `sub-${phaseIdx}-${taskIdx}-${stIdx}`,
-              title: st.title,
+              id: `sub-${taskIdx}-${stIdx}`,
+              title: typeof st === 'string' ? st : (st.title || 'Subtask'),
               selected: true,
             })),
             selected: true,
           });
         });
+      }
+
+      // 3. Ensure every phase referenced in tasks is in normalizedPhases
+      tasks.forEach((t) => {
+        if (t.phaseName && !normalizedPhases.some((np) => np.name === t.phaseName)) {
+          normalizedPhases.push({ name: t.phaseName, order: normalizedPhases.length + 1 });
+        }
       });
 
+      if (normalizedPhases.length === 0) {
+        normalizedPhases.push({ name: 'Planning & Execution', order: 1 });
+      }
+
+      setPlanPhases(normalizedPhases);
       setPlanTasks(tasks);
       setStep('review');
     } catch (err) {

@@ -56,6 +56,8 @@ export default function CommandPalette({
   onNavigateView,
   onOpenSettings,
   onOpenGlobalSearch,
+  views = [],
+  onSelectView,
 }) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -356,7 +358,24 @@ export default function CommandPalette({
       },
     }));
 
-    // 5. Workspaces / Teams
+    // 5. Saved Views (Phase 44)
+    const matchedViews = (views || [])
+      .filter((v) => v.name && v.name.toLowerCase().includes(q))
+      .map((v) => ({
+        id: `view-${v.id}`,
+        title: v.name,
+        description: v.description || 'Saved custom filter view',
+        category: 'Saved Views',
+        icon: Bookmark,
+        customIcon: v.icon,
+        color: v.color || '#6366f1',
+        action: () => {
+          onClose();
+          onSelectView?.(v);
+        },
+      }));
+
+    // 6. Workspaces / Teams
     const matchedTeams = (teams || [])
       .filter((tm) => tm.name && tm.name.toLowerCase().includes(q))
       .map((tm) => ({
@@ -384,6 +403,9 @@ export default function CommandPalette({
     }
     if (matchedProjects.length > 0) {
       groups.push({ category: 'Projects', items: matchedProjects });
+    }
+    if (matchedViews.length > 0) {
+      groups.push({ category: 'Saved Views', items: matchedViews });
     }
     if (matchedTasks.length > 0) {
       groups.push({ category: 'Tasks', items: matchedTasks });

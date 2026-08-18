@@ -9,6 +9,8 @@ import {
   ChevronDown,
   Sparkles,
   Plus,
+  Bookmark,
+  Eye,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import ProjectIcon from './ProjectIcon';
@@ -278,6 +280,10 @@ export default function Sidebar({
   onClose = () => { },
   activeTab = 'all',
   onTabChange = () => { },
+  savedViews = [],
+  activeViewId = null,
+  onSelectView = () => { },
+  onNewView = () => { },
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -386,6 +392,97 @@ export default function Sidebar({
             <Calendar size={15} />
             Calendar
           </button>
+
+          {/* ─── Saved Views Section (Phase 44) ─────────────────────────── */}
+          <div style={{ marginTop: 16, marginBottom: 4 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 8px',
+                marginBottom: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  color: '#50545c',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Saved Views
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNewView();
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#8a8f98',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                  borderRadius: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Save current filters as view"
+                aria-label="Save current view"
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+
+            {savedViews.length > 0 ? (
+              savedViews.slice(0, 8).map((view) => {
+                const isActive = activeViewId === view.id;
+                return (
+                  <button
+                    key={view.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectView(view);
+                      onClose();
+                    }}
+                    className={`sidebar-item${isActive ? ' active' : ''}`}
+                    style={{
+                      width: '100%',
+                      border: 'none',
+                      background: 'transparent',
+                      textAlign: 'left',
+                      font: 'inherit',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 13, lineHeight: 1 }}>{view.icon || '👁️'}</span>
+                    <span
+                      style={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {view.name}
+                    </span>
+                  </button>
+                );
+              })
+            ) : (
+              <p style={{ margin: '4px 8px', fontSize: 11, color: '#50545c' }}>
+                No views saved yet
+              </p>
+            )}
+          </div>
 
           {/* ─── Projects Section ─────────────────────────────────────────── */}
           <div style={{ marginTop: 16, marginBottom: 4 }}>
