@@ -19,6 +19,7 @@ import {
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
 import ProjectIcon, { GithubIcon } from './ProjectIcon';
+import TaskAttachments from './TaskAttachments';
 
 const API = API_URL;
 
@@ -1796,8 +1797,15 @@ export default function TaskDetailDrawer({
                 </form>
               </div>
 
+              {/* Task Attachments & Assets (Phase 36) */}
+              <TaskAttachments
+                taskId={task.id}
+                teamId={activeTeam?.id || task.teamId}
+                canEdit={true}
+              />
+
               {/* Tabbed Section: Comments vs Activity */}
-              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', flex: 1 }}>
                 {/* Tab Header */}
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--color-canvas-hairline, #ebebeb)', marginBottom: 14 }}>
                   <button

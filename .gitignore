@@ -5,3 +5,6 @@ node_modules
 /generated/prisma
 *Zone.Identifier*
 *:Zone.Identifier
+
+uploads/*
+!uploads/.gitkeep

@@ -16,6 +16,7 @@ const developerRoutes = require('./routes/developer');
 const githubRoutes = require('./routes/github');
 const integrationsRoutes = require('./routes/integrations');
 const usersRoutes = require('./routes/users');
+const attachmentsRoutes = require('./routes/attachments');
 
 const http = require('http');
 const { initSocketServer } = require('./services/realtime');
@@ -54,6 +55,7 @@ app.use('/developer', developerRoutes);
 app.use('/developer', integrationsRoutes);
 app.use(githubRoutes);
 app.use('/api', githubRoutes);
+app.use(attachmentsRoutes);
 
 // Comments, activities, and subtasks are nested under tasks
 app.use('/tasks/:taskId/comments', commentRoutes);

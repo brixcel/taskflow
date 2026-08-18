@@ -43,6 +43,7 @@ model User {
   webhooksCreated          Webhook[]
   githubIntegrationsCreated ProjectGitHubIntegration[]
   chatIntegrationsCreated  TeamChatIntegration[]
+  attachmentsUploaded      TaskAttachment[]
 
   @@map("users")
 }
@@ -69,6 +70,7 @@ model Team {
   webhooks           Webhook[]
   githubIntegrations ProjectGitHubIntegration[]
   chatIntegrations   TeamChatIntegration[]
+  attachments        TaskAttachment[]
 
   @@map("teams")
 }
@@ -161,6 +163,7 @@ model Task {
   subtasks      Subtask[]
   notifications Notification[]
   githubLinks   GitHubResourceLink[]
+  attachments   TaskAttachment[]
 
   @@index([teamId, status, order])
   @@index([teamId, order])
@@ -171,6 +174,26 @@ model Task {
   @@index([projectId])
   @@index([teamId, createdAt])
   @@map("tasks")
+}
+
+model TaskAttachment {
+  id          String   @id @default(uuid())
+  taskId      String
+  teamId      String
+  uploaderId  String
+  fileName    String
+  fileSize    Int
+  mimeType    String
+  storagePath String
+  createdAt   DateTime @default(now())
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  team     Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  uploader User @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([teamId, taskId])
+  @@index([taskId])
+  @@map("task_attachments")
 }
 
 // ─── Supporting models ────────────────────────────────────────────────────────
