@@ -28,6 +28,8 @@ const server = http.createServer(app);
 const io = initSocketServer(server);
 const PORT = process.env.PORT || 3000;
 
+const { sanitizeInput } = require('./middleware/sanitize');
+
 app.use(requestId);
 app.use(cors());
 app.use(express.json({
@@ -35,6 +37,7 @@ app.use(express.json({
     req.rawBody = buf.toString('utf8');
   }
 }));
+app.use(sanitizeInput);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', requestId: req.id });

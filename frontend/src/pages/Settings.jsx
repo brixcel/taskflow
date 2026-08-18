@@ -18,6 +18,11 @@ import {
   Sparkles,
   Eye,
   EyeOff,
+  Laptop,
+  Smartphone,
+  Globe,
+  LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
@@ -195,6 +200,7 @@ export default function Settings() {
     }
     fetchTeams();
     fetchNotificationPreferences();
+    fetchSessions();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -264,6 +270,54 @@ export default function Settings() {
       setAiKeyError(err.response?.data?.error || 'Failed to remove custom Gemini key');
     } finally {
       setSavingAiKey(false);
+    }
+  };
+
+  // ── Active Sessions & Connected Devices State (Phase 38) ────────────────────
+  const [sessions, setSessions] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionActionMsg, setSessionActionMsg] = useState('');
+  const [sessionActionError, setSessionActionError] = useState('');
+
+  const fetchSessions = async () => {
+    setLoadingSessions(true);
+    setSessionActionError('');
+    try {
+      const res = await axios.get(`${API}/auth/sessions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSessions(res.data.sessions || []);
+    } catch (err) {
+      setSessionActionError(err.response?.data?.error || 'Failed to load active sessions');
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const handleRevokeSession = async (sessionId) => {
+    try {
+      await axios.delete(`${API}/auth/sessions/${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+      setSessionActionMsg('Device session revoked successfully.');
+      setTimeout(() => setSessionActionMsg(''), 3000);
+    } catch (err) {
+      setSessionActionError(err.response?.data?.error || 'Failed to revoke session');
+    }
+  };
+
+  const handleLogoutAllOtherSessions = async () => {
+    if (!window.confirm('Sign out of all other devices?')) return;
+    try {
+      await axios.post(`${API}/auth/logout-all`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchSessions();
+      setSessionActionMsg('Successfully signed out of all other devices.');
+      setTimeout(() => setSessionActionMsg(''), 3000);
+    } catch (err) {
+      setSessionActionError(err.response?.data?.error || 'Failed to revoke sessions');
     }
   };
 
@@ -931,6 +985,120 @@ export default function Settings() {
                     </div>
                   ))}
                 </div>
+              </Card>
+
+              {/* Active Sessions & Connected Devices (Phase 38) */}
+              <Card>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <div>
+                    <SectionTitle>Active Sessions & Devices</SectionTitle>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--color-canvas-body, #50545c)' }}>
+                      Manage browsers and devices currently signed in to your account.
+                    </p>
+                  </div>
+                  {sessions.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={handleLogoutAllOtherSessions}
+                      className="btn-secondary"
+                      style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <LogOut size={14} /> Sign out other devices
+                    </button>
+                  )}
+                </div>
+
+                {sessionActionMsg && (
+                  <div className="success-banner" style={{ marginBottom: 14, fontSize: 12 }}>
+                    {sessionActionMsg}
+                  </div>
+                )}
+                {sessionActionError && (
+                  <div className="error-banner" style={{ marginBottom: 14, fontSize: 12 }}>
+                    {sessionActionError}
+                  </div>
+                )}
+
+                {loadingSessions ? (
+                  <div style={{ padding: '12px 0', fontSize: 12, color: 'var(--color-canvas-mute, #888)' }}>
+                    Loading active sessions…
+                  </div>
+                ) : sessions.length === 0 ? (
+                  <div style={{ padding: '12px 0', fontSize: 12, color: 'var(--color-canvas-mute, #888)' }}>
+                    No active sessions found.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {sessions.map((sess) => (
+                      <div
+                        key={sess.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 14px',
+                          border: '1px solid var(--color-canvas-card-border, #ebebeb)',
+                          borderRadius: 8,
+                          background: sess.isCurrent ? 'rgba(0, 112, 243, 0.03)' : 'var(--color-canvas-soft, #fafafa)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 8,
+                              background: 'var(--color-canvas-card, #fff)',
+                              border: '1px solid var(--color-canvas-card-border, #ebebeb)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: sess.isCurrent ? '#0070f3' : 'var(--color-canvas-mute, #888)',
+                            }}
+                          >
+                            {sess.isMobile ? <Smartphone size={18} /> : <Laptop size={18} />}
+                          </div>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-canvas-ink, #171717)' }}>
+                                {sess.browser} on {sess.os}
+                              </span>
+                              {sess.isCurrent && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    textTransform: 'uppercase',
+                                    padding: '2px 6px',
+                                    borderRadius: 99,
+                                    background: 'rgba(48, 164, 108, 0.12)',
+                                    color: '#30a46c',
+                                  }}
+                                >
+                                  Current Device
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--color-canvas-mute, #888)', marginTop: 2 }}>
+                              IP: {sess.ipAddress} • Last active {new Date(sess.lastActiveAt).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+
+                        {!sess.isCurrent && (
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeSession(sess.id)}
+                            className="btn-secondary"
+                            style={{ fontSize: 12, padding: '4px 10px', color: '#e5484d' }}
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </Card>
 
               {/* Data export */}

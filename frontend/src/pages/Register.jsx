@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import ThemeToggle from '../components/ThemeToggle';
@@ -58,6 +58,14 @@ export default function Register() {
   const [loading,         setLoading]         = useState(false);
   const [registered,      setRegistered]      = useState(false);
   const navigate = useNavigate();
+
+  // Navigation Guard: Redirect already authenticated users straight to Dashboard
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [navigate]);
 
   const clearFieldError = (key) => setFieldErrors(p => ({ ...p, [key]: undefined }));
 

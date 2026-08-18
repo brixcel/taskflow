@@ -7,6 +7,13 @@ const validate = require('../middleware/validate');
 const schemas  = require('../validation/schemas');
 const { sendPasswordResetEmail, sendVerificationEmail } = require('../services/email');
 const {
+  createSession,
+  revokeSession,
+  revokeAllUserSessions,
+  listUserSessions,
+} = require('../services/session');
+const requireAuth = require('../middleware/auth');
+const {
   authLimiter,
   registerLimiter,
   honeypotGuard,
@@ -82,9 +89,18 @@ router.post(
       // Send verification email
       await sendVerificationEmail(user.email, rawToken);
 
+      // Create Server-Side Session in Redis
+      const sessionId = await createSession({
+        userId: user.id,
+        teamId: defaultTeam ? defaultTeam.id : null,
+        userAgent: req.headers['user-agent'] || '',
+        ipAddress: req.ip || '127.0.0.1',
+      });
+
       const token = jwt.sign(
         {
           userId: user.id,
+          sid: sessionId,
           ...(defaultTeam ? { teamId: defaultTeam.id } : {}),
         },
         process.env.JWT_SECRET,
@@ -128,9 +144,18 @@ router.post('/login', authLimiter, turnstileGuard, validate(schemas.login), asyn
       include: { team: true },
     });
 
+    // Create Server-Side Session in Redis
+    const sessionId = await createSession({
+      userId: user.id,
+      teamId: membership ? membership.teamId : null,
+      userAgent: req.headers['user-agent'] || '',
+      ipAddress: req.ip || '127.0.0.1',
+    });
+
     const token = jwt.sign(
       {
         userId: user.id,
+        sid: sessionId,
         // Include teamId if available; resolveTeam middleware can also derive it.
         ...(membership ? { teamId: membership.teamId } : {}),
       },
@@ -153,6 +178,57 @@ router.post('/login', authLimiter, turnstileGuard, validate(schemas.login), asyn
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
+// ─── GET /auth/sessions — List Active Sessions & Devices ────────────
+
+router.get('/sessions', requireAuth, async (req, res) => {
+  try {
+    const sessions = await listUserSessions(req.userId, req.sessionId);
+    res.json({ sessions });
+  } catch (error) {
+    console.error('GET /auth/sessions error:', error);
+    res.status(500).json({ error: 'Failed to fetch active sessions' });
+  }
+});
+
+// ─── POST /auth/logout — Revoke Current Session ───────────────────
+
+router.post('/logout', requireAuth, async (req, res) => {
+  try {
+    if (req.sessionId) {
+      await revokeSession(req.sessionId, req.userId);
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('POST /auth/logout error:', error);
+    res.status(500).json({ error: 'Failed to log out' });
+  }
+});
+
+// ─── POST /auth/logout-all — Revoke All Sessions Across Devices ────
+
+router.post('/logout-all', requireAuth, async (req, res) => {
+  try {
+    const count = await revokeAllUserSessions(req.userId);
+    res.json({ success: true, message: `Signed out of ${count} active session(s)` });
+  } catch (error) {
+    console.error('POST /auth/logout-all error:', error);
+    res.status(500).json({ error: 'Failed to revoke sessions' });
+  }
+});
+
+// ─── DELETE /auth/sessions/:sessionId — Revoke Remote Session ──────
+
+router.delete('/sessions/:sessionId', requireAuth, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    await revokeSession(sessionId, req.userId);
+    res.json({ success: true, message: 'Session revoked successfully' });
+  } catch (error) {
+    console.error('DELETE /auth/sessions/:sessionId error:', error);
+    res.status(500).json({ error: 'Failed to revoke session' });
   }
 });
 

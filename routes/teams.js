@@ -4,6 +4,7 @@ const requireAuth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
 const validate = require('../middleware/validate');
 const schemas = require('../validation/schemas');
+const { revokeAllUserSessions } = require('../services/session');
 
 const router = express.Router();
 
@@ -237,6 +238,9 @@ router.delete('/:id/members/:userId', resolveTeamFromParam, requireRole('owner')
     await prisma.teamMembership.delete({
       where: { userId_teamId: { userId: targetUserId, teamId } },
     });
+
+    // Instantly revoke active sessions for evicted member (Phase 38)
+    await revokeAllUserSessions(targetUserId);
 
     res.status(204).send();
   } catch (error) {

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { authenticateApiKey } = require('../services/apiKeys');
+const { validateSession } = require('../services/session');
 
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -37,6 +38,20 @@ async function requireAuth(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'test-secret');
+
+    // Server-Side Redis Session Revocation Check (Phase 38)
+    if (decoded.sid) {
+      const session = await validateSession(decoded.sid);
+      if (!session) {
+        return res.status(401).json({
+          error: 'Session has been revoked or expired. Please log in again.',
+          code: 'SESSION_REVOKED',
+        });
+      }
+      req.sessionId = decoded.sid;
+      req.session = session;
+    }
+
     req.userId = decoded.userId;
     req.authMethod = 'jwt';
     next();
