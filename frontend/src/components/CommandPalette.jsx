@@ -23,6 +23,7 @@ import {
   Building2,
   Folder,
   Tag,
+  Bookmark,
   ExternalLink,
   Zap,
 } from 'lucide-react';
