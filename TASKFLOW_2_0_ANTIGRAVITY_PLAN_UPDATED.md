@@ -43,9 +43,8 @@
 | **Tier 1: Enterprise Core** | **Phase 38** | **Server-Side Redis Sessions & Instant Token Revocation**<br>• Redis session store & instant logout/eviction token revocation | ✅ **COMPLETE** | `phase38-redis-sessions.test.js` (5/5 passed) |
 | **Tier 1: Enterprise Core** | **Phase 39** | **Backend Redis Caching & Cache-Aside Layer**<br>• Sub-5ms caching for team memberships, project trees & dashboard metrics | ✅ **COMPLETE** | `phase39-redis-cache.test.js` (3/3 passed) |
 | **Tier 1: Enterprise Core** | **Phase 40** | **Performance Engineering & DB Query Optimization**<br>• Compound indexes, cursor pagination, slow query logging | ✅ **COMPLETE** | `phase40-performance.test.js` (18/18 passed) |
-| **Tier 1: Observability** | **Phase 41** | **Production Observability & Prometheus Metrics**<br>• Prometheus `/metrics`, `/health/live`, `/health/ready`, AI token metrics | ✅ **COMPLETE** | `phase41-observability.test.js` (15/15 passed) |
-| **Tier 2: Power UX** | **Phase 42** | **Universal Command Palette (`Cmd+K` / `Ctrl+K`)**<br>• Fast keyboard navigation, quick actions, global search | ⏳ **NEXT** | `phase42-command-palette.test.js` |
-| **Tier 2: Power UX** | **Phase 43** | **Task Templates & Workflow Automation**<br>• Reusable project templates & automated triggers (auto-assign, auto-tag) | ⏳ Pending | `phase43-templates.test.js` |
+| **Tier 2: Power UX** | **Phase 42** | **Universal Command Palette (`Cmd+K` / `Ctrl+K`)**<br>• Fast keyboard navigation, quick actions, global search | ✅ **COMPLETE** | `phase42-command-palette.test.js` (11/11 passed) |
+| **Tier 2: Power UX** | **Phase 43** | **Task Templates & Workflow Automation**<br>• Reusable project templates & automated triggers (auto-assign, auto-tag) | ⏳ **NEXT** | `phase43-templates.test.js` |
 | **Tier 2: Power UX** | **Phase 44** | **Custom Views & Saved Filters**<br>• Save custom search/sort filter combinations with 1-click access | ⏳ Pending | `phase44-custom-views.test.js` |
 | **Tier 2: Power UX** | **Phase 45** | **Time Tracking & Work Estimates**<br>• Log hours, stopwatch timers, estimated vs actual hours, team capacity | ⏳ Pending | `phase45-time-tracking.test.js` |
 | **Tier 3: Growth & Polish** | **Phase 46** | **Export & Reporting Engine (CSV / PDF / JSON)**<br>• Export task boards & team velocity summaries for executive reporting | ⏳ Pending | `phase46-exports.test.js` |

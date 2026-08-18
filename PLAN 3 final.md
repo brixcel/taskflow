@@ -1,18 +1,18 @@
 # TaskFlow — Full Production Plan
 
 > ## 🎯 Current Focus (read this first)
-> **Active phase: Phase 42 — Universal Command Palette (`Cmd+K` / `Ctrl+K`)**
+> **Active phase: Phase 43 — Task Templates & Workflow Automation**
 >
-> **Prior Progress: Phases 0–41 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
-> - 421+ automated tests passing with 100% success rate across 26 test suites.
-> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search, Universal Freelancer Agent & BYOK), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Turnstile CAPTCHA, Optimized Attachments, Postgres Row-Level Security (RLS), Global Input Sanitization, Server-Side Redis Sessions, Backend Redis Cache-Aside Layer, Compound Indexes, Cursor Pagination, Slow Query Performance Monitoring, and Production Observability & Prometheus Metrics (`/metrics`, `/health/live`, `/health/ready`).
+> **Prior Progress: Phases 0–42 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
+> - 432+ automated tests passing with 100% success rate across 27 test suites.
+> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search, Universal Freelancer Agent & BYOK), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Turnstile CAPTCHA, Optimized Attachments, Postgres Row-Level Security (RLS), Global Input Sanitization, Server-Side Redis Sessions, Backend Redis Cache-Aside Layer, Compound Indexes, Cursor Pagination, Slow Query Performance Monitoring, Production Observability & Prometheus Metrics (`/metrics`, `/health/live`, `/health/ready`), and Universal Command Palette (`Cmd+K` / `Ctrl+K`).
 >
 > **Prioritized Next Steps (Tier 2 Execution):**
-> 1. **Phase 42: Universal Command Palette (`Cmd+K` / `Ctrl+K`)**.
-> 2. **Phase 43: Task Templates & Workflow Automation**.
-> 3. **Phase 44: Custom Views & Saved Filters**.
-> 4. **Phase 45: Time Tracking & Work Estimates**.
-> 5. **Phase 46: Export & Reporting Engine (CSV / PDF / JSON)**.
+> 1. **Phase 43: Task Templates & Workflow Automation**.
+> 2. **Phase 44: Custom Views & Saved Filters**.
+> 3. **Phase 45: Time Tracking & Work Estimates**.
+> 4. **Phase 46: Export & Reporting Engine (CSV / PDF / JSON)**.
+> 5. **Phase 47: Interactive Demo Mode & Instant Sandbox Workspaces**.
 >
 > **This file is used across tools (Kiro and Antigravity).** See "Agent Reference" below for conventions.
 >

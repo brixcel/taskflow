@@ -32,6 +32,7 @@ import ProjectAnalytics from '../components/ProjectAnalytics';
 import ProjectGitHubView from '../components/ProjectGitHubView';
 import CalendarView from '../components/CalendarView';
 import GlobalSearchModal from '../components/GlobalSearchModal';
+import CommandPalette from '../components/CommandPalette';
 import ProjectIcon from '../components/ProjectIcon';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
@@ -775,6 +776,7 @@ export default function Dashboard() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [isDrawerEditRequested, setIsDrawerEditRequested] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const searchInputRef = useRef(null);
 
   const activeProject = projects.find(p => p.id === activeProjectId) || null;
@@ -857,8 +859,12 @@ export default function Dashboard() {
         activeEl.isContentEditable
       );
 
-      // Close drawer or modal on Escape
+      // Close drawer, modal, or command palette on Escape
       if (e.key === 'Escape') {
+        if (showCommandPalette) {
+          setShowCommandPalette(false);
+          return;
+        }
         if (selectedTask) {
           setSelectedTask(null);
           setIsDrawerEditRequested(false);
@@ -881,17 +887,17 @@ export default function Dashboard() {
         return;
       }
 
-      // ⌘K / Ctrl+K -> Global Search
+      // ⌘K / Ctrl+K -> Universal Command Palette
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
-        setShowGlobalSearch((prev) => !prev);
+        setShowCommandPalette((prev) => !prev);
         return;
       }
 
-      // '/' -> Global Search
+      // '/' -> Universal Command Palette
       if (e.key === '/') {
         e.preventDefault();
-        setShowGlobalSearch(true);
+        setShowCommandPalette(true);
         return;
       }
 
@@ -906,7 +912,7 @@ export default function Dashboard() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTask, showModal]);
+  }, [selectedTask, showModal, showCommandPalette]);
 
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -1406,16 +1412,16 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Search + ThemeToggle + New task */}
+          {/* Search / Command Palette + ThemeToggle + New task */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <button
-              onClick={() => setShowGlobalSearch(true)}
+              onClick={() => setShowCommandPalette(true)}
               className="field-input"
               style={{
                 height: 32,
                 paddingLeft: 10,
                 paddingRight: 10,
-                width: 190,
+                width: 200,
                 fontSize: 13,
                 display: 'flex',
                 alignItems: 'center',
@@ -1426,17 +1432,25 @@ export default function Dashboard() {
                 border: '1px solid var(--color-canvas-hairline, #ebebeb)',
                 borderRadius: 6,
               }}
-              aria-label="Open advanced global search (Press / or ⌘K)"
-              title="Global Search (/ or ⌘K)"
+              aria-label="Open Universal Command Palette (Press ⌘K or Ctrl+K)"
+              title="Universal Command Palette (⌘K / Ctrl+K)"
             >
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--color-canvas-body, #4d4d4d)' }}>
-                <Search size={14} style={{ color: '#adb2ba', flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: searchInput ? 'var(--color-canvas-ink, #171717)' : 'var(--color-canvas-mute, #888888)' }}>
-                  {searchInput ? searchInput : 'Search…'}
-                </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Search size={13} />
+                <span>Command Menu...</span>
               </span>
-              <kbd style={{ fontSize: 11, fontFamily: 'monospace', opacity: 0.7, background: 'var(--color-canvas-hover, #f0f0f0)', padding: '1px 5px', borderRadius: 4 }}>
-                /
+              <kbd
+                style={{
+                  fontSize: 10,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  padding: '1px 5px',
+                  borderRadius: 4,
+                  background: 'var(--color-canvas-hover, #f0f1f3)',
+                  border: '1px solid var(--color-canvas-hairline, #e8eaec)',
+                  color: 'var(--color-canvas-mute, #888888)',
+                }}
+              >
+                ⌘K
               </kbd>
             </button>
 
@@ -1804,6 +1818,39 @@ export default function Dashboard() {
         onSelectTask={handleOpenTaskById}
         onSelectProject={handleSelectProject}
         initialQuery={searchInput}
+      />
+
+      {/* Universal Command Palette (Phase 42) */}
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        projects={projects}
+        teams={teams}
+        activeTeam={activeTeam}
+        userRole={userRole}
+        onSelectTask={handleOpenTaskById}
+        onSelectProject={handleSelectProject}
+        onTeamSwitch={handleTeamSwitch}
+        onCreateTask={(status) => {
+          setModalDefaultStatus(status || 'todo');
+          setShowModal(true);
+        }}
+        onCreateWithAI={() => setShowAiModal(true)}
+        onCreateProject={() => setShowProjectModal(true)}
+        onOpenAIPlanner={() => setShowAiPlannerModal(true)}
+        onNavigateView={(view) => {
+          setViewMode(view);
+          const params = new URLSearchParams(location.search);
+          params.set('view', view);
+          navigate({ search: params.toString() });
+        }}
+        onOpenSettings={(tab) => {
+          navigate(`/settings${tab ? `?tab=${tab}` : ''}`);
+        }}
+        onOpenGlobalSearch={(initialQuery) => {
+          setSearchInput(initialQuery || '');
+          setShowGlobalSearch(true);
+        }}
       />
     </div>
   );
