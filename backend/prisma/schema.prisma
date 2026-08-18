@@ -18,6 +18,8 @@ model User {
   passwordHash    String
   name            String
   emailVerified   Boolean   @default(false)
+  isDemo          Boolean   @default(false)
+  demoExpiresAt   DateTime?
   isDeleted       Boolean   @default(false)
   deletedAt       DateTime?
   createdAt       DateTime  @default(now())
@@ -57,6 +59,8 @@ model Team {
   id                 String    @id @default(uuid())
   name               String
   ownerId            String
+  isDemo             Boolean   @default(false)
+  demoExpiresAt      DateTime?
   customGeminiKey    String?   // AES-256-GCM encrypted custom Gemini API key (BYOK)
   aiMonthlyUsage     Int       @default(0)
   aiUsageResetAt     DateTime?
