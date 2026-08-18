@@ -5,6 +5,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import { API_URL } from '../api/config';
 import SyncTaskLogo from '../components/SyncTaskLogo';
 import TurnstileWidget from '../components/TurnstileWidget';
+import { Button, Input, Label } from '../components/ui';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -15,7 +16,6 @@ function Logo({ dark = false }) {
     </div>
   );
 }
-
 
 function FieldError({ message }) {
   return (
@@ -32,13 +32,18 @@ function FieldError({ message }) {
 
 function Field({ id, label, type = 'text', value, onChange, placeholder, required, autoComplete, error, autoFocus }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <label htmlFor={id} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #3d4148)' }}>{label}</label>
-      <input
-        id={id} type={type} value={value} onChange={onChange}
-        placeholder={placeholder} required={required} autoComplete={autoComplete} autoFocus={autoFocus}
-        className="field-input"
-        style={{ borderColor: error ? 'var(--color-btn-danger-fg, #d93025)' : undefined }}
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id} className="text-[13px] font-medium text-[var(--color-canvas-body,#3d4148)]">{label}</Label>
+      <Input
+        id={id}
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        autoComplete={autoComplete}
+        autoFocus={autoFocus}
+        className={error ? 'border-[var(--color-btn-danger-fg,#d93025)]' : ''}
       />
       {error && <FieldError message={error} />}
     </div>
@@ -228,9 +233,9 @@ export default function Register() {
 
                 <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken('')} />
 
-                <button type="submit" className="btn-primary" style={{ width: '100%', height: 40, marginTop: 4 }} disabled={loading}>
+                <Button type="submit" className="w-full h-10 mt-1" loading={loading}>
                   {loading ? 'Creating account…' : 'Create account'}
-                </button>
+                </Button>
               </form>
 
               <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--color-canvas-hairline, #f0f1f3)', textAlign: 'center', fontSize: 13, color: 'var(--color-canvas-mute, #50545c)' }}>

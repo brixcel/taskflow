@@ -27,6 +27,16 @@ import {
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  Badge,
+  Button,
+} from '../components/ui';
 import { API_URL } from '../api/config';
 
 const API = API_URL;
@@ -987,7 +997,7 @@ export default function Settings() {
                 </div>
               </Card>
 
-              {/* Active Sessions & Connected Devices (Phase 38) */}
+              {/* Active Sessions & Connected Devices (Phase 38 / 46) */}
               <Card>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                   <div>
@@ -997,14 +1007,15 @@ export default function Settings() {
                     </p>
                   </div>
                   {sessions.length > 1 && (
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="sm"
                       onClick={handleLogoutAllOtherSessions}
-                      className="btn-secondary"
-                      style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      className="text-xs flex items-center gap-1.5"
                     >
                       <LogOut size={14} /> Sign out other devices
-                    </button>
+                    </Button>
                   )}
                 </div>
 
@@ -1028,76 +1039,60 @@ export default function Settings() {
                     No active sessions found.
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {sessions.map((sess) => (
-                      <div
-                        key={sess.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '12px 14px',
-                          border: '1px solid var(--color-canvas-card-border, #ebebeb)',
-                          borderRadius: 8,
-                          background: sess.isCurrent ? 'rgba(0, 112, 243, 0.03)' : 'var(--color-canvas-soft, #fafafa)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: 8,
-                              background: 'var(--color-canvas-card, #fff)',
-                              border: '1px solid var(--color-canvas-card-border, #ebebeb)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: sess.isCurrent ? '#0070f3' : 'var(--color-canvas-mute, #888)',
-                            }}
-                          >
-                            {sess.isMobile ? <Smartphone size={18} /> : <Laptop size={18} />}
-                          </div>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-canvas-ink, #171717)' }}>
-                                {sess.browser} on {sess.os}
-                              </span>
-                              {sess.isCurrent && (
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    fontWeight: 600,
-                                    textTransform: 'uppercase',
-                                    padding: '2px 6px',
-                                    borderRadius: 99,
-                                    background: 'rgba(48, 164, 108, 0.12)',
-                                    color: '#30a46c',
-                                  }}
-                                >
-                                  Current Device
+                  <Table className="mt-2">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Device & Browser</TableHead>
+                        <TableHead>IP Address</TableHead>
+                        <TableHead>Last Active</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sessions.map((sess) => (
+                        <TableRow key={sess.id} className={sess.isCurrent ? 'bg-[var(--color-canvas-subtle,#f9fafa)]' : ''}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-md bg-[var(--color-canvas-card,#fff)] border border-[var(--color-canvas-card-border,#ebebeb)] flex items-center justify-center text-[var(--color-canvas-mute,#888)] shrink-0">
+                                {sess.isMobile ? <Smartphone size={16} /> : <Laptop size={16} />}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-xs text-[var(--color-canvas-ink,#171717)]">
+                                  {sess.browser} on {sess.os}
                                 </span>
-                              )}
+                                {sess.isCurrent && (
+                                  <Badge variant="done" className="text-[10px] py-0 px-1.5 font-semibold">
+                                    Current Device
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-                            <div style={{ fontSize: 11, color: 'var(--color-canvas-mute, #888)', marginTop: 2 }}>
-                              IP: {sess.ipAddress} • Last active {new Date(sess.lastActiveAt).toLocaleString()}
-                            </div>
-                          </div>
-                        </div>
-
-                        {!sess.isCurrent && (
-                          <button
-                            type="button"
-                            onClick={() => handleRevokeSession(sess.id)}
-                            className="btn-secondary"
-                            style={{ fontSize: 12, padding: '4px 10px', color: '#e5484d' }}
-                          >
-                            Revoke
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-[var(--color-canvas-mute,#888)] font-mono">
+                            {sess.ipAddress || '—'}
+                          </TableCell>
+                          <TableCell className="text-xs text-[var(--color-canvas-mute,#888)]">
+                            {new Date(sess.lastActiveAt).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {!sess.isCurrent ? (
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleRevokeSession(sess.id)}
+                                className="h-7 px-2.5 text-xs"
+                              >
+                                Revoke
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-[var(--color-canvas-mute,#888)]">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </Card>
 

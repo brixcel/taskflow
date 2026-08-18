@@ -5,6 +5,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import { API_URL } from '../api/config';
 import SyncTaskLogo from '../components/SyncTaskLogo';
 import TurnstileWidget from '../components/TurnstileWidget';
+import { Button, Input, Label } from '../components/ui';
 
 function Logo({ dark = false }) {
   return (
@@ -16,9 +17,9 @@ function Logo({ dark = false }) {
 
 function FieldInput({ id, label, type = 'text', value, onChange, placeholder, required, autoFocus, hint }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <label htmlFor={id} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #3d4148)' }}>{label}</label>
-      <input
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id} className="text-[13px] font-medium text-[var(--color-canvas-body,#3d4148)]">{label}</Label>
+      <Input
         id={id}
         type={type}
         value={value}
@@ -26,9 +27,8 @@ function FieldInput({ id, label, type = 'text', value, onChange, placeholder, re
         placeholder={placeholder}
         required={required}
         autoFocus={autoFocus}
-        className="field-input"
       />
-      {hint && <p style={{ margin: 0, fontSize: 12, color: 'var(--color-canvas-mute, #adb2ba)' }}>{hint}</p>}
+      {hint && <p className="m-0 text-xs text-[var(--color-canvas-mute,#adb2ba)]">{hint}</p>}
     </div>
   );
 }
@@ -148,20 +148,20 @@ export default function Login() {
               placeholder="you@example.com" required autoFocus
             />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label htmlFor="password" style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-canvas-body, #3d4148)' }}>Password</label>
-                <Link to="/forgot-password" style={{ fontSize: 13, color: 'var(--color-canvas-mute, #50545c)', textDecoration: 'none' }}
-                  onMouseEnter={e => e.target.style.color = 'var(--color-canvas-ink, #0f1011)'}
-                  onMouseLeave={e => e.target.style.color = 'var(--color-canvas-mute, #50545c)'}
-                >
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password" className="text-[13px] font-medium text-[var(--color-canvas-body,#3d4148)]">Password</Label>
+                <Link to="/forgot-password" className="text-[13px] text-[var(--color-canvas-mute,#50545c)] hover:text-[var(--color-canvas-ink,#0f1011)] no-underline">
                   Forgot password?
                 </Link>
               </div>
-              <input
-                id="password" type="password"
-                value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" required className="field-input"
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
               />
             </div>
 
@@ -178,9 +178,9 @@ export default function Login() {
 
             <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken('')} />
 
-            <button type="submit" className="btn-primary" style={{ width: '100%', height: 40, marginTop: 4 }} disabled={loading}>
+            <Button type="submit" className="w-full h-10 mt-1" loading={loading}>
               {loading ? 'Signing in…' : 'Sign in'}
-            </button>
+            </Button>
           </form>
 
           <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--color-canvas-hairline, #f0f1f3)', textAlign: 'center', fontSize: 13, color: 'var(--color-canvas-mute, #50545c)' }}>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Check, Trash2 } from 'lucide-react';
 import { API_BASE } from '../api/config';
 import ProjectIcon, { PROJECT_ICON_KEYS } from './ProjectIcon';
+import { Button, Input, Textarea, Label } from './ui';
 
 const COLOR_PRESETS = [
   '#6366f1', // Indigo
@@ -330,50 +331,28 @@ export default function ProjectModal({
 
           {/* Project Name */}
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-canvas-ink, #0f1011)', marginBottom: 6 }}>
+            <Label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-canvas-ink, #0f1011)', marginBottom: 6 }}>
               Project Name <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <input
+            </Label>
+            <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Website Redesign, Mobile App v2, Marketing Launch"
               required
-              style={{
-                width: '100%',
-                padding: '9px 12px',
-                borderRadius: 6,
-                border: '1px solid var(--color-input-border, #ebebeb)',
-                background: 'var(--color-input-bg, #ffffff)',
-                color: 'var(--color-input-text, #171717)',
-                fontSize: 14,
-                boxSizing: 'border-box',
-              }}
             />
           </div>
 
           {/* Description */}
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-canvas-ink, #0f1011)', marginBottom: 6 }}>
+            <Label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-canvas-ink, #0f1011)', marginBottom: 6 }}>
               Description
-            </label>
-            <textarea
+            </Label>
+            <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe goals, milestones, or deliverables..."
               rows={3}
-              style={{
-                width: '100%',
-                padding: '9px 12px',
-                borderRadius: 6,
-                border: '1px solid var(--color-input-border, #ebebeb)',
-                background: 'var(--color-input-bg, #ffffff)',
-                color: 'var(--color-input-text, #171717)',
-                fontSize: 13,
-                resize: 'vertical',
-                boxSizing: 'border-box',
-                fontFamily: 'inherit',
-              }}
             />
           </div>
 
@@ -611,39 +590,19 @@ export default function ProjectModal({
               gap: 10,
             }}
           >
-            <button
+            <Button
               type="button"
+              variant="secondary"
               onClick={onClose}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 6,
-                border: '1px solid var(--color-btn-secondary-border, #ebebeb)',
-                background: 'var(--color-btn-secondary-bg, #ffffff)',
-                color: 'var(--color-btn-secondary-fg, #171717)',
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              disabled={loading}
-              style={{
-                padding: '8px 20px',
-                borderRadius: 6,
-                border: 'none',
-                background: 'var(--color-btn-primary-bg, #171717)',
-                color: 'var(--color-btn-primary-fg, #ffffff)',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-              }}
+              loading={loading}
             >
               {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Project'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
