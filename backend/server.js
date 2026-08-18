@@ -19,12 +19,15 @@ const usersRoutes = require('./routes/users');
 
 const http = require('http');
 const { initSocketServer } = require('./services/realtime');
+const requestId = require('./middleware/requestId');
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 const server = http.createServer(app);
 const io = initSocketServer(server);
 const PORT = process.env.PORT || 3000;
 
+app.use(requestId);
 app.use(cors());
 app.use(express.json({
   verify: (req, res, buf) => {
@@ -33,7 +36,7 @@ app.use(express.json({
 }));
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', requestId: req.id });
 });
 
 app.use('/auth', authRoutes);
@@ -56,6 +59,9 @@ app.use('/api', githubRoutes);
 app.use('/tasks/:taskId/comments', commentRoutes);
 app.use('/tasks/:taskId/activities', activityRoutes);
 app.use('/tasks/:taskId/subtasks', subtaskRoutes);
+
+// Centralized Error Handling Middleware (Charter C19)
+app.use(errorHandler);
 
 if (require.main === module) {
   server.listen(PORT, () => {

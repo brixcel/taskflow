@@ -148,13 +148,11 @@ describe('Phase 29 — AI Productivity Insights', () => {
     const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const threeDaysOverdue = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-
-    // Set Tuesday completion date
-    const tuesdayCompletion = new Date(now);
-    const day = tuesdayCompletion.getDay();
-    const diffToTuesday = tuesdayCompletion.getDate() - day + (day < 2 ? -5 : 2);
-    tuesdayCompletion.setDate(diffToTuesday);
-    tuesdayCompletion.setHours(14, 0, 0, 0);
+    // Set Tuesday completion date in past 7 days
+    const tuesdayCompletion = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const currentDay = tuesdayCompletion.getDay();
+    const dayDiff = (currentDay >= 2 ? currentDay - 2 : currentDay + 5);
+    tuesdayCompletion.setDate(tuesdayCompletion.getDate() - dayDiff);
 
     // 1. Completed tasks in current 7d window (4 tasks)
     for (let i = 1; i <= 4; i++) {

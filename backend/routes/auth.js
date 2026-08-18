@@ -6,6 +6,15 @@ const prisma   = require('../prisma');
 const validate = require('../middleware/validate');
 const schemas  = require('../validation/schemas');
 const { sendPasswordResetEmail, sendVerificationEmail } = require('../services/email');
+const {
+  authLimiter,
+  registerLimiter,
+  honeypotGuard,
+  disposableEmailGuard,
+  timingGuard,
+} = require('../middleware/authSecurity');
+const turnstileGuard = require('../middleware/turnstileGuard');
+const logger = require('../middleware/logger');
 
 const router = express.Router();
 
@@ -21,75 +30,84 @@ const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 // Generates an email verification token and dispatches the verification email.
 // Returns a JWT and user object with emailVerified: false.
 
-router.post('/register', validate(schemas.register), async (req, res) => {
-  try {
-    const { email, password, name, teamName } = req.body;
+router.post(
+  '/register',
+  registerLimiter,
+  honeypotGuard,
+  disposableEmailGuard,
+  timingGuard,
+  turnstileGuard,
+  validate(schemas.register),
+  async (req, res, next) => {
+    try {
+      const { email, password, name, teamName } = req.body;
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(409).json({ error: 'A user with this email already exists' });
-    }
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return res.status(409).json({ error: 'A user with this email already exists' });
+      }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
-      data: { email, passwordHash, name, emailVerified: false },
-    });
-
-    let defaultTeam = null;
-    if (teamName) {
-      defaultTeam = await prisma.team.create({
-        data: {
-          name: teamName,
-          ownerId: user.id,
-          memberships: {
-            create: { userId: user.id, role: 'owner' },
-          },
-        },
+      const user = await prisma.user.create({
+        data: { email, passwordHash, name, emailVerified: false },
       });
+
+      let defaultTeam = null;
+      if (teamName) {
+        defaultTeam = await prisma.team.create({
+          data: {
+            name: teamName,
+            ownerId: user.id,
+            memberships: {
+              create: { userId: user.id, role: 'owner' },
+            },
+          },
+        });
+      }
+
+      // Generate email verification token
+      const rawToken  = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + VERIFY_TOKEN_TTL_MS);
+
+      await prisma.emailVerificationToken.create({
+        data: { tokenHash, userId: user.id, expiresAt },
+      });
+
+      if (process.env.NODE_ENV === 'test') {
+        global.__lastVerifyTokenForTest__ = rawToken;
+      }
+
+      // Send verification email
+      await sendVerificationEmail(user.email, rawToken);
+
+      const token = jwt.sign(
+        {
+          userId: user.id,
+          ...(defaultTeam ? { teamId: defaultTeam.id } : {}),
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      res.status(201).json({
+        user:  { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified },
+        token,
+      });
+    } catch (error) {
+      if (logger && logger.error) logger.error({ err: error }, 'POST /auth/register error');
+      res.status(500).json({ error: 'Registration failed. Please try again.' });
     }
-
-    // Generate email verification token
-    const rawToken  = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + VERIFY_TOKEN_TTL_MS);
-
-    await prisma.emailVerificationToken.create({
-      data: { tokenHash, userId: user.id, expiresAt },
-    });
-
-    if (process.env.NODE_ENV === 'test') {
-      global.__lastVerifyTokenForTest__ = rawToken;
-    }
-
-    // Send verification email
-    await sendVerificationEmail(user.email, rawToken);
-
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        ...(defaultTeam ? { teamId: defaultTeam.id } : {}),
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.status(201).json({
-      user:  { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified },
-      token,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message, stack: error.stack });
   }
-});
+);
 
 // ─── POST /auth/login ─────────────────────────────────────────────────────────
 //
 // Returns a JWT containing both userId and the user's first (default) teamId,
 // and includes emailVerified in user object for frontend banner display.
 
-router.post('/login', validate(schemas.login), async (req, res) => {
+router.post('/login', authLimiter, turnstileGuard, validate(schemas.login), async (req, res, next) => {
   try {
     const { email, password } = req.body;
 

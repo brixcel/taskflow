@@ -4,6 +4,7 @@ import axios from 'axios';
 import ThemeToggle from '../components/ThemeToggle';
 import { API_URL } from '../api/config';
 import SyncTaskLogo from '../components/SyncTaskLogo';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 function Logo({ dark = false }) {
   return (
@@ -33,17 +34,22 @@ function FieldInput({ id, label, type = 'text', value, onChange, placeholder, re
 }
 
 export default function Login() {
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [email,          setEmail]          = useState('');
+  const [password,       setPassword]       = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [error,          setError]          = useState('');
+  const [loading,        setLoading]        = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/auth/login`, { email, password }, { timeout: 30000 });
+      const res = await axios.post(`${API_URL}/auth/login`, {
+        email,
+        password,
+        turnstileToken,
+      }, { timeout: 30000 });
       const { token, user } = res.data;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -161,6 +167,8 @@ export default function Login() {
                 <span>{error}</span>
               </div>
             )}
+
+            <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken('')} />
 
             <button type="submit" className="btn-primary" style={{ width: '100%', height: 40, marginTop: 4 }} disabled={loading}>
               {loading ? 'Signing in…' : 'Sign in'}

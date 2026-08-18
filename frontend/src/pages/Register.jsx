@@ -3,8 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import ThemeToggle from '../components/ThemeToggle';
 import { API_URL } from '../api/config';
-
 import SyncTaskLogo from '../components/SyncTaskLogo';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -50,6 +50,9 @@ export default function Register() {
   const [email,           setEmail]           = useState('');
   const [password,        setPassword]        = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [hpCompanyUrl,    setHpCompanyUrl]    = useState('');
+  const [turnstileToken,  setTurnstileToken]  = useState('');
+  const [formLoadTime]                        = useState(() => Date.now());
   const [fieldErrors,     setFieldErrors]     = useState({});
   const [error,           setError]           = useState('');
   const [loading,         setLoading]         = useState(false);
@@ -74,7 +77,12 @@ export default function Register() {
     setLoading(true);
     try {
       const res = await axios.post(`${API_URL}/auth/register`, {
-        name: name.trim(), email: email.trim(), password,
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        hp_company_url: hpCompanyUrl,
+        turnstileToken,
+        _formTime: formLoadTime,
       }, { timeout: 30000 });
       const { token, user } = res.data;
       if (token) localStorage.setItem('token', token);
@@ -168,6 +176,20 @@ export default function Register() {
               </p>
 
               <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                {/* Anti-Bot Honeypot Field (invisible to humans, filled by automated spam scripts) */}
+                <div style={{ display: 'none', position: 'absolute', left: '-9999px' }} aria-hidden="true">
+                  <label htmlFor="hp_company_url">Company Website</label>
+                  <input
+                    id="hp_company_url"
+                    type="text"
+                    name="hp_company_url"
+                    value={hpCompanyUrl}
+                    onChange={e => setHpCompanyUrl(e.target.value)}
+                    tabIndex={-1}
+                    autoComplete="off"
+                  />
+                </div>
+
                 <Field id="name" label="Full name" value={name}
                   onChange={e => { setName(e.target.value); clearFieldError('name'); }}
                   placeholder="Your name" required autoComplete="name" autoFocus error={fieldErrors.name}
@@ -195,6 +217,8 @@ export default function Register() {
                     {error}
                   </div>
                 )}
+
+                <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken('')} />
 
                 <button type="submit" className="btn-primary" style={{ width: '100%', height: 40, marginTop: 4 }} disabled={loading}>
                   {loading ? 'Creating account…' : 'Create account'}

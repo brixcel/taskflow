@@ -1209,7 +1209,7 @@ async function aggregateProductivityMetrics({
 
   // Tasks in current window vs prev window
   const completedInCurrent = window.currentStart
-    ? tasks.filter(t => t.status === 'done' && new Date(t.updatedAt) >= window.currentStart && new Date(t.updatedAt) <= window.currentEnd)
+    ? tasks.filter(t => t.status === 'done' && new Date(t.updatedAt) >= window.currentStart)
     : tasks.filter(t => t.status === 'done');
 
   const completedInPrev = (window.prevStart && window.prevEnd)
@@ -1217,7 +1217,7 @@ async function aggregateProductivityMetrics({
     : [];
 
   const createdInCurrent = window.currentStart
-    ? tasks.filter(t => new Date(t.createdAt) >= window.currentStart && new Date(t.createdAt) <= window.currentEnd)
+    ? tasks.filter(t => new Date(t.createdAt) >= window.currentStart)
     : tasks;
 
   const overdueTasks = tasks.filter(t => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now);

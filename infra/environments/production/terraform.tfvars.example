@@ -1,0 +1,10 @@
+aws_region           = "us-east-1"
+project_name         = "synctask"
+environment          = "production"
+db_instance_class    = "db.r6g.large"
+database_password    = "CHANGE_ME_PRODUCTION_STRONG_PASSWORD_12345!"
+jwt_secret           = "CHANGE_ME_PRODUCTION_JWT_SECRET_64_CHARACTERS_MINIMUM"
+gemini_api_key       = "AIzaSyDummyGeminiApiKeyForProduction"
+resend_api_key       = "re_dummy_resend_api_key_production"
+cors_allowed_origins = ["https://app.synctask.com", "https://synctask.com"]
+alert_email          = "oncall@synctask.com"

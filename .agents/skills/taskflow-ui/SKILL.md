@@ -250,3 +250,25 @@ Before committing any frontend UI change, verify:
 - [ ] **Keyboard Usability**: Tested `Tab` navigation order, `Esc` drawer closure, and form submission with `Enter`.
 - [ ] **No Inline Style Sprawl**: Verified CSS variables and tokens are used instead of ad-hoc hex values.
 - [ ] **Production Build**: Verified clean bundle compilation via `cd frontend && npm run build`.
+
+---
+
+## 10. Phase 46 — Design System Migration to shadcn/ui
+
+> **Reference**: [`SYNCTASK_2_0_SCALING_UI_ADDENDUM.md`](file:///home/brexc/projects/taskflow/SYNCTASK_2_0_SCALING_UI_ADDENDUM.md) (Phase 46)
+
+Adopt `shadcn/ui` for primitives without disrupting `DESIGN.md` aesthetics or breaking existing component styling.
+
+### Migration Principles
+1. **Incremental Replacement**: Migrate one shared primitive at a time across all screens; never do a big-bang rewrite.
+2. **Preserve Design Tokens**: Map shadcn/ui themes and Tailwind variables to the existing `DESIGN.md` CSS tokens in `index.css` rather than accepting generic defaults.
+3. **Bespoke Components Stay Custom**: Kanban boards, task detail drawers, timeline views, and AI review panels stay custom — shadcn is for primitives.
+4. **Clean Retirement**: Only delete old design system components once all call sites have migrated and verified.
+
+### Migration Sequence:
+1. `Button`, `Input`, `Label`, `Textarea`
+2. `Dialog` / `Modal`, `DropdownMenu`, `Popover`
+3. `Card`, `Badge`, `Tabs`
+4. `Table` (for sessions, member tables, search tables)
+5. `Toast` / Notifications
+

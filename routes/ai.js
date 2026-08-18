@@ -16,6 +16,7 @@ const {
 } = require('../services/ai');
 const { emitProjectCreated, emitTaskCreated } = require('../services/realtime');
 const logger = require('../middleware/logger');
+const aiCostFirewall = require('../middleware/aiCostFirewall');
 
 const aiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -25,7 +26,7 @@ const aiLimiter = rateLimit({
   message: { error: 'Too many AI requests. Please wait a few minutes before trying again.' },
 });
 
-router.use(requireAuth, resolveTeam, aiLimiter);
+router.use(requireAuth, resolveTeam, aiLimiter, aiCostFirewall);
 
 router.post('/generate-task', validate(schemas.aiTaskGenerateRequest), async (req, res) => {
   try {

@@ -1,27 +1,21 @@
 # TaskFlow — Full Production Plan
 
 > ## 🎯 Current Focus (read this first)
-> **Active phase: Phase 16 — Production Deployment Complete & Verified**
+> **Active phase: Phase 35 — AI Token Optimization & BYOK Key Integration**
 >
-> **Phase 16 Status: ✅ COMPLETE** — Production deployment preparation, separate database environments configured, security headers & CORS locked, 404 routing added, full production README with ERD & runbooks.
-> **Pre-Deployment QA Status: ✅ COMPLETE** — Manual QA checklist verified across auth, multi-tenancy, RBAC, CRUD, responsive layouts, 404 handling, and database purge utilities.
-> **Phase 15 Status: ✅ COMPLETE** — CI/CD Pipeline (`.github/workflows/ci.yml`, `.github/workflows/deploy-staging.yml`)
-> **Phase 14 Status: ✅ COMPLETE** — Frontend Production Polish (ErrorBoundary + Sentry capture, TaskSkeleton, mobile drawer sidebar, WCAG AA accessibility)
-> **Phase 13.5 Status: ✅ COMPLETE** — Design System (Vercel-inspired theme in `DESIGN.md`)
-> **Phase 13 Status: ✅ COMPLETE** — Due Dates (overdue indicator, timezone handling verified)
-> **Phase 12 Status: ✅ COMPLETE** — Terms of Service & Privacy Policy (`Terms.jsx`, `Privacy.jsx`)
-> **Phases 0–11 Status: ✅ COMPLETE** — All core multi-tenant, auth, validation, security, backups, and observability phases complete.
+> **Prior Progress: Phases 0–34 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
+> - 352 automated tests passing with 100% success rate across 19 test suites.
+> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Request ID tracing (C18), Error Masking (C19), Honeypot, Disposable Email Blocking, and Cloudflare Turnstile CAPTCHA.
 >
-> **Previously completed:**
-> - Phase 11: GDPR-Lite data export (`GET /users/me/export`) & account soft-deletion/anonymization (`DELETE /users/me`)
-> - Phase 10: Automated backups, restore engine, verification suite & disaster recovery runbook
-> - Phase 9: Sentry error tracking (backend + frontend), sensitive field scrubbing
-> - Phase 8: Rate limiting (429 on `/auth/login`, `/auth/register`, `/auth/forgot-password`), `GET /health` endpoint, pagination on task list and activity log, Dockerfile + docker-compose
-> - Phase 7: `helmet` headers, CORS locked to `CORS_ORIGIN`, startup env-var guard, `npm audit` script — tests in `security.test.js` and `phase7-extended.test.js`
-> - Phase 6: Email verification on register, `GET /auth/verify-email`, resend endpoint, `VerifyEmail.jsx` frontend page, unverified banner in Dashboard
-> - Phase 5: Password reset with nodemailer, `ForgotPassword.jsx`, `ResetPassword.jsx`
+> **Prioritized Next Steps (Tier 1 Execution):**
+> 1. **Phase 35: AI Token Optimization & BYOK Key Integration** (Prompt trimming, `maxOutputTokens` caps, BYOK key settings).
+> 2. **Phase 36: Optimized File & Image Attachments with Pre-Upload Compression** (Canvas WebP/JPEG 12MB → 250KB pre-compression).
+> 3. **Phase 37: Postgres Row-Level Security (RLS)**.
+> 4. **Phase 38: Server-Side Redis Sessions & Instant Token Revocation**.
+> 5. **Phase 39: Backend Redis Caching & Cache-Aside Layer**.
+> 6. **Phase 40: Performance Engineering & DB Query Optimization**.
 >
-> **This file is now used across two tools — Kiro (Claude) and Antigravity (Gemini Pro).** See "Agent Reference" below for conventions both need, and the Antigravity-specific subsection for quota/session management.
+> **This file is used across tools (Kiro and Antigravity).** See "Agent Reference" below for conventions.
 >
 > **When tagging this file, say which phase you mean** — e.g. "using PLAN.md, implement Phase 16" — so the agent doesn't try to reason about all 18 phases at once.
 >

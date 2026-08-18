@@ -1,0 +1,8 @@
+aws_region        = "us-east-1"
+project_name      = "synctask"
+environment       = "staging"
+database_password = "CHANGE_ME_STAGING_PASSWORD_SECURE_123!"
+jwt_secret        = "CHANGE_ME_STAGING_JWT_SECRET_LONG_KEY"
+gemini_api_key    = "AIzaSyDummyGeminiApiKeyForStaging"
+resend_api_key    = "re_dummy_resend_api_key"
+alert_email       = "devops-staging@synctask.local"

@@ -31,14 +31,28 @@
 | **Milestone I** | **Phase 30** | Natural-Language Search | ✅ **COMPLETE** | `phase30-ai-search.test.js` (23/23 passed) |
 | **Milestone J** | **Phase 31** | Webhooks & API Keys | ✅ **COMPLETE** | `phase31-webhooks.test.js` (18/18 passed) |
 | **Milestone J** | **Phase 32** | GitHub Integration | ✅ **COMPLETE** | `phase32-github.test.js` (22/22 passed) |
-| **Milestone J** | **Phase 33** | Slack / Discord Integration | ⏳ Pending | `phase33-integrations.test.js` |
-| **Milestone K** | **Phase 34** | Infrastructure as Code | ⏳ Pending | `phase34-iac.test.js` |
-| **Milestone K** | **Phase 35** | Production Observability | ⏳ Pending | `phase35-observability.test.js` |
-| **Milestone K** | **Phase 36** | Performance Engineering | ⏳ Pending | `phase36-performance.test.js` |
-| **Milestone L** | **Phase 37** | Command Palette | ⏳ Pending | `phase37-command-palette.test.js` |
-| **Milestone L** | **Phase 38** | Custom Views | ⏳ Pending | `phase38-custom-views.test.js` |
-| **Milestone L** | **Phase 39** | Task Templates | ⏳ Pending | `phase39-templates.test.js` |
-| **Milestone L** | **Phase 40** | Demo Mode | ⏳ Pending | `phase40-demo.test.js` |
+| **Milestone J** | **Phase 33** | Slack / Discord Integration | ✅ **COMPLETE** | `phase33-integrations.test.js` (14/14 passed) |
+| **Milestone K** | **Phase 34** | Infrastructure as Code (IaC) | ✅ **COMPLETE** | `phase34-iac.test.js` (34/34 passed) |
+| **Charter C12-C19** | **Hardening** | Error Masking, Tracing, Anti-Spam & Turnstile CAPTCHA | ✅ **COMPLETE** | `anti-spam.test.js` (10/10 passed) |
+
+### 🚀 Prioritized Next Phases (Execution Sequence)
+
+| Priority Tier | Phase | Title & Description | Status | Target Test Suite |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tier 1: AI Efficiency** | **Phase 35** | **AI Token Optimization & BYOK Key Integration**<br>• Trim prompt templates in "Create with AI" & Project Planner<br>• Strict `maxOutputTokens` & max 3 subtasks to eliminate token waste<br>• Team Settings: "Bring Your Own Gemini Key" (BYOK) with DB encryption | ⏳ **NEXT** | `phase35-ai-byok.test.js` |
+| **Tier 1: Media Engine** | **Phase 36** | **Optimized File & Image Attachments with Pre-Upload Compression**<br>• Task & comment file attachments (`POST /tasks/:id/attachments`)<br>• Browser HTML5 canvas pre-upload compression (WebP/JPEG 1920px, quality 0.8, 12MB → 250KB)<br>• Size caps (5MB max) & image preview drawer | ⏳ Pending | `phase36-attachments.test.js` |
+| **Tier 1: Enterprise Core** | **Phase 37** | **Postgres Row-Level Security (RLS)**<br>• Engine-level PostgreSQL multi-tenant isolation policies | ⏳ Pending | `phase37-rls.test.js` |
+| **Tier 1: Enterprise Core** | **Phase 38** | **Server-Side Redis Sessions & Instant Token Revocation**<br>• Redis session store & instant logout/eviction token revocation | ⏳ Pending | `phase38-redis-sessions.test.js` |
+| **Tier 1: Enterprise Core** | **Phase 39** | **Backend Redis Caching & Cache-Aside Layer**<br>• Sub-5ms caching for team memberships, project trees & dashboard metrics | ⏳ Pending | `phase39-redis-cache.test.js` |
+| **Tier 1: Enterprise Core** | **Phase 40** | **Performance Engineering & DB Query Optimization**<br>• Compound indexes, cursor pagination, slow query logging | ⏳ Pending | `phase40-performance.test.js` |
+| **Tier 1: Observability** | **Phase 41** | **Production Observability & Prometheus Metrics**<br>• Prometheus `/metrics`, `/health/live`, `/health/ready`, AI token metrics | ⏳ Pending | `phase41-observability.test.js` |
+| **Tier 2: Power UX** | **Phase 42** | **Universal Command Palette (`Cmd+K` / `Ctrl+K`)**<br>• Fast keyboard navigation, quick actions, global search | ⏳ Pending | `phase42-command-palette.test.js` |
+| **Tier 2: Power UX** | **Phase 43** | **Task Templates & Workflow Automation**<br>• Reusable project templates & automated triggers (auto-assign, auto-tag) | ⏳ Pending | `phase43-templates.test.js` |
+| **Tier 2: Power UX** | **Phase 44** | **Custom Views & Saved Filters**<br>• Save custom search/sort filter combinations with 1-click access | ⏳ Pending | `phase44-custom-views.test.js` |
+| **Tier 2: Power UX** | **Phase 45** | **Time Tracking & Work Estimates**<br>• Log hours, stopwatch timers, estimated vs actual hours, team capacity | ⏳ Pending | `phase45-time-tracking.test.js` |
+| **Tier 3: Growth & Polish** | **Phase 46** | **Export & Reporting Engine (CSV / PDF / JSON)**<br>• Export task boards & team velocity summaries for executive reporting | ⏳ Pending | `phase46-exports.test.js` |
+| **Tier 3: Growth & Polish** | **Phase 47** | **Interactive Demo Mode & Instant Sandbox Workspaces**<br>• 1-click test drive environment pre-populated with realistic workspaces | ⏳ Pending | `phase47-demo.test.js` |
+| **Tier 3: Growth & Polish** | **Phase 48** | **UI Modernization & TypeScript Migration**<br>• Incremental UI component refinement (shadcn/ui / Tailwind tokens) followed by full TypeScript migration | ⏳ Pending | `phase48-modernization.test.js` |
 
 ---
 
