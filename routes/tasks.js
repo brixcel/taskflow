@@ -19,6 +19,7 @@ const {
 } = require('../services/realtime');
 const { dispatchWebhookEvent } = require('../services/webhooks');
 const { dispatchChatEvent } = require('../services/chatIntegrations');
+const { invalidate } = require('../services/cache');
 
 const router = express.Router();
 
@@ -136,6 +137,9 @@ router.post('/', validate(schemas.taskCreate), async (req, res) => {
       dispatchWebhookEvent(req.teamId, 'task.assigned', task);
       dispatchChatEvent(req.teamId, 'task_assigned', { task, actor: req.user });
     }
+
+    // Invalidate project and analytics caches (Phase 39)
+    await invalidate(`cache:team:${req.teamId}:projects`, `cache:team:${req.teamId}:analytics`);
 
     res.status(201).json({ task });
   } catch (error) {
@@ -757,6 +761,9 @@ router.patch('/:id', validate(schemas.taskUpdate), async (req, res) => {
       dispatchChatEvent(req.teamId, 'task_assigned', { task, actor: req.user });
     }
 
+    // Invalidate project and analytics caches (Phase 39)
+    await invalidate(`cache:team:${req.teamId}:projects`, `cache:team:${req.teamId}:analytics`);
+
     res.json({ task });
   } catch (error) {
     if (logger && logger.error) {
@@ -793,6 +800,9 @@ router.delete('/:id', async (req, res) => {
     await prisma.task.delete({ where: { id } });
 
     emitTaskDeleted(req.teamId, id);
+
+    // Invalidate project and analytics caches (Phase 39)
+    await invalidate(`cache:team:${req.teamId}:projects`, `cache:team:${req.teamId}:analytics`);
 
     res.status(204).send();
   } catch (error) {

@@ -5,6 +5,7 @@ const requireRole = require('../middleware/requireRole');
 const validate = require('../middleware/validate');
 const schemas = require('../validation/schemas');
 const { revokeAllUserSessions } = require('../services/session');
+const { getOrSet, invalidate, invalidateTeamCache, invalidateUserCache, TTL } = require('../services/cache');
 
 const router = express.Router();
 
@@ -14,21 +15,23 @@ router.use(requireAuth);
 
 router.get('/me', async (req, res) => {
   try {
-    const memberships = await prisma.teamMembership.findMany({
-      where: { userId: req.userId },
-      orderBy: { joinedAt: 'asc' },
-      include: {
-        team: {
-          select: { id: true, name: true, ownerId: true, createdAt: true },
+    const teams = await getOrSet(`cache:user:${req.userId}:teams`, TTL.USER_TEAMS, async () => {
+      const memberships = await prisma.teamMembership.findMany({
+        where: { userId: req.userId },
+        orderBy: { joinedAt: 'asc' },
+        include: {
+          team: {
+            select: { id: true, name: true, ownerId: true, createdAt: true },
+          },
         },
-      },
-    });
+      });
 
-    const teams = memberships.map((m) => ({
-      ...m.team,
-      role: m.role,
-      joinedAt: m.joinedAt,
-    }));
+      return memberships.map((m) => ({
+        ...m.team,
+        role: m.role,
+        joinedAt: m.joinedAt,
+      }));
+    });
 
     res.json({ teams });
   } catch (error) {
@@ -57,6 +60,8 @@ router.post('/', validate(schemas.teamCreate), async (req, res) => {
 
       return { team: newTeam };
     });
+
+    await invalidateUserCache(req.userId);
 
     res.status(201).json({ team });
   } catch (error) {
@@ -116,6 +121,10 @@ router.post('/:id/members', validate(schemas.memberAdd), async (req, res) => {
       });
     }
 
+    // Invalidate caches
+    await invalidate(`cache:team:${teamId}:members`);
+    await invalidateUserCache(targetUserId);
+
     res.status(201).json({ membership });
   } catch (error) {
     console.error(error);
@@ -147,6 +156,9 @@ router.post('/join', validate(schemas.teamJoin), async (req, res) => {
       update: {},
     });
 
+    await invalidate(`cache:team:${team.id}:members`);
+    await invalidateUserCache(req.userId);
+
     res.status(201).json({
       team: { id: team.id, name: team.name },
       membership,
@@ -170,20 +182,25 @@ router.get('/:id/members', async (req, res) => {
     if (!requesterMembership) {
       return res.status(403).json({ error: 'You are not a member of this team' });
     }
-    const memberships = await prisma.teamMembership.findMany({
-      where: { teamId },
-      orderBy: { joinedAt: 'asc' },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-      },
+
+    const members = await getOrSet(`cache:team:${teamId}:members`, TTL.MEMBERS, async () => {
+      const memberships = await prisma.teamMembership.findMany({
+        where: { teamId },
+        orderBy: { joinedAt: 'asc' },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
+
+      return memberships.map((m) => ({
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        role: m.role,
+        joinedAt: m.joinedAt,
+      }));
     });
-    const members = memberships.map((m) => ({
-      id: m.user.id,
-      name: m.user.name,
-      email: m.user.email,
-      role: m.role,
-      joinedAt: m.joinedAt,
-    }));
+
     res.json({ members });
   } catch (error) {
     console.error(error);
@@ -242,6 +259,10 @@ router.delete('/:id/members/:userId', resolveTeamFromParam, requireRole('owner')
     // Instantly revoke active sessions for evicted member (Phase 38)
     await revokeAllUserSessions(targetUserId);
 
+    // Invalidate caches (Phase 39)
+    await invalidate(`cache:team:${teamId}:members`);
+    await invalidateUserCache(targetUserId);
+
     res.status(204).send();
   } catch (error) {
     console.error(error);
@@ -284,6 +305,9 @@ router.patch('/:id/members/:userId/role', resolveTeamFromParam, requireRole('own
         data: { teamId, teamName: team?.name, role },
       });
     }
+
+    // Invalidate team members cache (Phase 39)
+    await invalidate(`cache:team:${teamId}:members`);
 
     res.json({ membership: updated });
   } catch (error) {

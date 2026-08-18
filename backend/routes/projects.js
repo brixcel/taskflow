@@ -14,6 +14,7 @@ const {
 } = require('../services/realtime');
 const { dispatchWebhookEvent } = require('../services/webhooks');
 const { dispatchChatEvent } = require('../services/chatIntegrations');
+const { getOrSet, invalidate, TTL } = require('../services/cache');
 
 const router = express.Router({ mergeParams: true });
 
@@ -76,64 +77,71 @@ function computeProjectStats(project) {
 router.get('/', async (req, res) => {
   try {
     const { status, search, archived } = req.query;
+    const isDefaultQuery = !status && !search && !archived;
 
-    const where = {
-      teamId: req.teamId,
-    };
+    const fetchProjectsFromDb = async () => {
+      const where = {
+        teamId: req.teamId,
+      };
 
-    if (archived === 'true') {
-      where.isArchived = true;
-    } else if (archived === 'all') {
-      // Return both active and archived
-    } else {
-      where.isArchived = false;
-    }
+      if (archived === 'true') {
+        where.isArchived = true;
+      } else if (archived === 'all') {
+        // Return both active and archived
+      } else {
+        where.isArchived = false;
+      }
 
-    if (status && status !== 'all') {
-      where.status = status;
-    }
+      if (status && status !== 'all') {
+        where.status = status;
+      }
 
-    if (search && search.trim()) {
-      const q = search.trim();
-      where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
-      ];
-    }
+      if (search && search.trim()) {
+        const q = search.trim();
+        where.OR = [
+          { name: { contains: q, mode: 'insensitive' } },
+          { description: { contains: q, mode: 'insensitive' } },
+        ];
+      }
 
-    const rawProjects = await prisma.project.findMany({
-      where,
-      orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
-      include: {
-        createdBy: {
-          select: { id: true, name: true, email: true },
-        },
-        members: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true },
+      const rawProjects = await prisma.project.findMany({
+        where,
+        orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
+        include: {
+          createdBy: {
+            select: { id: true, name: true, email: true },
+          },
+          members: {
+            include: {
+              user: {
+                select: { id: true, name: true, email: true },
+              },
+            },
+          },
+          tasks: {
+            select: {
+              id: true,
+              status: true,
+              priority: true,
+              dueDate: true,
             },
           },
         },
-        tasks: {
-          select: {
-            id: true,
-            status: true,
-            priority: true,
-            dueDate: true,
-          },
-        },
-      },
-    });
+      });
 
-    const projects = rawProjects.map((p) => {
-      const stats = computeProjectStats(p);
-      const { tasks, ...rest } = p;
-      return {
-        ...rest,
-        stats,
-      };
-    });
+      return rawProjects.map((p) => {
+        const stats = computeProjectStats(p);
+        const { tasks, ...rest } = p;
+        return {
+          ...rest,
+          stats,
+        };
+      });
+    };
+
+    const projects = isDefaultQuery
+      ? await getOrSet(`cache:team:${req.teamId}:projects`, TTL.PROJECTS, fetchProjectsFromDb)
+      : await fetchProjectsFromDb();
 
     res.json({ projects, count: projects.length });
   } catch (error) {
@@ -252,6 +260,9 @@ router.post('/', validate(schemas.projectCreate), async (req, res) => {
 
     emitProjectCreated(req.teamId, responsePayload);
     dispatchWebhookEvent(req.teamId, 'project.created', responsePayload);
+
+    // Invalidate project cache (Phase 39)
+    await invalidate(`cache:team:${req.teamId}:projects`, `cache:team:${req.teamId}:analytics`);
 
     res.status(201).json({ project: responsePayload });
   } catch (error) {
@@ -408,6 +419,9 @@ router.patch('/:id', validate(schemas.projectUpdate), async (req, res) => {
     emitProjectUpdated(req.teamId, responsePayload);
     dispatchChatEvent(req.teamId, 'project_updated', { project: responsePayload, actor: req.user });
 
+    // Invalidate project cache (Phase 39)
+    await invalidate(`cache:team:${req.teamId}:projects`, `cache:team:${req.teamId}:analytics`);
+
     res.json({ project: responsePayload });
   } catch (error) {
     if (logger && logger.error) {
@@ -465,6 +479,9 @@ router.delete('/:id', async (req, res) => {
     });
 
     emitProjectDeleted(req.teamId, id);
+
+    // Invalidate project cache (Phase 39)
+    await invalidate(`cache:team:${req.teamId}:projects`, `cache:team:${req.teamId}:analytics`);
 
     res.json({ success: true, message: 'Project deleted successfully' });
   } catch (error) {
