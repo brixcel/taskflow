@@ -9,6 +9,7 @@ const { sendPasswordResetEmail, sendVerificationEmail } = require('../services/e
 const {
   createSession,
   revokeSession,
+  revokeOtherSessions,
   revokeAllUserSessions,
   listUserSessions,
 } = require('../services/session');
@@ -226,18 +227,43 @@ router.post('/logout-all', requireAuth, async (req, res) => {
   }
 });
 
-// ─── DELETE /auth/sessions/:sessionId — Revoke Remote Session ──────
+// ─── POST /auth/sessions/revoke-others — Revoke All Other Sessions ───────────
 
-router.delete('/sessions/:sessionId', requireAuth, async (req, res) => {
+router.post('/sessions/revoke-others', requireAuth, async (req, res) => {
   try {
-    const { sessionId } = req.params;
-    await revokeSession(sessionId, req.userId);
-    res.json({ success: true, message: 'Session revoked successfully' });
+    const count = await revokeOtherSessions(req.userId, req.sessionId);
+    res.json({
+      success: true,
+      message: `Signed out of ${count} other active session(s)`,
+      revokedCount: count,
+    });
   } catch (error) {
-    console.error('DELETE /auth/sessions/:sessionId error:', error);
-    res.status(500).json({ error: 'Failed to revoke session' });
+    console.error('POST /auth/sessions/revoke-others error:', error);
+    res.status(500).json({ error: 'Failed to revoke other sessions' });
   }
 });
+
+// ─── DELETE & POST /auth/sessions/:sessionId — Revoke Remote Session ────────
+
+const handleRevokeSingleSession = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const result = await revokeSession(sessionId, req.userId);
+    if (result.notFound) {
+      return res.status(404).json({ error: 'Session not found or already revoked' });
+    }
+    if (result.forbidden) {
+      return res.status(403).json({ error: 'You are not authorized to revoke this session' });
+    }
+    res.json({ success: true, message: 'Session revoked successfully' });
+  } catch (error) {
+    console.error('Revoke session error:', error);
+    res.status(500).json({ error: 'Failed to revoke session' });
+  }
+};
+
+router.delete('/sessions/:sessionId', requireAuth, handleRevokeSingleSession);
+router.post('/sessions/:sessionId/revoke', requireAuth, handleRevokeSingleSession);
 
 // ─── GET /auth/verify-email ───────────────────────────────────────────────────
 //

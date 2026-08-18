@@ -320,14 +320,14 @@ export default function Settings() {
   const handleLogoutAllOtherSessions = async () => {
     if (!window.confirm('Sign out of all other devices?')) return;
     try {
-      await axios.post(`${API}/auth/logout-all`, {}, {
+      await axios.post(`${API}/auth/sessions/revoke-others`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchSessions();
       setSessionActionMsg('Successfully signed out of all other devices.');
       setTimeout(() => setSessionActionMsg(''), 3000);
     } catch (err) {
-      setSessionActionError(err.response?.data?.error || 'Failed to revoke sessions');
+      setSessionActionError(err.response?.data?.error || 'Failed to revoke other sessions');
     }
   };
 

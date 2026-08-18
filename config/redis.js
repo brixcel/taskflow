@@ -87,6 +87,50 @@ class InMemoryRedisMock {
     return 'OK';
   }
 
+  pipeline() {
+    return this.multi();
+  }
+
+  multi() {
+    const ops = [];
+    const self = this;
+    const chain = {
+      set(key, value, mode, duration) {
+        ops.push(() => self.set(key, value, mode, duration));
+        return chain;
+      },
+      del(...keys) {
+        ops.push(() => self.del(...keys));
+        return chain;
+      },
+      sadd(key, ...members) {
+        ops.push(() => self.sadd(key, ...members));
+        return chain;
+      },
+      srem(key, ...members) {
+        ops.push(() => self.srem(key, ...members));
+        return chain;
+      },
+      expire(key, seconds) {
+        ops.push(() => self.expire(key, seconds));
+        return chain;
+      },
+      async exec() {
+        const results = [];
+        for (const op of ops) {
+          try {
+            const res = await op();
+            results.push([null, res]);
+          } catch (err) {
+            results.push([err, null]);
+          }
+        }
+        return results;
+      },
+    };
+    return chain;
+  }
+
   _isExpired(key) {
     if (!this.ttls.has(key)) return false;
     if (Date.now() > this.ttls.get(key)) {

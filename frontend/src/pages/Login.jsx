@@ -43,6 +43,12 @@ export default function Login() {
 
   // Navigation Guard: Redirect already authenticated users straight to Dashboard
   useEffect(() => {
+    const notice = sessionStorage.getItem('auth_notice');
+    if (notice) {
+      setError(notice);
+      sessionStorage.removeItem('auth_notice');
+    }
+
     const token = localStorage.getItem('token');
     if (token) {
       navigate('/dashboard', { replace: true });
