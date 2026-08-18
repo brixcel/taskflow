@@ -19,6 +19,7 @@ const usersRoutes = require('./routes/users');
 const attachmentsRoutes = require('./routes/attachments');
 const taskTemplatesRoutes = require('./routes/taskTemplates');
 const viewsRoutes = require('./routes/views');
+const { timeRouter, taskTimeRouter } = require('./routes/timeTracking');
 
 const http = require('http');
 const { initSocketServer } = require('./services/realtime');
@@ -63,6 +64,8 @@ app.use('/developer', developerRoutes);
 app.use('/developer', integrationsRoutes);
 app.use('/task-templates', taskTemplatesRoutes);
 app.use('/views', viewsRoutes);
+app.use('/time', timeRouter);
+app.use('/tasks', taskTimeRouter);
 app.use(githubRoutes);
 app.use('/api', githubRoutes);
 app.use(attachmentsRoutes);

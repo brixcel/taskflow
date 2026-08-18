@@ -15,6 +15,10 @@ import {
   Activity,
   Eye,
   Link,
+  Play,
+  Square,
+  Timer,
+  History,
 } from 'lucide-react';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
@@ -41,6 +45,24 @@ function formatShortDate(isoString) {
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return null;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function formatDurationMins(mins) {
+  if (!mins || mins <= 0) return '0m';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+function formatSecondsToHMS(totalSecs) {
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
 }
 
 function isSubtaskOverdue(dueDateStr, completed) {
@@ -203,9 +225,151 @@ export default function TaskDetailDrawer({
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [commentDraft,     setCommentDraft]     = useState('');
 
+  // Time Tracking & Estimates State (Phase 45)
+  const [timeEntries, setTimeEntries] = useState([]);
+  const [totalTrackedMinutes, setTotalTrackedMinutes] = useState(0);
+  const [estimatedMinutes, setEstimatedMinutes] = useState(task?.estimatedMinutes || 0);
+  const [isRunningTimer, setIsRunningTimer] = useState(false);
+  const [runningEntryId, setRunningEntryId] = useState(null);
+  const [timerElapsedSeconds, setTimerElapsedSeconds] = useState(0);
+  const [showManualLog, setShowManualLog] = useState(false);
+  const [logDurationMins, setLogDurationMins] = useState(30);
+  const [logDescription, setLogDescription] = useState('');
+  const [logIsBillable, setLogIsBillable] = useState(true);
+  const [isLoggingTime, setIsLoggingTime] = useState(false);
+  const [estimateInput, setEstimateInput] = useState('');
+  const [isEditingEstimate, setIsEditingEstimate] = useState(false);
+
   const titleInputRef = useRef(null);
   const subtaskInputRef = useRef(null);
   const typingTimerRef = useRef(null);
+
+  // Fetch time entries and running timer status
+  const fetchTimeData = async () => {
+    if (!task?.id) return;
+    try {
+      const res = await axios.get(`${API}/tasks/${task.id}/time`, {
+        headers: { Authorization: `Bearer ${token}`, 'X-Team-Id': activeTeam?.id },
+      });
+      setTimeEntries(res.data.entries || []);
+      setTotalTrackedMinutes(res.data.totalDurationMinutes || 0);
+      setEstimatedMinutes(res.data.task?.estimatedMinutes || 0);
+
+      // Check if user has active running timer on this task
+      const runRes = await axios.get(`${API}/time/running`, {
+        headers: { Authorization: `Bearer ${token}`, 'X-Team-Id': activeTeam?.id },
+      });
+      if (runRes.data.running && runRes.data.entry?.taskId === task.id) {
+        setIsRunningTimer(true);
+        setRunningEntryId(runRes.data.entry.id);
+        setTimerElapsedSeconds(runRes.data.elapsedSeconds || 0);
+      } else {
+        setIsRunningTimer(false);
+        setRunningEntryId(null);
+      }
+    } catch (err) {
+      console.error('Error fetching time data:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (task?.id) {
+      fetchTimeData();
+    }
+  }, [task?.id]);
+
+  // Live stopwatch counter interval
+  useEffect(() => {
+    let interval = null;
+    if (isRunningTimer) {
+      interval = setInterval(() => {
+        setTimerElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRunningTimer]);
+
+  const handleStartTimer = async () => {
+    try {
+      const res = await axios.post(`${API}/tasks/${task.id}/time/start`, {}, {
+        headers: { Authorization: `Bearer ${token}`, 'X-Team-Id': activeTeam?.id },
+      });
+      setIsRunningTimer(true);
+      setRunningEntryId(res.data.timeEntry?.id);
+      setTimerElapsedSeconds(0);
+      fetchTimeData();
+    } catch (err) {
+      console.error('Error starting timer:', err);
+    }
+  };
+
+  const handleStopTimer = async () => {
+    try {
+      await axios.post(`${API}/tasks/${task.id}/time/stop`, {}, {
+        headers: { Authorization: `Bearer ${token}`, 'X-Team-Id': activeTeam?.id },
+      });
+      setIsRunningTimer(false);
+      setRunningEntryId(null);
+      setTimerElapsedSeconds(0);
+      fetchTimeData();
+    } catch (err) {
+      console.error('Error stopping timer:', err);
+    }
+  };
+
+  const handleManualLog = async (e) => {
+    e.preventDefault();
+    if (!logDurationMins || logDurationMins <= 0) return;
+    setIsLoggingTime(true);
+    try {
+      await axios.post(
+        `${API}/tasks/${task.id}/time/log`,
+        {
+          durationMinutes: parseInt(logDurationMins, 10),
+          description: logDescription.trim() || null,
+          isBillable: logIsBillable,
+        },
+        { headers: { Authorization: `Bearer ${token}`, 'X-Team-Id': activeTeam?.id } }
+      );
+      setShowManualLog(false);
+      setLogDescription('');
+      setLogDurationMins(30);
+      fetchTimeData();
+    } catch (err) {
+      console.error('Error logging time:', err);
+    } finally {
+      setIsLoggingTime(false);
+    }
+  };
+
+  const handleSaveEstimate = async () => {
+    const mins = estimateInput === '' ? null : parseInt(estimateInput, 10);
+    try {
+      await axios.patch(
+        `${API}/tasks/${task.id}/estimate`,
+        { estimatedMinutes: mins },
+        { headers: { Authorization: `Bearer ${token}`, 'X-Team-Id': activeTeam?.id } }
+      );
+      setEstimatedMinutes(mins);
+      setIsEditingEstimate(false);
+      setTask((prev) => ({ ...prev, estimatedMinutes: mins }));
+    } catch (err) {
+      console.error('Error updating estimate:', err);
+    }
+  };
+
+  const handleDeleteTimeEntry = async (entryId) => {
+    try {
+      await axios.delete(`${API}/time/${entryId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'X-Team-Id': activeTeam?.id },
+      });
+      fetchTimeData();
+    } catch (err) {
+      console.error('Error deleting time entry:', err);
+    }
+  };
 
   const {
     joinTask,
@@ -1867,6 +2031,26 @@ export default function TaskDetailDrawer({
                       </span>
                     )}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('time')}
+                    style={{
+                      padding: '8px 14px', fontSize: 13, fontWeight: 600,
+                      color: activeTab === 'time' ? 'var(--color-canvas-ink, #0f1011)' : 'var(--color-canvas-mute, #888888)',
+                      borderBottom: activeTab === 'time' ? '2px solid #0070f3' : '2px solid transparent',
+                      background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    <Clock size={13} />
+                    Time
+                    {totalTrackedMinutes > 0 && (
+                      <span style={{ fontSize: 11, padding: '1px 5px', borderRadius: 99, background: 'rgba(99, 102, 241, 0.12)', color: '#6366f1' }}>
+                        {formatDurationMins(totalTrackedMinutes)}
+                      </span>
+                    )}
+                  </button>
                 </div>
 
                 {/* Comments Tab Content */}
@@ -2228,6 +2412,298 @@ export default function TaskDetailDrawer({
                     )}
                   </div>
                 )}
+
+                {/* Time Tracking & Estimates Tab Content (Phase 45) */}
+                {activeTab === 'time' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Stopwatch & Estimate Dashboard Card */}
+                    <div
+                      style={{
+                        padding: 16,
+                        borderRadius: 10,
+                        background: 'var(--color-canvas-subtle, #141517)',
+                        border: '1px solid var(--color-canvas-hairline, #2c2f35)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 14,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                        <div>
+                          <span style={{ fontSize: 11, color: 'var(--color-canvas-muted, #8a8f98)', textTransform: 'uppercase', fontWeight: 600 }}>
+                            Live Stopwatch
+                          </span>
+                          <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: isRunningTimer ? '#ef4444' : 'var(--color-canvas-fg, #ffffff)' }}>
+                            {formatSecondsToHMS(timerElapsedSeconds)}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={isRunningTimer ? handleStopTimer : handleStartTimer}
+                            className="btn-primary"
+                            style={{
+                              backgroundColor: isRunningTimer ? '#ef4444' : '#6366f1',
+                              padding: '8px 16px',
+                              fontSize: 13,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            {isRunningTimer ? (
+                              <>
+                                <Square size={13} fill="#ffffff" />
+                                Stop Timer
+                              </>
+                            ) : (
+                              <>
+                                <Play size={13} fill="#ffffff" />
+                                Start Timer
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setShowManualLog(v => !v)}
+                            className="btn-secondary"
+                            style={{ padding: '8px 14px', fontSize: 13 }}
+                          >
+                            + Log Time
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Work Estimate vs Actual Progress */}
+                      <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-canvas-hairline, #2c2f35)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, color: 'var(--color-canvas-muted, #8a8f98)' }}>
+                            Estimate vs Tracked:
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-canvas-fg, #ffffff)' }}>
+                              {formatDurationMins(totalTrackedMinutes)} / {estimatedMinutes ? formatDurationMins(estimatedMinutes) : 'No estimate'}
+                            </span>
+                            {!isEditingEstimate && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEstimateInput(estimatedMinutes || '');
+                                  setIsEditingEstimate(true);
+                                }}
+                                style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: 11, cursor: 'pointer', padding: 0 }}
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Progress bar */}
+                        {estimatedMinutes > 0 && (
+                          <div style={{ height: 6, width: '100%', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${Math.min(100, Math.round((totalTrackedMinutes / estimatedMinutes) * 100))}%`,
+                                backgroundColor: totalTrackedMinutes > estimatedMinutes ? '#ef4444' : '#10b981',
+                                borderRadius: 3,
+                                transition: 'width 200ms',
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        {/* Edit Estimate Input Box */}
+                        {isEditingEstimate && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                            <input
+                              type="number"
+                              min="0"
+                              step="15"
+                              placeholder="Minutes (e.g. 120)"
+                              value={estimateInput}
+                              onChange={(e) => setEstimateInput(e.target.value)}
+                              style={{
+                                width: 140,
+                                padding: '4px 8px',
+                                borderRadius: 4,
+                                backgroundColor: '#111315',
+                                border: '1px solid #374151',
+                                color: '#ffffff',
+                                fontSize: 12,
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSaveEstimate}
+                              className="btn-primary"
+                              style={{ padding: '4px 10px', fontSize: 11 }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingEstimate(false)}
+                              className="btn-secondary"
+                              style={{ padding: '4px 10px', fontSize: 11 }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Manual Log Time Dialog */}
+                    {showManualLog && (
+                      <form
+                        onSubmit={handleManualLog}
+                        style={{
+                          padding: 14,
+                          borderRadius: 8,
+                          background: 'var(--color-canvas-card, #1a1d21)',
+                          border: '1px solid #6366f1',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 10,
+                        }}
+                      >
+                        <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Log Work Hours</h4>
+
+                        <div style={{ display: 'flex', gap: 10 }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Duration (Minutes)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={logDurationMins}
+                              onChange={(e) => setLogDurationMins(e.target.value)}
+                              required
+                              style={{
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                padding: '6px 8px',
+                                borderRadius: 6,
+                                backgroundColor: '#111315',
+                                border: '1px solid #374151',
+                                color: '#ffffff',
+                                fontSize: 12,
+                              }}
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 6 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={logIsBillable}
+                                onChange={(e) => setLogIsBillable(e.target.checked)}
+                              />
+                              Billable
+                            </label>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Work Description</label>
+                          <input
+                            type="text"
+                            placeholder="What did you work on?"
+                            value={logDescription}
+                            onChange={(e) => setLogDescription(e.target.value)}
+                            style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
+                              padding: '6px 8px',
+                              borderRadius: 6,
+                              backgroundColor: '#111315',
+                              border: '1px solid #374151',
+                              color: '#ffffff',
+                              fontSize: 12,
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowManualLog(false)}
+                            className="btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: 11 }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isLoggingTime}
+                            className="btn-primary"
+                            style={{ padding: '4px 12px', fontSize: 11 }}
+                          >
+                            {isLoggingTime ? 'Logging...' : 'Save Time'}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {/* Time Entries History Table */}
+                    <div>
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <History size={14} /> Time Entries Log ({timeEntries.length})
+                      </h4>
+
+                      {timeEntries.length === 0 ? (
+                        <p style={{ fontSize: 12.5, color: 'var(--color-canvas-muted, #8a8f98)', fontStyle: 'italic' }}>
+                          No time recorded for this task yet. Start the stopwatch or log manual hours above.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {timeEntries.map((entry) => (
+                            <div
+                              key={entry.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                borderRadius: 6,
+                                background: 'var(--color-canvas-subtle, #141517)',
+                                border: '1px solid var(--color-canvas-hairline, #2c2f35)',
+                                fontSize: 12,
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{ fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color: '#a5b4fc' }}>
+                                  {formatDurationMins(entry.durationMinutes)}
+                                </span>
+                                <div>
+                                  <span style={{ color: 'var(--color-canvas-fg, #ffffff)' }}>
+                                    {entry.description || 'General task work'}
+                                  </span>
+                                  <div style={{ fontSize: 10.5, color: '#6b7280' }}>
+                                    {entry.user?.name || 'Member'} • {formatTimestamp(entry.startTime)}
+                                    {entry.isBillable && <span style={{ marginLeft: 6, color: '#10b981' }}>• Billable</span>}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTimeEntry(entry.id)}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
+                                title="Delete entry"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2320,6 +2796,62 @@ export default function TaskDetailDrawer({
                   className="field-input"
                   style={{ height: 28, padding: '0 8px', fontSize: 12 }}
                 />
+              </div>
+
+              {/* Work Estimate & Quick Timer (Phase 45) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px', background: 'var(--color-canvas-subtle, #141517)', borderRadius: 8, border: '1px solid var(--color-canvas-hairline, #2c2f35)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-canvas-fg, #ffffff)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Clock size={13} className="text-indigo-400" />
+                    Time & Estimate
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('time')}
+                    style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, color: '#6366f1', cursor: 'pointer' }}
+                  >
+                    View Log →
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5 }}>
+                  <span style={{ color: 'var(--color-canvas-muted, #8a8f98)' }}>Tracked:</span>
+                  <span style={{ fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color: '#a5b4fc' }}>
+                    {formatDurationMins(totalTrackedMinutes)}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={isRunningTimer ? handleStopTimer : handleStartTimer}
+                  style={{
+                    marginTop: 4,
+                    height: 26,
+                    borderRadius: 6,
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    background: isRunningTimer ? '#ef4444' : '#6366f1',
+                    color: '#ffffff',
+                  }}
+                >
+                  {isRunningTimer ? (
+                    <>
+                      <Square size={11} fill="#ffffff" />
+                      Stop Timer ({formatSecondsToHMS(timerElapsedSeconds)})
+                    </>
+                  ) : (
+                    <>
+                      <Play size={11} fill="#ffffff" />
+                      Start Timer
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Labels Manager */}

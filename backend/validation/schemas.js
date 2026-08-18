@@ -671,6 +671,33 @@ const customViewUpdate = z.object({
   position: z.number().optional(),
 });
 
+// ─── Time Tracking & Work Estimates (Phase 45) ────────────────────────────────
+
+const timeEntryLog = z.object({
+  durationMinutes: z.number().int().min(1, 'Duration must be at least 1 minute').max(1440, 'Duration cannot exceed 24 hours (1440 minutes)'),
+  description: z.string().max(500, 'Description must be 500 characters or fewer').optional().nullable(),
+  isBillable: z.boolean().optional().default(true),
+  hourlyRate: z.number().positive().optional().nullable(),
+  startTime: z.string().optional(),
+});
+
+const timeEntryUpdate = z.object({
+  durationMinutes: z.number().int().min(1).max(1440).optional(),
+  description: z.string().max(500).optional().nullable(),
+  isBillable: z.boolean().optional(),
+  hourlyRate: z.number().positive().optional().nullable(),
+});
+
+const taskEstimateUpdate = z.object({
+  estimatedMinutes: z.number().int().min(0, 'Estimated minutes cannot be negative').max(60000, 'Estimate cannot exceed 1000 hours').nullable(),
+});
+
+const timeSummaryQuery = z.object({
+  range: z.enum(['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month', 'all']).optional().default('this_week'),
+  userId: z.string().uuid().optional(),
+  projectId: z.string().uuid().optional(),
+});
+
 module.exports = {
   register,
   login,
@@ -727,6 +754,10 @@ module.exports = {
   taskTemplateApply,
   customViewCreate,
   customViewUpdate,
+  timeEntryLog,
+  timeEntryUpdate,
+  taskEstimateUpdate,
+  timeSummaryQuery,
 };
 
 

@@ -786,6 +786,7 @@ export default function Dashboard() {
   const [activeView, setActiveView] = useState(null);
   const [showCustomViewModal, setShowCustomViewModal] = useState(false);
   const [editingView, setEditingView] = useState(null);
+  const [runningTimer, setRunningTimer] = useState({ running: false, entry: null, elapsedSeconds: 0 });
   const searchInputRef = useRef(null);
 
   const activeProject = projects.find(p => p.id === activeProjectId) || null;
@@ -857,6 +858,60 @@ export default function Dashboard() {
 
   const handleClearActiveView = () => {
     setActiveView(null);
+  };
+
+  // Active Running Timer Polling (Phase 45)
+  const fetchRunningTimer = useCallback(async () => {
+    if (!token || !activeTeam?.id) return;
+    try {
+      const res = await axios.get(`${API}/time/running`, {
+        headers: { Authorization: `Bearer ${token}`, 'X-Team-Id': activeTeam.id },
+      });
+      if (res.data.running && res.data.entry) {
+        setRunningTimer({
+          running: true,
+          entry: res.data.entry,
+          elapsedSeconds: res.data.elapsedSeconds || 0,
+        });
+      } else {
+        setRunningTimer({ running: false, entry: null, elapsedSeconds: 0 });
+      }
+    } catch (err) {
+      console.error('Error fetching running timer:', err);
+    }
+  }, [token, activeTeam?.id]);
+
+  useEffect(() => {
+    fetchRunningTimer();
+  }, [fetchRunningTimer]);
+
+  useEffect(() => {
+    let interval = null;
+    if (runningTimer.running) {
+      interval = setInterval(() => {
+        setRunningTimer((prev) => ({
+          ...prev,
+          elapsedSeconds: prev.elapsedSeconds + 1,
+        }));
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [runningTimer.running]);
+
+  const handleGlobalStopTimer = async () => {
+    if (!runningTimer.entry?.taskId) return;
+    try {
+      await axios.post(
+        `${API}/tasks/${runningTimer.entry.taskId}/time/stop`,
+        {},
+        { headers: { Authorization: `Bearer ${token}`, 'X-Team-Id': activeTeam?.id } }
+      );
+      setRunningTimer({ running: false, entry: null, elapsedSeconds: 0 });
+    } catch (err) {
+      console.error('Error stopping timer:', err);
+    }
   };
 
   const handleTaskReschedule = async (taskId, newDueDate) => {
@@ -1512,6 +1567,61 @@ export default function Dashboard() {
 
             {/* Quick notifications bell */}
             <NotificationBell onSelectTask={handleOpenTaskById} />
+
+            {/* Global Active Stopwatch Widget (Phase 45) */}
+            {runningTimer.running && runningTimer.entry && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '4px 10px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: 6,
+                  fontSize: 12,
+                }}
+              >
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
+                <span
+                  onClick={() => handleOpenTaskById(runningTimer.entry.taskId)}
+                  style={{
+                    maxWidth: 110,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    color: 'var(--color-canvas-fg, #ffffff)',
+                    fontWeight: 500,
+                  }}
+                  title={runningTimer.entry.task?.title}
+                >
+                  {runningTimer.entry.task?.title || 'Active Task'}
+                </span>
+                <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: '#ef4444' }}>
+                  {Math.floor(runningTimer.elapsedSeconds / 60)}:
+                  {String(runningTimer.elapsedSeconds % 60).padStart(2, '0')}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleGlobalStopTimer}
+                  style={{
+                    height: 20,
+                    padding: '0 6px',
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    background: '#ef4444',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                  title="Stop active timer"
+                >
+                  Stop
+                </button>
+              </div>
+            )}
 
             {/* Quick theme toggle in dashboard header */}
             <ThemeToggle variant="icon" size="sm" />

@@ -72,7 +72,7 @@ describe('Phase 41: Production Observability & Prometheus Metrics', () => {
     });
 
     it('tracks 404 and client error status codes correctly', async () => {
-      await request(app).get('/auth/unmatched-probe-subpath-404');
+      await request(app).get('/unmatched-probe-subpath-404');
 
       const metricsText = await getMetrics();
       expect(metricsText).toContain('status_code="404"');
