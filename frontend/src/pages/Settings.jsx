@@ -15,6 +15,9 @@ import {
   Send,
   ExternalLink,
   MessageCircle,
+  Sparkles,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
@@ -171,6 +174,14 @@ export default function Settings() {
   const [deliveries, setDeliveries] = useState([]);
   const [loadingDeliveries, setLoadingDeliveries] = useState(false);
 
+  // ── AI & BYOK Custom Gemini Key state (Phase 35) ───────────────────────────
+  const [aiSettings, setAiSettings] = useState({ hasCustomKey: false, monthlyUsage: 0, monthlyLimit: 20 });
+  const [customKeyInput, setCustomKeyInput] = useState('');
+  const [showCustomKey, setShowCustomKey] = useState(false);
+  const [savingAiKey, setSavingAiKey] = useState(false);
+  const [aiKeySuccess, setAiKeySuccess] = useState('');
+  const [aiKeyError, setAiKeyError] = useState('');
+
   const token = localStorage.getItem('token');
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -187,6 +198,12 @@ export default function Settings() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (activeTeam?.id) {
+      fetchAiSettings();
+    }
+  }, [activeTeam?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (activeSettingsTab === 'developer' && activeTeam?.id) {
       fetchApiKeys();
       fetchWebhooks();
@@ -194,6 +211,61 @@ export default function Settings() {
       fetchProjects();
     }
   }, [activeSettingsTab, activeTeam?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchAiSettings = async () => {
+    if (!activeTeam?.id) return;
+    try {
+      const res = await axios.get(`${API}/teams/${activeTeam.id}/ai-settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.data) {
+        setAiSettings(res.data);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSaveAiKey = async (e) => {
+    e.preventDefault();
+    if (!customKeyInput.trim()) return;
+    setSavingAiKey(true);
+    setAiKeyError('');
+    setAiKeySuccess('');
+    try {
+      const res = await axios.put(`${API}/teams/${activeTeam.id}/ai-settings`, {
+        customGeminiKey: customKeyInput.trim(),
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAiSettings(prev => ({ ...prev, hasCustomKey: true }));
+      setAiKeySuccess(res.data.message || 'Custom Gemini API key saved successfully!');
+      setCustomKeyInput('');
+    } catch (err) {
+      setAiKeyError(err.response?.data?.error || 'Failed to save custom Gemini key');
+    } finally {
+      setSavingAiKey(false);
+    }
+  };
+
+  const handleRemoveAiKey = async () => {
+    setSavingAiKey(true);
+    setAiKeyError('');
+    setAiKeySuccess('');
+    try {
+      const res = await axios.put(`${API}/teams/${activeTeam.id}/ai-settings`, {
+        customGeminiKey: null,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAiSettings(prev => ({ ...prev, hasCustomKey: false }));
+      setAiKeySuccess(res.data.message || 'Custom key removed. Reverted to standard quota.');
+    } catch (err) {
+      setAiKeyError(err.response?.data?.error || 'Failed to remove custom Gemini key');
+    } finally {
+      setSavingAiKey(false);
+    }
+  };
 
 
   const fetchTeams = async () => {
@@ -672,6 +744,126 @@ export default function Settings() {
                 <SectionTitle>Active Team Workspace</SectionTitle>
                 <Row label="Team Name" value={activeTeam?.name || 'No team selected'} />
                 <Row label="Team Identifier" value={activeTeam?.id || '—'} />
+              </Card>
+
+              {/* AI & Gemini Integration (BYOK) Card (Phase 35) */}
+              <Card>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Sparkles size={16} color="#6366f1" />
+                    <SectionTitle>AI & Gemini Workspace Agent</SectionTitle>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: '3px 10px',
+                      borderRadius: 20,
+                      background: aiSettings.hasCustomKey ? 'rgba(48, 164, 108, 0.12)' : 'rgba(99, 102, 241, 0.12)',
+                      color: aiSettings.hasCustomKey ? '#30a46c' : '#6366f1',
+                    }}
+                  >
+                    {aiSettings.hasCustomKey ? 'Custom BYOK Key Active' : 'Free Quota Plan'}
+                  </span>
+                </div>
+
+                <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--color-canvas-body, #50545c)', lineHeight: '20px' }}>
+                  TaskFlow AI acts as an intelligent workspace agent for freelancers, designers, marketers, and developers. You can use our built-in free quota or connect your own Google Gemini API key for unlimited generations.
+                </p>
+
+                {/* Monthly Quota Meter */}
+                {!aiSettings.hasCustomKey && (
+                  <div style={{ marginBottom: 18, padding: '12px 16px', background: 'var(--color-canvas-soft, #f8f9fa)', borderRadius: 8, border: '1px solid var(--color-canvas-hairline, #ebebeb)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 500, marginBottom: 6 }}>
+                      <span style={{ color: 'var(--color-canvas-ink, #171717)' }}>Monthly Built-in AI Generations</span>
+                      <span style={{ color: 'var(--color-canvas-mute, #888)' }}>{aiSettings.monthlyUsage} / {aiSettings.monthlyLimit} used</span>
+                    </div>
+                    <div style={{ width: '100%', height: 6, background: 'rgba(0,0,0,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${Math.min(100, (aiSettings.monthlyUsage / aiSettings.monthlyLimit) * 100)}%`,
+                          height: '100%',
+                          background: aiSettings.monthlyUsage >= aiSettings.monthlyLimit ? '#e5484d' : '#6366f1',
+                          borderRadius: 3,
+                          transition: 'width 200ms ease',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Feedback messages */}
+                {aiKeySuccess && (
+                  <div className="success-banner" style={{ marginBottom: 14, fontSize: 13 }}>
+                    {aiKeySuccess}
+                  </div>
+                )}
+                {aiKeyError && (
+                  <div className="error-banner" style={{ marginBottom: 14, fontSize: 13 }}>
+                    {aiKeyError}
+                  </div>
+                )}
+
+                {/* Custom Key Form */}
+                <form onSubmit={handleSaveAiKey} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <label htmlFor="gemini-key-input" style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-canvas-ink, #171717)' }}>
+                    {aiSettings.hasCustomKey ? 'Update Custom Google Gemini API Key' : 'Bring Your Own Gemini API Key (Optional)'}
+                  </label>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input
+                        id="gemini-key-input"
+                        type={showCustomKey ? 'text' : 'password'}
+                        placeholder={aiSettings.hasCustomKey ? '••••••••••••••••••••••••••••••••' : 'AIzaSy...'}
+                        value={customKeyInput}
+                        onChange={(e) => setCustomKeyInput(e.target.value)}
+                        className="field-input"
+                        style={{ width: '100%', paddingRight: 36 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomKey(v => !v)}
+                        style={{
+                          position: 'absolute',
+                          right: 8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--color-canvas-mute, #888)',
+                          padding: 4,
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {showCustomKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={savingAiKey || !customKeyInput.trim()}
+                      className="btn-primary"
+                      style={{ height: 36, padding: '0 16px', fontSize: 13, flexShrink: 0 }}
+                    >
+                      {savingAiKey ? 'Saving…' : 'Save Key'}
+                    </button>
+                    {aiSettings.hasCustomKey && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveAiKey}
+                        disabled={savingAiKey}
+                        className="btn-secondary"
+                        style={{ height: 36, padding: '0 14px', fontSize: 13, color: '#e5484d', borderColor: 'rgba(229, 72, 77, 0.3)', flexShrink: 0 }}
+                      >
+                        Remove Key
+                      </button>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--color-canvas-mute, #888)', lineHeight: '16px' }}>
+                    Your API key is encrypted at rest using AES-256-GCM. Free Gemini API keys can be obtained at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: '#0070f3' }}>Google AI Studio</a>.
+                  </span>
+                </form>
               </Card>
 
               {/* Notification Preferences */}

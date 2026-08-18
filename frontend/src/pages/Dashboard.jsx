@@ -158,10 +158,8 @@ function NewTaskModal({
   const [aiError, setAiError] = useState('');
 
   const samplePrompts = [
-    'Redesign login page with OAuth support',
-    'Configure AWS deployment & monitoring',
-    'Database schema design & indices',
-    'Investigate and fix critical crash bug',
+    'Design brand logo & client assets',
+    'Fix user authentication bug',
   ];
 
   const handleAiGenerate = async (customPrompt) => {

@@ -2,6 +2,7 @@ const xss = require('xss');
 const { GoogleGenAI } = require('@google/genai');
 const prisma = require('../prisma');
 const logger = require('../middleware/logger');
+const { decryptSecret } = require('./encryption');
 const {
   aiTaskGenerateResponse,
   aiProjectPlanResponse,
@@ -22,6 +23,30 @@ function getGeminiTimeoutMs() {
   return Number.isFinite(customTimeout) && customTimeout > 0
     ? customTimeout
     : DEFAULT_GEMINI_TIMEOUT_MS;
+}
+
+/**
+ * Resolves the active Gemini API Key for a team:
+ * Uses custom encrypted BYOK key if configured, otherwise falls back to system key.
+ */
+async function resolveGeminiApiKey(teamId = null) {
+  if (teamId) {
+    try {
+      const team = await prisma.team.findUnique({
+        where: { id: teamId },
+        select: { id: true, customGeminiKey: true, aiMonthlyUsage: true, aiUsageResetAt: true },
+      });
+
+      if (team && team.customGeminiKey) {
+        const decrypted = decryptSecret(team.customGeminiKey);
+        if (decrypted && decrypted.trim().length > 0) {
+          return { apiKey: decrypted.trim(), isCustomKey: true, teamId: team.id };
+        }
+      }
+    } catch (_) {}
+  }
+
+  return { apiKey: process.env.GEMINI_API_KEY, isCustomKey: false, teamId };
 }
 
 function categorizeGeminiError(error) {
@@ -129,8 +154,10 @@ async function callGeminiGenerate({
   responseMimeType = 'application/json',
   timeoutMs = getGeminiTimeoutMs(),
   modelOverride = null,
+  teamId = null,
+  maxOutputTokens = 600,
 }) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const { apiKey, isCustomKey } = await resolveGeminiApiKey(teamId);
   const isTestEnv = process.env.NODE_ENV === 'test';
 
   if (!apiKey) {
@@ -144,6 +171,16 @@ async function callGeminiGenerate({
     const err = new Error('Gemini API call bypassed in test environment');
     err.name = 'TestEnvError';
     throw err;
+  }
+
+  // Track monthly usage for teams on built-in free tier
+  if (teamId && !isCustomKey) {
+    try {
+      await prisma.team.update({
+        where: { id: teamId },
+        data: { aiMonthlyUsage: { increment: 1 } },
+      });
+    } catch (_) {}
   }
 
   const model = modelOverride || getGeminiModel();
@@ -160,6 +197,7 @@ async function callGeminiGenerate({
 
   const requestConfig = {
     responseMimeType,
+    maxOutputTokens,
   };
   if (systemInstruction) {
     requestConfig.systemInstruction = systemInstruction;
@@ -230,10 +268,9 @@ function generateFallbackTask(prompt, project) {
     description = `### Objective\nProvide seamless and secure user authentication supporting OAuth and email credentials.\n\n### Scope\n- Secure password hashing & JWT token validation.\n- OAuth provider integration.\n- Error handling & rate limiting.`;
     labels = ['auth', 'frontend', 'security'];
     subtasks = [
-      { title: 'Design responsive login & signup view', order: 1000 },
-      { title: 'Configure OAuth providers (Google / GitHub)', order: 2000 },
-      { title: 'Implement form validation and error toast states', order: 3000 },
-      { title: 'Write integration tests for authentication', order: 4000 },
+      { title: 'Design responsive login view', order: 1000 },
+      { title: 'Configure authentication providers & JWT', order: 2000 },
+      { title: 'Add form validation & test verification', order: 3000 },
     ];
   } else if (pLower.includes('aws') || pLower.includes('deploy') || pLower.includes('cloud') || pLower.includes('docker') || pLower.includes('k8s')) {
     if (!title.toLowerCase().includes('deploy') && !title.toLowerCase().includes('cloud')) {
@@ -242,10 +279,9 @@ function generateFallbackTask(prompt, project) {
     description = `### Objective\nEstablish resilient deployment pipelines and cloud infrastructure for high availability.\n\n### Scope\n- Infrastructure as Code provisioning.\n- CI/CD automated pipeline build.\n- Monitoring and alert setup.`;
     labels = ['devops', 'infrastructure', 'cloud'];
     subtasks = [
-      { title: 'Configure IAM roles and security groups', order: 1000 },
+      { title: 'Configure cloud resources & security groups', order: 1000 },
       { title: 'Provision containerized application services', order: 2000 },
-      { title: 'Set up custom domain and SSL/TLS termination', order: 3000 },
-      { title: 'Run production health checks & smoke tests', order: 4000 },
+      { title: 'Set up custom domain & verify health checks', order: 3000 },
     ];
   } else if (pLower.includes('database') || pLower.includes('postgres') || pLower.includes('sql') || pLower.includes('prisma') || pLower.includes('schema')) {
     if (!title.toLowerCase().includes('database') && !title.toLowerCase().includes('migration')) {
@@ -255,34 +291,31 @@ function generateFallbackTask(prompt, project) {
     labels = ['database', 'backend', 'prisma'];
     subtasks = [
       { title: 'Define Prisma schema models and relationships', order: 1000 },
-      { title: 'Apply database migration and generate Prisma client', order: 2000 },
-      { title: 'Add database indices for optimized search queries', order: 3000 },
-      { title: 'Verify data integrity and cascading deletions', order: 4000 },
+      { title: 'Apply database migration and generate client', order: 2000 },
+      { title: 'Add database indices for optimized queries', order: 3000 },
     ];
   } else if (pLower.includes('bug') || pLower.includes('fix') || pLower.includes('error') || pLower.includes('crash')) {
     priority = 'urgent';
     deadlineDays = 1;
     labels = ['bug', 'fix'];
     subtasks = [
-      { title: 'Reproduce bug in local test environment', order: 1000 },
-      { title: 'Isolate root cause in application logic', order: 2000 },
-      { title: 'Implement bug fix and edge-case guard', order: 3000 },
-      { title: 'Add regression test in test suite', order: 4000 },
+      { title: 'Reproduce and isolate root cause', order: 1000 },
+      { title: 'Implement fix with edge-case guards', order: 2000 },
+      { title: 'Add automated regression test', order: 3000 },
     ];
   } else if (pLower.includes('redesign') || /\bui\b/i.test(pLower) || /\bux\b/i.test(pLower) || pLower.includes('design') || pLower.includes('frontend')) {
     labels = ['ui', 'design', 'frontend'];
     subtasks = [
-      { title: 'Create UI mockups and component hierarchy', order: 1000 },
+      { title: 'Create UI mockups and layout hierarchy', order: 1000 },
       { title: 'Implement component markup with CSS tokens', order: 2000 },
-      { title: 'Add interactive animations and micro-interactions', order: 3000 },
-      { title: 'Conduct responsive and accessibility audit', order: 4000 },
+      { title: 'Verify responsive styling and interactions', order: 3000 },
     ];
   } else {
     labels = ['general'];
     subtasks = [
       { title: `Analyze requirements for ${title.slice(0, 50)}`, order: 1000 },
       { title: 'Implement core functionality', order: 2000 },
-      { title: 'Review and verify with unit tests', order: 3000 },
+      { title: 'Review and verify deliverables', order: 3000 },
     ];
   }
 
@@ -302,7 +335,7 @@ function generateFallbackTask(prompt, project) {
   };
 }
 
-async function generateTaskFromPrompt({ prompt, project = null, currentContext = '' }) {
+async function generateTaskFromPrompt({ prompt, project = null, currentContext = '', teamId = null }) {
   const cleanPrompt = sanitizePrompt(prompt);
   if (!cleanPrompt) {
     throw new Error('Prompt cannot be empty');
@@ -312,27 +345,27 @@ async function generateTaskFromPrompt({ prompt, project = null, currentContext =
   const startTime = Date.now();
 
   try {
-    const systemInstructions = `You are ST AI, the intelligent task assistant inside SyncTask 2.0, an enterprise task management platform.
-Your job is to take the user's natural language task request and produce a complete, structured JSON task plan.
+    const systemInstructions = `You are TaskFlow AI, the intelligent workspace agent for freelancers, designers, marketers, content creators, and engineering teams.
+Your job is to take the user's task request and produce a concise, structured JSON task plan.
 
 Output MUST be a valid JSON object matching this schema:
 {
-  "title": "Clear action-oriented title under 200 characters",
-  "description": "Comprehensive markdown description with Objective, Scope, and Implementation sections",
+  "title": "Action-oriented title under 150 characters",
+  "description": "Concise markdown description with Goal, Deliverables, and Next Steps",
   "priority": "low" | "medium" | "high" | "urgent",
-  "suggestedDeadlineDays": integer number between 1 and 30,
-  "labels": ["array", "of", "1-4", "concise", "lowercase", "labels"],
+  "suggestedDeadlineDays": integer between 1 and 30,
+  "labels": ["1-3", "concise", "lowercase", "labels"],
   "suggestedSubtasks": [
-    { "title": "Step 1 description", "order": 1000 },
-    { "title": "Step 2 description", "order": 2000 }
+    { "title": "Concise step 1", "order": 1000 },
+    { "title": "Concise step 2", "order": 2000 },
+    { "title": "Concise step 3", "order": 3000 }
   ]
 }
 
 Guidelines:
-- Title must be crisp and action-oriented.
-- Subtasks must be concrete, sequential checklist items (3 to 6 subtasks).
-- Priority should reflect the task's stated urgency and importance.
-- Do NOT output any markdown code blocks, backticks, or extra text — only the raw JSON object.`;
+- Tailor language to the user's field (e.g. design assets, client revisions, content drafting, or technical implementation).
+- Limit suggestedSubtasks to AT MOST 3 concise checklist items to conserve tokens.
+- Output ONLY the raw JSON object with no preamble or codeblock formatting.`;
 
     let contextSnippet = '';
     if (project && project.name) {
@@ -346,6 +379,8 @@ Guidelines:
 
     const responseText = await callGeminiGenerate({
       contents: fullPrompt,
+      teamId,
+      maxOutputTokens: 500,
     });
 
     const parsedJson = parseGeminiJsonResponse(responseText);
@@ -880,7 +915,7 @@ function generateFallbackProjectPlan(rawPrompt, timeframeWeeks = 4) {
 /**
  * Generate a complete project hierarchy and roadmap using Gemini AI or deterministic fallback
  */
-async function generateProjectPlan({ prompt, timeframeWeeks = 4, teamContext = null }) {
+async function generateProjectPlan({ prompt, timeframeWeeks = 4, teamContext = null, teamId = null }) {
   const cleanPrompt = sanitizePrompt(prompt);
   if (!cleanPrompt) {
     throw new Error('Prompt cannot be empty');
@@ -891,28 +926,28 @@ async function generateProjectPlan({ prompt, timeframeWeeks = 4, teamContext = n
   const startTime = Date.now();
 
   try {
-    const systemPrompt = `You are ST AI, a Principal Technical Architect and Project Director inside SyncTask 2.0.
-Your task is to take a high-level project goal and decompose it into a complete, professional project plan with phases, tasks, and subtasks.
+    const systemPrompt = `You are TaskFlow AI, the intelligent project director for freelancers, design agencies, marketers, and engineering teams.
+Your task is to decompose the project goal into a concise, professional roadmap.
 
 Output MUST be a valid JSON object matching this schema:
 {
-  "name": "Concise, punchy project title (under 100 characters)",
-  "description": "Comprehensive markdown description detailing the objective, architecture overview, and milestone timeline",
-  "icon": "A single representative emoji (e.g. 🚀, 🛒, 📱, ☁️, 🎨, ⚡, 📊)",
-  "color": "Hex color code matching modern palette (e.g. #6366f1, #10b981, #3b82f6, #8b5cf6, #f59e0b, #ec4899)",
-  "targetDays": integer number of total days (${weeks * 7}),
-  "phases": ["Planning", "UI/UX", "Development", "Testing", "Deployment"],
+  "name": "Concise project title (under 80 characters)",
+  "description": "Clear markdown summary of Objective, Scope, and Key Deliverables",
+  "icon": "Representative emoji (e.g. 🎨, 🚀, 📱, 🛒, 📢, 💼, ⚡)",
+  "color": "Hex color code (#6366f1, #10b981, #3b82f6, #8b5cf6, #f59e0b, #ec4899)",
+  "targetDays": ${weeks * 7},
+  "phases": ["Phase 1 Name", "Phase 2 Name", "Phase 3 Name"],
   "tasks": [
     {
-      "title": "Action-oriented task title (under 200 characters)",
-      "description": "Detailed explanation of what needs to be implemented or achieved",
-      "phase": "One of the phases listed above (e.g. Planning, UI/UX, Development, Testing, Deployment)",
+      "title": "Action-oriented task title",
+      "description": "Clear explanation of deliverable",
+      "phase": "Matching one of the phases above",
       "priority": "low" | "medium" | "high" | "urgent",
-      "suggestedDeadlineOffsetDays": integer day offset from start (between 1 and ${weeks * 7}),
-      "labels": ["concise", "lowercase", "tags"],
+      "suggestedDeadlineOffsetDays": integer day offset between 1 and ${weeks * 7},
+      "labels": ["1-3", "lowercase", "tags"],
       "subtasks": [
         {
-          "title": "Specific subtask checklist item",
+          "title": "Concise checklist item",
           "estimatedMinutes": 30,
           "order": 1000
         }
@@ -922,10 +957,10 @@ Output MUST be a valid JSON object matching this schema:
 }
 
 Guidelines:
-- Generate 5 to 8 comprehensive tasks distributed across the 5 phases: Planning, UI/UX, Development, Testing, Deployment.
-- Each task should include 2 to 4 actionable subtasks.
-- Order tasks logically with staggered deadline offsets progressing from day 1 up to ${weeks * 7}.
-- Do NOT output markdown code fences, backticks, or explanatory text — ONLY the raw JSON object.`;
+- Generate 3 to 5 high-impact tasks across 2 to 4 phases (e.g. Discovery/Planning, Production/Design, Review/Launch).
+- Adapt vocabulary to the user's domain (freelance client deliverables, design revisions, content calendar, or software implementation).
+- Limit subtasks to 1 to 3 items per task to conserve output tokens.
+- Output ONLY the raw JSON object without markdown codeblocks or filler text.`;
 
     let contextSnippet = `Target Timeframe: ${weeks} weeks (${weeks * 7} days)\nUser Project Request: "${cleanPrompt}"`;
     if (teamContext && teamContext.name) {
@@ -936,6 +971,8 @@ Guidelines:
 
     const responseText = await callGeminiGenerate({
       contents: fullPrompt,
+      teamId,
+      maxOutputTokens: 1000,
     });
 
     const parsedJson = parseGeminiJsonResponse(responseText);

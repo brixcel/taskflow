@@ -487,4 +487,76 @@ router.get('/:id/analytics', resolveTeamFromParam, validate(schemas.analyticsQue
   }
 });
 
+// ─── GET /teams/:id/ai-settings — Get AI Usage and BYOK Status ────────────────
+
+router.get('/:id/ai-settings', async (req, res) => {
+  try {
+    const teamId = req.params.id;
+
+    const membership = await prisma.teamMembership.findUnique({
+      where: {
+        userId_teamId: {
+          userId: req.userId,
+          teamId,
+        },
+      },
+      include: {
+        team: {
+          select: {
+            id: true,
+            name: true,
+            customGeminiKey: true,
+            aiMonthlyUsage: true,
+            aiUsageResetAt: true,
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      return res.status(404).json({ error: 'Team not found or access denied' });
+    }
+
+    res.json({
+      hasCustomKey: Boolean(membership.team.customGeminiKey),
+      monthlyUsage: membership.team.aiMonthlyUsage || 0,
+      monthlyLimit: 20,
+    });
+  } catch (error) {
+    console.error('GET /teams/:id/ai-settings error:', error);
+    res.status(500).json({ error: 'Failed to fetch AI settings' });
+  }
+});
+
+// ─── PUT /teams/:id/ai-settings — Update or Remove Custom Gemini Key (BYOK) ───
+
+router.put('/:id/ai-settings', resolveTeamFromParam, requireRole('owner', 'admin'), async (req, res) => {
+  try {
+    const teamId = req.params.id;
+    const { customGeminiKey } = req.body;
+    const { encryptSecret } = require('../services/encryption');
+
+    let encryptedKey = null;
+    if (customGeminiKey && typeof customGeminiKey === 'string' && customGeminiKey.trim().length > 0) {
+      encryptedKey = encryptSecret(customGeminiKey.trim());
+    }
+
+    await prisma.team.update({
+      where: { id: teamId },
+      data: {
+        customGeminiKey: encryptedKey,
+      },
+    });
+
+    res.json({
+      success: true,
+      hasCustomKey: Boolean(encryptedKey),
+      message: encryptedKey ? 'Custom Gemini API key saved successfully' : 'Custom key removed. Using standard free tier quota.',
+    });
+  } catch (error) {
+    console.error('PUT /teams/:id/ai-settings error:', error);
+    res.status(500).json({ error: 'Failed to update AI settings' });
+  }
+});
+
 module.exports = router;

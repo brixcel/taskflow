@@ -50,22 +50,25 @@ model User {
 // ─── Multi-tenancy ───────────────────────────────────────────────────────────
 
 model Team {
-  id        String   @id @default(uuid())
-  name      String
-  ownerId   String
-  createdAt DateTime @default(now())
+  id                 String    @id @default(uuid())
+  name               String
+  ownerId            String
+  customGeminiKey    String?   // AES-256-GCM encrypted custom Gemini API key (BYOK)
+  aiMonthlyUsage     Int       @default(0)
+  aiUsageResetAt     DateTime?
+  createdAt          DateTime  @default(now())
 
-  owner         User             @relation("OwnedTeams", fields: [ownerId], references: [id])
-  memberships   TeamMembership[]
-  projects      Project[]
-  tasks         Task[]
-  notifications Notification[]
-  savedSearches SavedSearch[]
-  recentSearches RecentSearch[]
-  apiKeys       ApiKey[]
-  webhooks      Webhook[]
+  owner              User             @relation("OwnedTeams", fields: [ownerId], references: [id])
+  memberships        TeamMembership[]
+  projects           Project[]
+  tasks              Task[]
+  notifications      Notification[]
+  savedSearches      SavedSearch[]
+  recentSearches     RecentSearch[]
+  apiKeys            ApiKey[]
+  webhooks           Webhook[]
   githubIntegrations ProjectGitHubIntegration[]
-  chatIntegrations TeamChatIntegration[]
+  chatIntegrations   TeamChatIntegration[]
 
   @@map("teams")
 }

@@ -1,19 +1,19 @@
 # TaskFlow — Full Production Plan
 
 > ## 🎯 Current Focus (read this first)
-> **Active phase: Phase 35 — AI Token Optimization & BYOK Key Integration**
+> **Active phase: Phase 36 — Optimized File & Image Attachments with Pre-Upload Compression**
 >
-> **Prior Progress: Phases 0–34 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
-> - 352 automated tests passing with 100% success rate across 19 test suites.
-> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Request ID tracing (C18), Error Masking (C19), Honeypot, Disposable Email Blocking, and Cloudflare Turnstile CAPTCHA.
+> **Prior Progress: Phases 0–35 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
+> - 363 automated tests passing with 100% success rate across 20 test suites.
+> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search, Universal Freelancer Agent & BYOK), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Request ID tracing (C18), Error Masking (C19), Honeypot, Disposable Email Blocking, and Cloudflare Turnstile CAPTCHA.
 >
 > **Prioritized Next Steps (Tier 1 Execution):**
-> 1. **Phase 35: AI Token Optimization & BYOK Key Integration** (Prompt trimming, `maxOutputTokens` caps, BYOK key settings).
-> 2. **Phase 36: Optimized File & Image Attachments with Pre-Upload Compression** (Canvas WebP/JPEG 12MB → 250KB pre-compression).
-> 3. **Phase 37: Postgres Row-Level Security (RLS)**.
-> 4. **Phase 38: Server-Side Redis Sessions & Instant Token Revocation**.
-> 5. **Phase 39: Backend Redis Caching & Cache-Aside Layer**.
-> 6. **Phase 40: Performance Engineering & DB Query Optimization**.
+> 1. **Phase 36: Optimized File & Image Attachments with Pre-Upload Compression** (Canvas WebP/JPEG 12MB → 250KB pre-compression, task & comment attachments).
+> 2. **Phase 37: Postgres Row-Level Security (RLS)**.
+> 3. **Phase 38: Server-Side Redis Sessions & Instant Token Revocation**.
+> 4. **Phase 39: Backend Redis Caching & Cache-Aside Layer**.
+> 5. **Phase 40: Performance Engineering & DB Query Optimization**.
+> 6. **Phase 41: Production Observability & Prometheus Metrics**.
 >
 > **This file is used across tools (Kiro and Antigravity).** See "Agent Reference" below for conventions.
 >

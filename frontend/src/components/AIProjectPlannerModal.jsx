@@ -31,33 +31,21 @@ const COLOR_PRESETS = [
 
 const PROMPT_TEMPLATES = [
   {
-    title: 'E-Commerce Platform',
-    icon: ShoppingCart,
-    prompt: 'Build a modern e-commerce platform with product catalog, cart, Stripe payment checkout, and order fulfillment',
-    weeks: 4,
-  },
-  {
-    title: 'Mobile App MVP',
-    icon: Smartphone,
-    prompt: 'Design and launch an iOS & Android cross-platform mobile app MVP with offline sync and push notifications',
-    weeks: 6,
-  },
-  {
-    title: 'Cloud & CI/CD Migration',
-    icon: Cloud,
-    prompt: 'Migrate database and backend services to AWS with Docker, Kubernetes, and automated GitHub Actions CI/CD',
-    weeks: 4,
-  },
-  {
-    title: 'AI Assistant Integration',
+    title: 'Brand Identity & Design Package',
     icon: Sparkles,
-    prompt: 'Build an AI assistant integration with natural language processing, automated prompt routing, and vector search',
-    weeks: 3,
+    prompt: 'Design complete brand identity with logo concepts, typography, color palette, and client guidelines',
+    weeks: 2,
   },
   {
-    title: 'SaaS Product Launch',
+    title: 'Marketing & Content Launch',
     icon: Rocket,
-    prompt: 'Execute a 30-day SaaS product marketing launch with landing page, analytics tracking, and social campaigns',
+    prompt: 'Plan marketing product launch with landing page copy, social media calendar, and email sequence',
+    weeks: 4,
+  },
+  {
+    title: 'Web Application MVP',
+    icon: Cloud,
+    prompt: 'Build web application MVP with user auth, responsive dashboard, database schema, and payment checkout',
     weeks: 4,
   },
 ];

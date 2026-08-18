@@ -56,6 +56,7 @@ router.post('/generate-task', validate(schemas.aiTaskGenerateRequest), async (re
       prompt,
       project: targetProject,
       currentContext: currentContext || '',
+      teamId: req.teamId,
     });
 
     res.json({
@@ -117,16 +118,17 @@ router.post('/breakdown-task', validate(schemas.aiTaskBreakdownRequest), async (
       }
     }
 
-    const result = await breakdownTaskIntoSubtasks({
+    const { subtasks } = await breakdownTaskIntoSubtasks({
       title: taskTitle,
       description: taskDescription,
       existingSubtasks,
-      projectContext,
+      project: projectContext,
+      teamId: req.teamId,
     });
 
     res.json({
       success: true,
-      subtasks: result.subtasks,
+      subtasks,
     });
   } catch (error) {
     if (logger && logger.error) {
@@ -149,6 +151,7 @@ router.post('/plan-project', validate(schemas.aiProjectPlanRequest), async (req,
       prompt,
       timeframeWeeks: timeframeWeeks || 4,
       teamContext: team,
+      teamId: req.teamId,
     });
 
     res.json({
