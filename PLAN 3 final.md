@@ -1,18 +1,18 @@
 # TaskFlow — Full Production Plan
 
 > ## 🎯 Current Focus (read this first)
-> **Active phase: Phase 37 — Postgres Row-Level Security (RLS)**
+> **Active phase: Phase 38 — Server-Side Redis Sessions & Instant Token Revocation**
 >
-> **Prior Progress: Phases 0–36 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
-> - 372 automated tests passing with 100% success rate across 21 test suites.
-> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search, Universal Freelancer Agent & BYOK), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Turnstile CAPTCHA, and Optimized Attachments with Pre-Upload Compression.
+> **Prior Progress: Phases 0–37 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
+> - 380 automated tests passing with 100% success rate across 22 test suites.
+> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search, Universal Freelancer Agent & BYOK), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Turnstile CAPTCHA, Optimized Attachments, and Postgres Row-Level Security (RLS).
 >
 > **Prioritized Next Steps (Tier 1 Execution):**
-> 1. **Phase 37: Postgres Row-Level Security (RLS)** (Engine-level PostgreSQL multi-tenant isolation policies).
-> 2. **Phase 38: Server-Side Redis Sessions & Instant Token Revocation**.
-> 3. **Phase 39: Backend Redis Caching & Cache-Aside Layer**.
-> 4. **Phase 40: Performance Engineering & DB Query Optimization**.
-> 5. **Phase 41: Production Observability & Prometheus Metrics**.
+> 1. **Phase 38: Server-Side Redis Sessions & Instant Token Revocation** (Redis session store & instant logout/eviction token revocation).
+> 2. **Phase 39: Backend Redis Caching & Cache-Aside Layer**.
+> 3. **Phase 40: Performance Engineering & DB Query Optimization**.
+> 4. **Phase 41: Production Observability & Prometheus Metrics**.
+> 5. **Phase 42: Universal Command Palette (`Cmd+K` / `Ctrl+K`)**.
 >
 > **This file is used across tools (Kiro and Antigravity).** See "Agent Reference" below for conventions.
 >
