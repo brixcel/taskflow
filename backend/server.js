@@ -29,8 +29,12 @@ const io = initSocketServer(server);
 const PORT = process.env.PORT || 3000;
 
 const { sanitizeInput } = require('./middleware/sanitize');
+const { metricsMiddleware } = require('./middleware/metricsMiddleware');
+const metricsRoutes = require('./routes/metrics');
+const healthRoutes = require('./routes/health');
 
 app.use(requestId);
+app.use(metricsMiddleware);
 app.use(cors());
 app.use(express.json({
   verify: (req, res, buf) => {
@@ -39,9 +43,8 @@ app.use(express.json({
 }));
 app.use(sanitizeInput);
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', requestId: req.id });
-});
+app.use('/metrics', metricsRoutes);
+app.use('/health', healthRoutes);
 
 app.use('/auth', authRoutes);
 app.use('/users', usersRoutes);

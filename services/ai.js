@@ -10,6 +10,7 @@ const {
   aiSearchResponse,
 } = require('../validation/schemas');
 const { parseSearchQuery, buildPrismaWhereClause } = require('./searchParser');
+const { recordAiRequest, recordAiTokens, recordAiError } = require('./metrics');
 
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 const DEFAULT_GEMINI_TIMEOUT_MS = 10000;
@@ -112,6 +113,14 @@ function logGeminiDiagnostic({ feature, model, elapsedMs, error, fallbackReason 
   }
 
   const errorCategory = categorizeGeminiError(error);
+  try {
+    recordAiError({
+      model: model || getGeminiModel(),
+      feature: feature || 'unknown',
+      errorType: errorCategory,
+    });
+  } catch (_) {}
+
   const sanitizedMessage = error?.message
     ? String(error.message)
         .replace(/AIza[0-9A-Za-z-_]{35}/g, '[REDACTED_API_KEY]')
@@ -212,7 +221,19 @@ async function callGeminiGenerate({
   try {
     const response = await Promise.race([requestPromise, timeoutPromise]);
     clearTimeout(timerId);
-    return response.text?.trim() || '{}';
+    const text = response.text?.trim() || '{}';
+    try {
+      const inputTokens = Math.max(1, Math.ceil(JSON.stringify(contents).length / 4));
+      const outputTokens = Math.max(1, Math.ceil(text.length / 4));
+      recordAiTokens({ model, feature: 'gemini_generate', inputTokens, outputTokens });
+      recordAiRequest({
+        model,
+        feature: 'gemini_generate',
+        status: 'success',
+        keyType: isCustomKey ? 'byok' : 'system',
+      });
+    } catch (_) {}
+    return text;
   } catch (err) {
     clearTimeout(timerId);
     throw err;
@@ -403,6 +424,22 @@ Guidelines:
       suggestedSubtasks: Array.isArray(parsedJson.suggestedSubtasks) ? parsedJson.suggestedSubtasks : [],
     });
 
+    try {
+      recordAiTokens({
+        model,
+        feature: 'generateTaskFromPrompt',
+        inputTokens: Math.max(10, Math.ceil(cleanPrompt.length / 4)),
+        outputTokens: Math.max(20, Math.ceil(JSON.stringify(validated).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'generateTaskFromPrompt',
+        status: 'success',
+        keyType: teamId ? 'byok' : 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
     return validated;
   } catch (error) {
     const elapsedMs = Date.now() - startTime;
@@ -418,10 +455,28 @@ Guidelines:
     dueDate.setUTCDate(dueDate.getUTCDate() + rawResult.suggestedDeadlineDays);
     const suggestedDueDate = dueDate.toISOString().slice(0, 10);
 
-    return aiTaskGenerateResponse.parse({
+    const fallbackResult = aiTaskGenerateResponse.parse({
       ...rawResult,
       suggestedDueDate,
     });
+
+    try {
+      recordAiTokens({
+        model,
+        feature: 'generateTaskFromPrompt',
+        inputTokens: Math.max(10, Math.ceil(cleanPrompt.length / 4)),
+        outputTokens: Math.max(20, Math.ceil(JSON.stringify(fallbackResult).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'generateTaskFromPrompt',
+        status: 'fallback',
+        keyType: 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
+    return fallbackResult;
   }
 }
 
@@ -572,6 +627,22 @@ Guidelines:
       order: typeof st.order === 'number' ? st.order : (idx + 1) * 1000,
     })).filter(st => st.title.length > 0);
 
+    try {
+      recordAiTokens({
+        model,
+        feature: 'breakdownTaskIntoSubtasks',
+        inputTokens: Math.max(10, Math.ceil(cleanTitle.length / 4)),
+        outputTokens: Math.max(20, Math.ceil(JSON.stringify(subtasks).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'breakdownTaskIntoSubtasks',
+        status: 'success',
+        keyType: 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
     return { subtasks };
   } catch (err) {
     const elapsedMs = Date.now() - startTime;
@@ -587,6 +658,23 @@ Guidelines:
       description: cleanDesc,
       existingSubtasks,
     });
+
+    try {
+      recordAiTokens({
+        model,
+        feature: 'breakdownTaskIntoSubtasks',
+        inputTokens: Math.max(10, Math.ceil(cleanTitle.length / 4)),
+        outputTokens: Math.max(20, Math.ceil(JSON.stringify(fallbackList).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'breakdownTaskIntoSubtasks',
+        status: 'fallback',
+        keyType: 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
     return { subtasks: fallbackList };
   }
 }
@@ -987,6 +1075,22 @@ Guidelines:
       tasks: Array.isArray(parsedJson.tasks) ? parsedJson.tasks : [],
     });
 
+    try {
+      recordAiTokens({
+        model,
+        feature: 'generateProjectPlan',
+        inputTokens: Math.max(10, Math.ceil(cleanPrompt.length / 4)),
+        outputTokens: Math.max(50, Math.ceil(JSON.stringify(validated).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'generateProjectPlan',
+        status: 'success',
+        keyType: teamId ? 'byok' : 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
     return validated;
   } catch (err) {
     const elapsedMs = Date.now() - startTime;
@@ -998,7 +1102,25 @@ Guidelines:
     });
 
     const rawResult = generateFallbackProjectPlan(cleanPrompt, weeks);
-    return aiProjectPlanResponse.parse(rawResult);
+    const fallbackResult = aiProjectPlanResponse.parse(rawResult);
+
+    try {
+      recordAiTokens({
+        model,
+        feature: 'generateProjectPlan',
+        inputTokens: Math.max(10, Math.ceil(cleanPrompt.length / 4)),
+        outputTokens: Math.max(50, Math.ceil(JSON.stringify(fallbackResult).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'generateProjectPlan',
+        status: 'fallback',
+        keyType: 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
+    return fallbackResult;
   }
 }
 
@@ -1617,7 +1739,25 @@ Guidelines:
       generatedAt: new Date().toISOString(),
     };
 
-    return aiProductivityInsightsResponse.parse(result);
+    const validated = aiProductivityInsightsResponse.parse(result);
+
+    try {
+      recordAiTokens({
+        model,
+        feature: 'generateProductivityInsights',
+        inputTokens: Math.max(20, Math.ceil(JSON.stringify(contextData).length / 4)),
+        outputTokens: Math.max(50, Math.ceil(JSON.stringify(validated).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'generateProductivityInsights',
+        status: 'success',
+        keyType: teamId ? 'byok' : 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
+    return validated;
   } catch (err) {
     const elapsedMs = Date.now() - startTime;
     logGeminiDiagnostic({
@@ -1628,7 +1768,25 @@ Guidelines:
     });
 
     const fallback = generateFallbackInsights(metrics, scopeName);
-    return aiProductivityInsightsResponse.parse(fallback);
+    const fallbackResult = aiProductivityInsightsResponse.parse(fallback);
+
+    try {
+      recordAiTokens({
+        model,
+        feature: 'generateProductivityInsights',
+        inputTokens: Math.max(20, Math.ceil(JSON.stringify(metrics).length / 4)),
+        outputTokens: Math.max(50, Math.ceil(JSON.stringify(fallbackResult).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'generateProductivityInsights',
+        status: 'fallback',
+        keyType: 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
+    return fallbackResult;
   }
 }
 
@@ -1971,6 +2129,24 @@ Guidelines:
       },
       searchExpression: parsedJson.searchExpression || fallback.searchExpression,
     };
+
+    try {
+      recordAiTokens({
+        model,
+        feature: 'interpretNaturalSearchPrompt',
+        inputTokens: Math.max(10, Math.ceil(cleanPrompt.length / 4)),
+        outputTokens: Math.max(20, Math.ceil(JSON.stringify(result).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'interpretNaturalSearchPrompt',
+        status: 'success',
+        keyType: 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
+    return result;
   } catch (err) {
     const elapsedMs = Date.now() - startTime;
     logGeminiDiagnostic({
@@ -1980,7 +2156,25 @@ Guidelines:
       error: err,
     });
 
-    return fallbackNaturalSearchInterpreter(cleanPrompt, context);
+    const fallbackResult = fallbackNaturalSearchInterpreter(cleanPrompt, context);
+
+    try {
+      recordAiTokens({
+        model,
+        feature: 'interpretNaturalSearchPrompt',
+        inputTokens: Math.max(10, Math.ceil(cleanPrompt.length / 4)),
+        outputTokens: Math.max(20, Math.ceil(JSON.stringify(fallbackResult).length / 4)),
+      });
+      recordAiRequest({
+        model,
+        feature: 'interpretNaturalSearchPrompt',
+        status: 'fallback',
+        keyType: 'system',
+        durationSeconds: (Date.now() - startTime) / 1000,
+      });
+    } catch (_) {}
+
+    return fallbackResult;
   }
 }
 

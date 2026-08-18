@@ -1,18 +1,18 @@
 # TaskFlow — Full Production Plan
 
 > ## 🎯 Current Focus (read this first)
-> **Active phase: Phase 40 — Performance Engineering & DB Query Optimization**
+> **Active phase: Phase 42 — Universal Command Palette (`Cmd+K` / `Ctrl+K`)**
 >
-> **Prior Progress: Phases 0–39 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
-> - 388 automated tests passing with 100% success rate across 24 test suites.
-> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search, Universal Freelancer Agent & BYOK), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Turnstile CAPTCHA, Optimized Attachments, Postgres Row-Level Security (RLS), Global Input Sanitization, Server-Side Redis Sessions, and Backend Redis Cache-Aside Layer.
+> **Prior Progress: Phases 0–41 & Engineering Charter Hardening: ✅ ALL COMPLETE & VERIFIED**
+> - 421+ automated tests passing with 100% success rate across 26 test suites.
+> - Built-in: Multi-tenancy, RBAC, Validation, Sentry, GDPR, Due Dates, CI/CD, Analytics, Kanban, Subtasks, Notifications, Real-Time WebSockets, Projects, Calendar, AI Suite (Assistant, Breakdown, Planner, Insights, Natural Search, Universal Freelancer Agent & BYOK), Webhooks, GitHub/Slack/Discord integrations, Terraform IaC, Turnstile CAPTCHA, Optimized Attachments, Postgres Row-Level Security (RLS), Global Input Sanitization, Server-Side Redis Sessions, Backend Redis Cache-Aside Layer, Compound Indexes, Cursor Pagination, Slow Query Performance Monitoring, and Production Observability & Prometheus Metrics (`/metrics`, `/health/live`, `/health/ready`).
 >
-> **Prioritized Next Steps (Tier 1 Execution):**
-> 1. **Phase 40: Performance Engineering & DB Query Optimization** (Compound indexes, cursor pagination, slow query logging).
-> 2. **Phase 41: Production Observability & Prometheus Metrics**.
-> 3. **Phase 42: Universal Command Palette (`Cmd+K` / `Ctrl+K`)**.
-> 4. **Phase 43: Custom Dashboard Widgets & Workspace Customization**.
-> 5. **Phase 44: Production Hardening, Security Audit & Penetration Testing**.
+> **Prioritized Next Steps (Tier 2 Execution):**
+> 1. **Phase 42: Universal Command Palette (`Cmd+K` / `Ctrl+K`)**.
+> 2. **Phase 43: Task Templates & Workflow Automation**.
+> 3. **Phase 44: Custom Views & Saved Filters**.
+> 4. **Phase 45: Time Tracking & Work Estimates**.
+> 5. **Phase 46: Export & Reporting Engine (CSV / PDF / JSON)**.
 >
 > **This file is used across tools (Kiro and Antigravity).** See "Agent Reference" below for conventions.
 >

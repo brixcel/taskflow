@@ -8,8 +8,7 @@ const { upload, UPLOADS_DIR } = require('../middleware/upload');
 
 const router = express.Router();
 
-router.use(requireAuth);
-router.use(resolveTeam);
+router.use(['/tasks/:taskId/attachments', '/attachments'], requireAuth, resolveTeam);
 
 // ─── POST /tasks/:taskId/attachments — Upload attachments to task ─────────────
 

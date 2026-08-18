@@ -1,4 +1,5 @@
 const { redis } = require('../config/redis');
+const { recordRedisOp } = require('./metrics');
 
 // Cache TTL presets in seconds
 const TTL = {
@@ -24,9 +25,12 @@ async function getOrSet(key, ttlSeconds, fetchFn) {
   try {
     const cached = await redis.get(key);
     if (cached !== null && cached !== undefined) {
+      recordRedisOp({ operation: 'get', status: 'hit' });
       return JSON.parse(cached);
     }
+    recordRedisOp({ operation: 'get', status: 'miss' });
   } catch (err) {
+    recordRedisOp({ operation: 'get', status: 'error' });
     // If Redis read fails, proceed directly to DB fetch
   }
 
@@ -35,7 +39,9 @@ async function getOrSet(key, ttlSeconds, fetchFn) {
   if (freshData !== null && freshData !== undefined) {
     try {
       await redis.set(key, JSON.stringify(freshData), 'EX', ttlSeconds);
+      recordRedisOp({ operation: 'set', status: 'write' });
     } catch (err) {
+      recordRedisOp({ operation: 'set', status: 'error' });
       // Redis write failure is non-fatal
     }
   }
@@ -51,8 +57,11 @@ async function invalidate(...keys) {
   if (flatKeys.length === 0) return 0;
 
   try {
-    return await redis.del(...flatKeys);
+    const res = await redis.del(...flatKeys);
+    recordRedisOp({ operation: 'del', status: 'delete' });
+    return res;
   } catch {
+    recordRedisOp({ operation: 'del', status: 'error' });
     return 0;
   }
 }

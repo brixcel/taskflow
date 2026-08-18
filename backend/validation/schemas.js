@@ -301,8 +301,11 @@ const notificationPreferencesUpdate = z.object({
 const notificationQuery = z.object({
   unread: z.enum(['true', 'false']).optional(),
   type: z.string().trim().optional(),
+  teamId: z.string().trim().optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+  cursor: z.string().trim().optional(),
+  mode: z.enum(['cursor', 'offset']).optional(),
 });
 
 // ─── Search ───────────────────────────────────────────────────────────────────

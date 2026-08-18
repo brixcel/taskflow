@@ -22,6 +22,7 @@ const {
 } = require('../middleware/authSecurity');
 const turnstileGuard = require('../middleware/turnstileGuard');
 const logger = require('../middleware/logger');
+const { recordAuthEvent } = require('../services/metrics');
 
 const router = express.Router();
 
@@ -107,6 +108,8 @@ router.post(
         { expiresIn: '7d' }
       );
 
+      recordAuthEvent({ event: 'register', status: 'success' });
+
       res.status(201).json({
         user:  { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified },
         token,
@@ -129,11 +132,13 @@ router.post('/login', authLimiter, turnstileGuard, validate(schemas.login), asyn
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
+      recordAuthEvent({ event: 'login', status: 'failed' });
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const passwordMatches = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatches) {
+      recordAuthEvent({ event: 'login', status: 'failed' });
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -162,6 +167,8 @@ router.post('/login', authLimiter, turnstileGuard, validate(schemas.login), asyn
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    recordAuthEvent({ event: 'login', status: 'success' });
 
     res.json({
       user: {

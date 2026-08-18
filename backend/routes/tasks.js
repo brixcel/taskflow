@@ -20,6 +20,7 @@ const {
 const { dispatchWebhookEvent } = require('../services/webhooks');
 const { dispatchChatEvent } = require('../services/chatIntegrations');
 const { invalidate } = require('../services/cache');
+const { paginateWithCursor, InvalidCursorError } = require('../helpers/cursorPagination');
 
 const router = express.Router();
 
@@ -199,7 +200,37 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // Run count and fetch in parallel for efficiency
+    // ── Cursor-Based Pagination Mode ──────────────────────────────────────────
+    if (req.query.cursor || req.query.mode === 'cursor') {
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || req.query.pageSize, 10) || 20));
+      const result = await paginateWithCursor(prisma.task, {
+        where,
+        cursor: req.query.cursor,
+        limit,
+        orderBy: [
+          { order: 'asc' },
+          { id: 'asc' },
+        ],
+        include: {
+          assignee:  { select: { id: true, name: true } },
+          createdBy: { select: { id: true, name: true } },
+          project:   { select: { id: true, name: true, color: true, icon: true } },
+          subtasks:  { select: { id: true, completed: true } },
+        },
+      });
+
+      return res.json({
+        tasks: result.items,
+        pagination: {
+          nextCursor: result.nextCursor,
+          prevCursor: result.prevCursor,
+          hasMore: result.hasMore,
+          limit: result.limit,
+        },
+      });
+    }
+
+    // ── Standard Offset Pagination Mode (Default) ─────────────────────────────
     const [total, tasks] = await Promise.all([
       prisma.task.count({ where }),
       prisma.task.findMany({
@@ -229,6 +260,9 @@ router.get('/', async (req, res) => {
       },
     });
   } catch (error) {
+    if (error instanceof InvalidCursorError) {
+      return res.status(400).json({ error: error.message });
+    }
     if (logger && logger.error) {
       logger.error({ err: error }, 'GET /tasks failed');
     }

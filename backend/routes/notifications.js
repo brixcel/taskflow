@@ -7,6 +7,7 @@ const {
   getUserPreferences,
   checkDueDates,
 } = require('../services/notifications');
+const { paginateWithCursor, InvalidCursorError } = require('../helpers/cursorPagination');
 
 const router = express.Router();
 
@@ -16,16 +17,50 @@ router.use(requireAuth);
 // ─── GET /notifications — list paginated notifications for current user ───────
 router.get('/', validate(schemas.notificationQuery, 'query'), async (req, res) => {
   try {
-    const { unread, type, teamId } = req.query;
-    const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const { unread, type, teamId, cursor, mode } = req.query;
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const skip  = (page - 1) * limit;
 
     const where = { userId: req.userId };
     if (unread === 'true')  where.read = false;
     if (unread === 'false') where.read = true;
     if (type)               where.type = type;
     if (teamId)             where.teamId = teamId;
+
+    // ── Cursor-based pagination mode ──────────────────────────────────────────
+    if (cursor || mode === 'cursor') {
+      const [result, unreadCount] = await Promise.all([
+        paginateWithCursor(prisma.notification, {
+          where,
+          cursor,
+          limit,
+          orderBy: [
+            { createdAt: 'desc' },
+            { id: 'desc' },
+          ],
+          include: {
+            actor: { select: { id: true, name: true, email: true } },
+            task:  { select: { id: true, title: true, status: true, priority: true } },
+            team:  { select: { id: true, name: true } },
+          },
+        }),
+        prisma.notification.count({ where: { userId: req.userId, read: false } }),
+      ]);
+
+      return res.json({
+        notifications: result.items,
+        unreadCount,
+        pagination: {
+          nextCursor: result.nextCursor,
+          prevCursor: result.prevCursor,
+          hasMore: result.hasMore,
+          limit: result.limit,
+        },
+      });
+    }
+
+    // ── Standard Offset Pagination Mode ───────────────────────────────────────
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const skip = (page - 1) * limit;
 
     const [notifications, total, unreadCount] = await Promise.all([
       prisma.notification.findMany({
@@ -54,6 +89,9 @@ router.get('/', validate(schemas.notificationQuery, 'query'), async (req, res) =
       totalPages,
     });
   } catch (error) {
+    if (error instanceof InvalidCursorError) {
+      return res.status(400).json({ error: error.message });
+    }
     console.error('Error fetching notifications:', error);
     res.status(500).json({ error: 'Failed to fetch notifications' });
   }

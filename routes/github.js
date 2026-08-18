@@ -115,7 +115,7 @@ router.post('/api/github/webhook/:integrationId', handleIntegrationWebhook);
 
 // ─── Protected Routes Middleware ─────────────────────────────────────────────
 // All subsequent routes require user authentication and team resolution
-router.use(requireAuth, resolveTeam);
+router.use(['/projects/:projectId/github', '/projects/:projectId/integrations/github', '/github', '/api/projects/:projectId/github', '/api/github'], requireAuth, resolveTeam);
 
 /**
  * Helper to check project membership & elevated rights

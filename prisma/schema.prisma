@@ -85,6 +85,7 @@ model TeamMembership {
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@id([userId, teamId])
+  @@index([teamId, role])
   @@map("team_memberships")
 }
 
@@ -117,6 +118,7 @@ model Project {
 
   @@index([teamId, status])
   @@index([teamId, isArchived])
+  @@index([teamId, isArchived, status])
   @@index([teamId, order])
   @@index([teamId, createdAt])
   @@map("projects")
@@ -168,6 +170,10 @@ model Task {
   @@index([teamId, status, order])
   @@index([teamId, order])
   @@index([teamId, status])
+  @@index([teamId, status, priority])
+  @@index([teamId, assigneeId, status])
+  @@index([teamId, projectId, status])
+  @@index([teamId, status, dueDate])
   @@index([teamId, dueDate])
   @@index([teamId, assigneeId])
   @@index([teamId, projectId])
@@ -243,6 +249,7 @@ model Comment {
   task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   author User @relation(fields: [authorId], references: [id])
 
+  @@index([taskId, createdAt])
   @@map("comments")
 }
 
@@ -258,6 +265,7 @@ model Activity {
   user User @relation(fields: [userId], references: [id])
 
   @@index([taskId, createdAt])
+  @@index([userId, createdAt])
   @@map("activities")
 }
 
@@ -312,6 +320,7 @@ model Notification {
 
   @@index([userId, read, createdAt])
   @@index([userId, createdAt])
+  @@index([userId, type, createdAt])
   @@index([teamId])
   @@map("notifications")
 }
