@@ -44,6 +44,7 @@ model User {
   githubIntegrationsCreated ProjectGitHubIntegration[]
   chatIntegrationsCreated  TeamChatIntegration[]
   attachmentsUploaded      TaskAttachment[]
+  taskTemplatesCreated     TaskTemplate[]
 
   @@map("users")
 }
@@ -71,6 +72,7 @@ model Team {
   githubIntegrations ProjectGitHubIntegration[]
   chatIntegrations   TeamChatIntegration[]
   attachments        TaskAttachment[]
+  taskTemplates      TaskTemplate[]
 
   @@map("teams")
 }
@@ -564,5 +566,31 @@ model ChatIntegrationDelivery {
   @@index([integrationId, createdAt])
   @@map("chat_integration_deliveries")
 }
+
+// ─── Task Templates & Workflow Automation (Phase 43) ───────────────────────────
+
+model TaskTemplate {
+  id              String    @id @default(uuid())
+  teamId          String
+  createdById     String
+  name            String
+  description     String?
+  category        String    @default("General") // e.g. Engineering, Design, Product, Operations, Bug
+  defaultPriority String    @default("medium")  // urgent, high, medium, low
+  defaultLabels   String[]  @default([])
+  subtasks        Json?     // Array of { title: string, estimatedHours?: number }
+  automationRules Json?     // Workflow triggers: { autoDueDays?: number, defaultStatus?: string, autoAssignToCreator?: boolean }
+  usageCount      Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([createdById])
+  @@map("task_templates")
+}
+
 
 

@@ -581,6 +581,51 @@ const chatIntegrationUpdate = z.object({
   isActive: z.boolean().optional(),
 });
 
+const taskTemplateCreate = z.object({
+  name: nonBlankString(100, { requiredMsg: 'Template name is required', maxMsg: 'Template name must be 100 characters or fewer' }),
+  description: z.string().trim().max(1000, 'Description must be 1000 characters or fewer').optional(),
+  category: z.string().trim().max(50).optional(),
+  defaultPriority: prioritySchema.optional(),
+  defaultLabels: labelsSchema.optional(),
+  subtasks: z.array(z.object({
+    title: nonBlankString(200, { requiredMsg: 'Subtask title is required' }),
+    estimatedHours: z.number().nonnegative().max(1000).optional(),
+  })).max(30, 'Maximum 30 subtasks allowed in a template').optional(),
+  automationRules: z.object({
+    autoDueDays: z.number().int().min(0).max(365).optional(),
+    defaultStatus: z.enum(['todo', 'in_progress', 'done']).optional(),
+    autoAssignToCreator: z.boolean().optional(),
+  }).optional(),
+});
+
+const taskTemplateUpdate = z.object({
+  name: nonBlankString(100, { requiredMsg: 'Template name is required', maxMsg: 'Template name must be 100 characters or fewer' }).optional(),
+  description: z.string().trim().max(1000, 'Description must be 1000 characters or fewer').optional().nullable(),
+  category: z.string().trim().max(50).optional(),
+  defaultPriority: prioritySchema.optional(),
+  defaultLabels: labelsSchema.optional(),
+  subtasks: z.array(z.object({
+    title: nonBlankString(200, { requiredMsg: 'Subtask title is required' }),
+    estimatedHours: z.number().nonnegative().max(1000).optional(),
+  })).max(30).optional().nullable(),
+  automationRules: z.object({
+    autoDueDays: z.number().int().min(0).max(365).optional(),
+    defaultStatus: z.enum(['todo', 'in_progress', 'done']).optional(),
+    autoAssignToCreator: z.boolean().optional(),
+  }).optional().nullable(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field must be provided' },
+);
+
+const taskTemplateApply = z.object({
+  projectId: z.string().uuid('projectId must be a valid UUID').optional().nullable(),
+  title: z.string().trim().max(200).optional(),
+  assigneeId: z.string().uuid('assigneeId must be a valid UUID').optional().nullable(),
+  dueDate: dueDateSchema.optional(),
+  status: z.enum(['todo', 'in_progress', 'done']).optional(),
+});
+
 module.exports = {
   register,
   login,
@@ -632,7 +677,12 @@ module.exports = {
   githubManualLink,
   chatIntegrationCreate,
   chatIntegrationUpdate,
+  taskTemplateCreate,
+  taskTemplateUpdate,
+  taskTemplateApply,
 };
+
+
 
 
 

@@ -16,6 +16,7 @@ import {
   Clock,
   Trash2,
   MessageSquare,
+  Zap,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TaskSkeleton from '../components/TaskSkeleton';
@@ -33,6 +34,7 @@ import ProjectGitHubView from '../components/ProjectGitHubView';
 import CalendarView from '../components/CalendarView';
 import GlobalSearchModal from '../components/GlobalSearchModal';
 import CommandPalette from '../components/CommandPalette';
+import TaskTemplateModal from '../components/TaskTemplateModal';
 import ProjectIcon from '../components/ProjectIcon';
 import { useRealtime } from '../context/RealtimeContext';
 import { API_URL } from '../api/config';
@@ -777,6 +779,7 @@ export default function Dashboard() {
   const [isDrawerEditRequested, setIsDrawerEditRequested] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
   const searchInputRef = useRef(null);
 
   const activeProject = projects.find(p => p.id === activeProjectId) || null;
@@ -1461,6 +1464,16 @@ export default function Dashboard() {
             <ThemeToggle variant="icon" size="sm" />
 
             <button
+              onClick={() => setShowTemplateModal(true)}
+              className="btn-secondary"
+              style={{ height: 32, fontSize: 13, gap: 5 }}
+              title="Templates & Workflows"
+            >
+              <Zap size={14} className="text-indigo-400" />
+              Templates
+            </button>
+
+            <button
               className="btn-primary"
               onClick={() => {
                 setModalDefaultStatus('todo');
@@ -1838,6 +1851,7 @@ export default function Dashboard() {
         onCreateWithAI={() => setShowAiModal(true)}
         onCreateProject={() => setShowProjectModal(true)}
         onOpenAIPlanner={() => setShowAiPlannerModal(true)}
+        onOpenTemplates={() => setShowTemplateModal(true)}
         onNavigateView={(view) => {
           setViewMode(view);
           const params = new URLSearchParams(location.search);
@@ -1850,6 +1864,21 @@ export default function Dashboard() {
         onOpenGlobalSearch={(initialQuery) => {
           setSearchInput(initialQuery || '');
           setShowGlobalSearch(true);
+        }}
+      />
+
+      {/* Task Templates & Workflow Automation Modal (Phase 43) */}
+      <TaskTemplateModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        userRole={userRole}
+        onTemplateApplied={(data) => {
+          if (data?.task) {
+            setTasks((prev) => [data.task, ...prev]);
+            handleOpenTaskById(data.task.id);
+          }
         }}
       />
     </div>

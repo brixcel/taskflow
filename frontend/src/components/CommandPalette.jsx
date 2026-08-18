@@ -24,6 +24,7 @@ import {
   Folder,
   Tag,
   ExternalLink,
+  Zap,
 } from 'lucide-react';
 import { API_URL } from '../api/config';
 import ProjectIcon from './ProjectIcon';
@@ -51,6 +52,7 @@ export default function CommandPalette({
   onCreateWithAI,
   onCreateProject,
   onOpenAIPlanner,
+  onOpenTemplates,
   onNavigateView,
   onOpenSettings,
   onOpenGlobalSearch,
@@ -185,6 +187,18 @@ export default function CommandPalette({
         action: () => {
           onClose();
           onOpenAIPlanner?.();
+        },
+      },
+      {
+        id: 'action-templates',
+        title: 'Task Templates & Workflows',
+        description: 'Browse preset engineering, design, and product task workflows',
+        category: 'Actions',
+        icon: Zap,
+        iconColor: '#6366f1',
+        action: () => {
+          onClose();
+          onOpenTemplates?.();
         },
       },
       {
