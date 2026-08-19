@@ -771,11 +771,15 @@ async function seedRealisticData() {
   console.log('═══════════════════════════════════════════════════════════════════════════\n');
 }
 
-seedRealisticData()
-  .catch((e) => {
-    console.error('❌ Error seeding test data:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  seedRealisticData()
+    .catch((e) => {
+      console.error('❌ Error seeding test data:', e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
+
+module.exports = { seedRealisticData };

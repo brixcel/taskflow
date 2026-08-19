@@ -79,8 +79,19 @@ app.use('/tasks/:taskId/subtasks', subtaskRoutes);
 app.use(errorHandler);
 
 if (require.main === module) {
-  server.listen(PORT, () => {
+  server.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
+    try {
+      const prismaClient = require('./prisma');
+      const owner = await prismaClient.user.findUnique({ where: { email: 'owner@synctask.local' } });
+      if (!owner) {
+        console.log('🌱 No canonical demo accounts detected in database. Seeding demo accounts...');
+        const { seedRealisticData } = require('./scripts/seed-test-data');
+        await seedRealisticData();
+      }
+    } catch (err) {
+      console.warn('⚠️ Auto-seed check notice:', err.message);
+    }
   });
 }
 

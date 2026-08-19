@@ -98,4 +98,29 @@ router.get('/ready', async (req, res) => {
   });
 });
 
+/**
+ * POST /health/seed
+ * Secure / diagnostic database seeder for demo environments.
+ */
+router.post('/seed', async (req, res) => {
+  try {
+    const { seedRealisticData } = require('../scripts/seed-test-data');
+    await seedRealisticData();
+    return res.json({
+      success: true,
+      message: 'Demo accounts and workspaces successfully seeded',
+      accounts: [
+        { email: 'owner@synctask.local', role: 'owner' },
+        { email: 'admin@synctask.local', role: 'admin' },
+        { email: 'dev@synctask.local', role: 'member' },
+        { email: 'designer@synctask.local', role: 'member' },
+        { email: 'qa@synctask.local', role: 'member' },
+      ],
+    });
+  } catch (err) {
+    console.error('Error in /health/seed:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
