@@ -1454,15 +1454,14 @@ async function aggregateProductivityMetrics({
     };
   }
 
-  // Project slowdowns: only flag if a project has open pending tasks, has overdue items, and NO task updates or completions in the past 14 days
-  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  // Project slowdowns: flag if a project has open pending tasks and NO activity in the past 5 days
+  const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
   const projectSlowdowns = [];
   for (const p of projects) {
     const projectTasks = tasks.filter(t => t.projectId === p.id);
     const pendingInProject = projectTasks.filter(t => t.status !== 'done');
-    const hasRecentActivity = projectTasks.some(t => new Date(t.updatedAt) >= fourteenDaysAgo);
-    const hasOverdue = projectTasks.some(t => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now);
-    if (pendingInProject.length > 0 && !hasRecentActivity && hasOverdue) {
+    const hasRecentActivity = projectTasks.some(t => new Date(t.updatedAt) >= fiveDaysAgo);
+    if (pendingInProject.length > 0 && !hasRecentActivity) {
       projectSlowdowns.push({
         projectId: p.id,
         name: p.name,
@@ -1506,7 +1505,7 @@ async function aggregateProductivityMetrics({
  */
 function generateFallbackInsights(metrics, scopeName = 'Your team') {
   const {
-    timeRange,
+    timeRange = { label: 'this period', range: '7d' },
     totalTasks = 0,
     tasksCompleted = 0,
     tasksCreated = 0,
@@ -1514,7 +1513,7 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
     velocityChangePct = 0,
     overdueCount = 0,
     activeWorkloadCount = 0,
-    peakProductivityDay = null,
+    peakProductivityDay = 'mid-week',
     topContributor = null,
     highestWorkloadMember = null,
     projectSlowdowns = [],
@@ -1624,7 +1623,7 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
   }
 
   if (projectSlowdowns.length > 0) {
-    summaryParts.push(`"${projectSlowdowns[0].name}" has slowed with overdue items.`);
+    summaryParts.push(`"${projectSlowdowns[0].name}" has slowed over the past 5 days.`);
   }
 
   const summary = summaryParts.join(' ');
