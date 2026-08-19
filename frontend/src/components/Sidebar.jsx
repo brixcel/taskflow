@@ -328,10 +328,22 @@ export default function Sidebar({
     if (view) {
       navigate(`/dashboard?view=${view}`);
     } else {
-      navigate('/dashboard');
+      navigate(`/dashboard?tab=${tab}`);
     }
+    onClose();
   };
 
+  const handleProjectClick = (projId) => {
+    onSelectProject(projId);
+    if (projId) {
+      navigate(`/dashboard?projectId=${projId}`);
+    } else {
+      navigate('/dashboard');
+    }
+    onClose();
+  };
+
+  const isDashboard = location.pathname === '/dashboard';
   const isMyTasks = activeTab === 'mine' && !activeProjectId && !activeViewId;
   const isAllTasks = activeTab === 'all' && !activeProjectId && !activeViewId;
 
