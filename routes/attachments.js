@@ -250,7 +250,13 @@ router.get('/attachments/:attachmentId/preview', async (req, res) => {
     }
 
     res.setHeader('Content-Type', attachment.mimeType);
-    res.setHeader('Content-Disposition', `inline; filename="${attachment.fileName}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (attachment.mimeType === 'image/svg+xml') {
+      // Sandbox SVGs to prevent stored XSS attacks
+      res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    }
+    const safeFileName = attachment.fileName.replace(/["\r\n]/g, '_');
+    res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"`);
     res.sendFile(filePath);
   } catch (error) {
     console.error('GET /attachments/:attachmentId/preview error:', error);

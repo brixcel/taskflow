@@ -12,6 +12,7 @@ const {
   generateWebhookSecret,
   sendWebhookPing,
   VALID_WEBHOOK_EVENTS,
+  validateWebhookUrl,
 } = require('../services/webhooks');
 const logger = require('../middleware/logger');
 
@@ -239,12 +240,17 @@ router.post(
     try {
       const { name, url, events } = req.body;
 
+      const urlCheck = validateWebhookUrl(url);
+      if (!urlCheck.valid) {
+        return res.status(400).json({ error: urlCheck.error });
+      }
+
       const secret = generateWebhookSecret();
 
       const webhook = await prisma.webhook.create({
         data: {
           name: sanitize(name),
-          url: url.trim(),
+          url: urlCheck.url,
           secret,
           events,
           teamId: req.teamId,
@@ -313,7 +319,13 @@ router.patch(
 
       const updateData = {};
       if (name !== undefined) updateData.name = sanitize(name);
-      if (url !== undefined) updateData.url = url.trim();
+      if (url !== undefined) {
+        const urlCheck = validateWebhookUrl(url);
+        if (!urlCheck.valid) {
+          return res.status(400).json({ error: urlCheck.error });
+        }
+        updateData.url = urlCheck.url;
+      }
       if (events !== undefined) updateData.events = events;
       if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 

@@ -3,6 +3,8 @@ const { z }       = require('zod');
 const prisma      = require('../prisma');
 const requireAuth = require('../middleware/auth');
 const logger      = require('../middleware/logger');
+const { revokeAllUserSessions } = require('../services/session');
+const { invalidateUserCache } = require('../services/cache');
 
 const router = express.Router();
 
@@ -216,6 +218,14 @@ router.delete('/me', requireAuth, async (req, res) => {
         },
       }),
     ]);
+
+    // Revoke all active Redis sessions and invalidate user cache
+    try {
+      await revokeAllUserSessions(userId);
+      await invalidateUserCache(userId);
+    } catch (err) {
+      logger.warn({ err, userId }, 'Failed to revoke Redis sessions during account deletion');
+    }
 
     logger.info({ userId }, 'User account successfully deleted and anonymized');
     return res.status(200).json({ message: 'Account successfully deleted and data anonymized' });

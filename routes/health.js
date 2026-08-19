@@ -100,10 +100,20 @@ router.get('/ready', async (req, res) => {
 
 /**
  * POST /health/seed
- * Secure / diagnostic database seeder for demo environments.
+ * Secure administrative database seeder for demo environments.
+ * Requires x-admin-secret header matching ADMIN_SEED_SECRET or JWT_SECRET.
  */
 router.post('/seed', async (req, res) => {
   try {
+    const adminSecret = process.env.ADMIN_SEED_SECRET || process.env.JWT_SECRET;
+    const providedSecret = req.headers['x-admin-secret'] || req.body?.adminSecret;
+
+    if (!adminSecret || !providedSecret || providedSecret !== adminSecret) {
+      return res.status(401).json({
+        error: 'Unauthorized: missing or invalid administrative seed secret (x-admin-secret header required)',
+      });
+    }
+
     const { seedRealisticData } = require('../scripts/seed-test-data');
     await seedRealisticData();
     return res.json({

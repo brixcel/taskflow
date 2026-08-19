@@ -65,6 +65,63 @@ function verifyWebhookSignature(signatureHeader, secret, payloadString, toleranc
 }
 
 /**
+ * Checks if an IP or hostname is private/internal (SSRF Prevention)
+ */
+function isPrivateOrInternalHost(hostname) {
+  if (!hostname) return true;
+  const lower = hostname.toLowerCase();
+
+  // Localhost & metadata
+  if (
+    lower === 'localhost' ||
+    lower === '127.0.0.1' ||
+    lower === '0.0.0.0' ||
+    lower === '::1' ||
+    lower === '169.254.169.254' ||
+    lower.endsWith('.local') ||
+    lower.endsWith('.internal') ||
+    lower.endsWith('.localhost')
+  ) {
+    return true;
+  }
+
+  // IPv4 Private subnets
+  const ipParts = lower.split('.').map(Number);
+  if (ipParts.length === 4 && ipParts.every((p) => !isNaN(p) && p >= 0 && p <= 255)) {
+    const [a, b] = ipParts;
+    if (a === 10) return true; // 10.0.0.0/8
+    if (a === 127) return true; // 127.0.0.0/8
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 168) return true; // 192.168.0.0/16
+    if (a === 169 && b === 254) return true; // 169.254.0.0/16
+    if (a === 0) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Validates a webhook destination URL against SSRF and protocol rules
+ */
+function validateWebhookUrl(urlString) {
+  try {
+    const parsed = new URL(urlString);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return { valid: false, error: 'Webhook URL must use HTTP or HTTPS protocol' };
+    }
+    if (isPrivateOrInternalHost(parsed.hostname)) {
+      return {
+        valid: false,
+        error: 'Webhook URL cannot point to localhost, private IP ranges, or internal cloud metadata',
+      };
+    }
+    return { valid: true, url: parsed.href };
+  } catch {
+    return { valid: false, error: 'Invalid webhook URL format' };
+  }
+}
+
+/**
  * Delivers a single payload to a specific webhook endpoint and records the delivery
  */
 async function deliverWebhook({ webhook, event, data, prismaInstance = prisma }) {
@@ -87,6 +144,27 @@ async function deliverWebhook({ webhook, event, data, prismaInstance = prisma })
   let responseBody = null;
   let status = 'failed';
   let errorMsg = null;
+
+  // SSRF guard
+  const urlCheck = validateWebhookUrl(webhook.url);
+  if (!urlCheck.valid) {
+    errorMsg = urlCheck.error || 'Blocked by SSRF policy';
+    const delivery = await prismaInstance.webhookDelivery.create({
+      data: {
+        id: deliveryId,
+        webhookId: webhook.id,
+        event,
+        payload: payloadObject,
+        statusCode: null,
+        responseBody: null,
+        durationMs: 0,
+        status: 'failed',
+        error: errorMsg,
+        deliveredAt: new Date(),
+      },
+    });
+    return delivery;
+  }
 
   try {
     const res = await fetch(webhook.url, {
@@ -218,4 +296,5 @@ module.exports = {
   deliverWebhook,
   dispatchWebhookEvent,
   sendWebhookPing,
+  validateWebhookUrl,
 };
