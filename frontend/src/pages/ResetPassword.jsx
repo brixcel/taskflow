@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { Eye, EyeOff } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import SyncTaskLogo from '../components/SyncTaskLogo';
 import { API_URL } from '../api/config';
@@ -22,11 +23,13 @@ function ResetPassword() {
 
   const token = searchParams.get('token') || '';
 
-  const [password, setPassword]               = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fieldErrors, setFieldErrors]         = useState({});
-  const [error, setError]                     = useState('');
-  const [success, setSuccess]                 = useState(false);
+  const [password, setPassword]                           = useState('');
+  const [confirmPassword, setConfirmPassword]             = useState('');
+  const [showPassword, setShowPassword]                   = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword]     = useState(false);
+  const [fieldErrors, setFieldErrors]                     = useState({});
+  const [error, setError]                                 = useState('');
+  const [success, setSuccess]                             = useState(false);
 
   // If there's no token in the URL, show an immediate error state
   const [missingToken] = useState(!token);
@@ -173,17 +176,28 @@ function ResetPassword() {
                 >
                   New password
                 </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); clearField('password'); }}
-                  required
-                  placeholder="Min. 8 characters"
-                  className="field-input"
-                  style={{ fontSize: '14px', lineHeight: '20px', borderColor: fieldErrors.password ? 'var(--color-btn-danger-fg, #ee0000)' : undefined }}
-                  autoComplete="new-password"
-                />
+                <div className="relative flex items-center">
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); clearField('password'); }}
+                    required
+                    placeholder="Min. 8 characters"
+                    className="field-input pr-10 w-full"
+                    style={{ fontSize: '14px', lineHeight: '20px', borderColor: fieldErrors.password ? 'var(--color-btn-danger-fg, #ee0000)' : undefined }}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--color-canvas-mute,#8a8f98)] hover:text-[var(--color-canvas-ink,#0f1011)] bg-transparent border-none cursor-pointer flex items-center justify-center rounded transition-colors"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 {fieldErrors.password && <FieldError message={fieldErrors.password} />}
               </div>
 
@@ -196,17 +210,28 @@ function ResetPassword() {
                 >
                   Confirm new password
                 </label>
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => { setConfirmPassword(e.target.value); clearField('confirmPassword'); }}
-                  required
-                  placeholder="••••••••"
-                  className="field-input"
-                  style={{ fontSize: '14px', lineHeight: '20px', borderColor: fieldErrors.confirmPassword ? 'var(--color-btn-danger-fg, #ee0000)' : undefined }}
-                  autoComplete="new-password"
-                />
+                <div className="relative flex items-center">
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => { setConfirmPassword(e.target.value); clearField('confirmPassword'); }}
+                    required
+                    placeholder="••••••••"
+                    className="field-input pr-10 w-full"
+                    style={{ fontSize: '14px', lineHeight: '20px', borderColor: fieldErrors.confirmPassword ? 'var(--color-btn-danger-fg, #ee0000)' : undefined }}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(v => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--color-canvas-mute,#8a8f98)] hover:text-[var(--color-canvas-ink,#0f1011)] bg-transparent border-none cursor-pointer flex items-center justify-center rounded transition-colors"
+                    title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 {fieldErrors.confirmPassword && <FieldError message={fieldErrors.confirmPassword} />}
               </div>
 

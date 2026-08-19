@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { Eye, EyeOff } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { API_URL } from '../api/config';
 import SyncTaskLogo from '../components/SyncTaskLogo';
@@ -31,20 +32,36 @@ function FieldError({ message }) {
 }
 
 function Field({ id, label, type = 'text', value, onChange, placeholder, required, autoComplete, error, autoFocus }) {
+  const [show, setShow] = useState(false);
+  const isPassword = type === 'password';
+
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id} className="text-[13px] font-medium text-[var(--color-canvas-body,#3d4148)]">{label}</Label>
-      <Input
-        id={id}
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        autoComplete={autoComplete}
-        autoFocus={autoFocus}
-        className={error ? 'border-[var(--color-btn-danger-fg,#d93025)]' : ''}
-      />
+      <div className="relative flex items-center">
+        <Input
+          id={id}
+          type={isPassword ? (show ? 'text' : 'password') : type}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          required={required}
+          autoComplete={autoComplete}
+          autoFocus={autoFocus}
+          className={`${error ? 'border-[var(--color-btn-danger-fg,#d93025)]' : ''} ${isPassword ? 'pr-10' : ''}`}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShow(v => !v)}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--color-canvas-mute,#8a8f98)] hover:text-[var(--color-canvas-ink,#0f1011)] bg-transparent border-none cursor-pointer flex items-center justify-center rounded transition-colors"
+            title={show ? 'Hide password' : 'Show password'}
+            aria-label={show ? 'Hide password' : 'Show password'}
+          >
+            {show ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        )}
+      </div>
       {error && <FieldError message={error} />}
     </div>
   );
