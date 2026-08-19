@@ -1,14 +1,14 @@
-# TaskFlow
+# SyncTask
 
 A real-time, multi-tenant project and task management platform built for modern engineering and product teams.
 
-[![CI](https://github.com/brixcel/taskflow/actions/workflows/ci.yml/badge.svg)](https://github.com/brixcel/taskflow/actions/workflows/ci.yml)
+[![CI](https://github.com/brixcel/synctask/actions/workflows/ci.yml/badge.svg)](https://github.com/brixcel/synctask/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org)
 [![PostgreSQL](https://img.shields.io/badge/postgresql-15%2B-blue.svg)](https://www.postgresql.org)
 [![React](https://img.shields.io/badge/react-19-61dafb.svg)](https://react.dev)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-TaskFlow provides collaborative project tracking with multi-tenant workspace isolation, flexible board and list views, real-time updates via WebSockets, time tracking, developer webhooks, and AI-assisted task workflows.
+SyncTask provides collaborative project tracking with multi-tenant workspace isolation, flexible board and list views, real-time updates via WebSockets, time tracking, developer webhooks, and AI-assisted task workflows.
 
 ---
 
@@ -26,7 +26,7 @@ TaskFlow provides collaborative project tracking with multi-tenant workspace iso
 
 ## Architecture & Data Model
 
-TaskFlow implements a multi-tenant hierarchy where all operational resources are scoped to a **Team**.
+SyncTask implements a multi-tenant hierarchy where all operational resources are scoped to a **Team**.
 
 ```mermaid
 graph TD
@@ -69,8 +69,8 @@ graph TD
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/brixcel/taskflow.git
-cd taskflow
+git clone https://github.com/brixcel/synctask.git
+cd synctask
 
 # Install backend dependencies
 npm install
@@ -95,7 +95,7 @@ Key environment variables in `.env`:
 
 ```ini
 PORT=3000
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/taskflow?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/synctask?schema=public"
 JWT_SECRET="your-development-jwt-secret-min-32-chars"
 CORS_ORIGIN="http://localhost:5173"
 REDIS_URL="redis://localhost:6379"
@@ -134,7 +134,7 @@ npm run dev
 
 ## Testing
 
-TaskFlow includes comprehensive automated unit, integration, and security test suites.
+SyncTask includes comprehensive automated unit, integration, and security test suites.
 
 ```bash
 # Run all backend tests
@@ -153,7 +153,7 @@ npm test -- __tests__/security.test.js
 ## Project Structure
 
 ```text
-taskflow/
+synctask/
 ├── backend/                  # (or root) Express API server & routes
 │   ├── routes/               # Modular REST route handlers
 │   ├── middleware/           # Auth, tenant resolver, rate limiting, sanitization
@@ -184,7 +184,7 @@ taskflow/
 
 ## Security & Responsible Disclosure
 
-Security and tenant isolation are foundational design principles of TaskFlow:
+Security and tenant isolation are foundational design principles of SyncTask:
 - **Tenant Scoping**: All resource queries are strictly bounded by verified team memberships resolved at the middleware layer.
 - **Input Sanitization**: All user inputs are validated with strict schemas (`zod`) and sanitized against XSS attacks before storage.
 - **Cryptographic Standards**: Secure password hashing with bcrypt, constant-time token comparison for reset/verification links, and HMAC-SHA256 signatures for outgoing webhooks.

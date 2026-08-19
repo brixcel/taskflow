@@ -1388,13 +1388,13 @@ async function aggregateProductivityMetrics({
   const currentCount = completedInCurrent.length;
   const prevCount = completedInPrev.length;
   let velocityChangePct = 0;
-  if (prevCount === 0 && currentCount > 0) {
-    velocityChangePct = 100;
-  } else if (prevCount > 0) {
+  let hasVelocityBaseline = false;
+  if (prevCount > 0) {
+    hasVelocityBaseline = true;
     velocityChangePct = Math.round(((currentCount - prevCount) / prevCount) * 100);
   }
 
-  // Peak productivity day of week
+  // Peak productivity day of week (requires minimum 3 completions and at least 2 on the top day to be statistically meaningful)
   const dayCounts = { Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0, Saturday: 0, Sunday: 0 };
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   for (const t of completedInCurrent) {
@@ -1404,10 +1404,15 @@ async function aggregateProductivityMetrics({
 
   let peakDay = null;
   let maxDayCount = 0;
-  for (const [dName, dCount] of Object.entries(dayCounts)) {
-    if (dCount > maxDayCount) {
-      maxDayCount = dCount;
-      peakDay = dName;
+  if (completedInCurrent.length >= 3) {
+    for (const [dName, dCount] of Object.entries(dayCounts)) {
+      if (dCount > maxDayCount) {
+        maxDayCount = dCount;
+        peakDay = dName;
+      }
+    }
+    if (maxDayCount < 2) {
+      peakDay = null;
     }
   }
 
@@ -1486,6 +1491,7 @@ async function aggregateProductivityMetrics({
     })),
     completionRate,
     velocityChangePct,
+    hasVelocityBaseline,
     peakProductivityDay: peakDay,
     topContributor,
     highestWorkloadMember,
@@ -1513,6 +1519,10 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
     projectSlowdowns = [],
   } = metrics;
 
+  const hasVelocityBaseline = metrics.hasVelocityBaseline !== undefined
+    ? Boolean(metrics.hasVelocityBaseline)
+    : (velocityChangePct !== 0);
+
   const highlights = [];
   const bottlenecks = [];
   const workloadAnalysis = [];
@@ -1521,9 +1531,9 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
   // 1. Velocity & Milestone Highlights
   if (tasksCompleted > 0) {
     let velText = `${scopeName} completed ${tasksCompleted} task${tasksCompleted === 1 ? '' : 's'} ${timeRange.label.toLowerCase()}`;
-    if (velocityChangePct > 0) {
+    if (hasVelocityBaseline && velocityChangePct > 0) {
       velText += ` (${velocityChangePct}% improvement compared with the previous period).`;
-    } else if (velocityChangePct < 0) {
+    } else if (hasVelocityBaseline && velocityChangePct < 0) {
       velText += ` (${Math.abs(velocityChangePct)}% decrease from the previous period).`;
     } else {
       velText += '.';
@@ -1541,7 +1551,7 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
     highlights.push(`${topContributor.name} was the top contributor with ${topContributor.completedCount} task${topContributor.completedCount === 1 ? '' : 's'} completed.`);
   }
 
-  if (completionRate >= 70) {
+  if (completionRate >= 70 && totalTasks >= 3) {
     highlights.push(`Overall project completion rate is strong at ${completionRate}%.`);
   }
 
@@ -1561,13 +1571,15 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
   }
 
   // 3. Workload Analysis
-  if (highestWorkloadMember && highestWorkloadMember.activeCount > 0) {
+  if (highestWorkloadMember && highestWorkloadMember.activeCount >= 3) {
     workloadAnalysis.push(`${highestWorkloadMember.name} has the highest active workload with ${highestWorkloadMember.activeCount} active task${highestWorkloadMember.activeCount === 1 ? '' : 's'}.`);
+  } else if (activeWorkloadCount > 0) {
+    workloadAnalysis.push(`Active workload is distributed across the team (${activeWorkloadCount} total active task${activeWorkloadCount === 1 ? '' : 's'}).`);
   } else {
-    workloadAnalysis.push(`Active workload is evenly distributed across the team (${activeWorkloadCount} total active tasks).`);
+    workloadAnalysis.push('No active tasks currently in flight.');
   }
 
-  if (tasksCreated > tasksCompleted && tasksCreated > 0) {
+  if (tasksCreated > tasksCompleted && tasksCreated >= 3) {
     workloadAnalysis.push(`Task inflow exceeded completions (${tasksCreated} created vs ${tasksCompleted} completed), increasing active backlog.`);
   }
 
@@ -1585,14 +1597,19 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
   }
 
   if (recommendations.length === 0) {
-    recommendations.push('Maintain current execution velocity and continue clearing active sprint items.');
-    recommendations.push('Review backlog items to prepare scope for upcoming milestones.');
+    if (totalTasks === 0) {
+      recommendations.push('Create your first task to start tracking work.');
+    } else if (activeWorkloadCount > 0) {
+      recommendations.push(`Focus on moving the ${activeWorkloadCount} active task${activeWorkloadCount === 1 ? '' : 's'} to review and done.`);
+    } else {
+      recommendations.push('Plan upcoming milestone backlog items to prepare next sprint tasks.');
+    }
   }
 
   // Formulate executive summary
   let summaryParts = [];
   if (tasksCompleted > 0) {
-    summaryParts.push(`${scopeName} completed ${tasksCompleted} task${tasksCompleted === 1 ? '' : 's'} ${timeRange.label.toLowerCase()}${velocityChangePct > 0 ? ` (${velocityChangePct}% improvement compared with last period)` : ''}.`);
+    summaryParts.push(`${scopeName} completed ${tasksCompleted} task${tasksCompleted === 1 ? '' : 's'} ${timeRange.label.toLowerCase()}${hasVelocityBaseline && velocityChangePct > 0 ? ` (${velocityChangePct}% improvement compared with last period)` : ''}.`);
   } else {
     summaryParts.push(`${scopeName} tracked ${activeWorkloadCount} active tasks ${timeRange.label.toLowerCase()}.`);
   }
@@ -1601,7 +1618,7 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
     summaryParts.push(`${overdueCount} task${overdueCount === 1 ? ' is' : 's are'} overdue.`);
   }
 
-  if (highestWorkloadMember && highestWorkloadMember.activeCount > 0) {
+  if (highestWorkloadMember && highestWorkloadMember.activeCount >= 3) {
     summaryParts.push(`${highestWorkloadMember.name} has the highest active workload.`);
   }
 
@@ -1625,6 +1642,7 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
       tasksCreated,
       completionRate,
       velocityChangePct,
+      hasVelocityBaseline,
       overdueCount,
       activeWorkloadCount,
       peakProductivityDay,
@@ -1663,21 +1681,23 @@ async function generateProductivityInsights({
   const startTime = Date.now();
 
   try {
-    const systemPrompt = `You are ST AI, a Principal Productivity Intelligence Analyst inside SyncTask 2.0.
-Your task is to analyze aggregated productivity metrics and output structured JSON with concise, executive-grade insights.
+    const systemPrompt = `You are a factual, concise Engineering Productivity Intelligence Analyst inside SyncTask.
+Your task is to analyze aggregated team productivity metrics and output structured JSON with grounded, professional, fluff-free observations.
 
 Output MUST be a valid JSON object matching this schema:
 {
-  "summary": "Executive summary paragraph (2-3 sentences)",
+  "summary": "Executive summary paragraph (2-3 sentences max). Factual and grounded.",
   "highlights": ["Array of 2 to 4 positive accomplishments or velocity milestones"],
-  "bottlenecks": ["Array of 1 to 3 overdue warnings, stalled projects, or blockers"],
+  "bottlenecks": ["Array of 1 to 3 overdue warnings, stalled projects, or blockers. If none, state 'No critical overdue blockers or stalled projects detected.'"],
   "workloadAnalysis": ["Array of 1 to 3 observations on team capacity and workload balance"],
-  "recommendations": ["Array of 2 to 4 actionable suggestions to optimize velocity"]
+  "recommendations": ["Array of 2 to 4 actionable, specific suggestions grounded in the metrics"]
 }
 
-Guidelines:
-- Reference specific metric numbers, percentages, member names, and project names from the context.
-- Keep tone professional, constructive, and action-oriented.
+STRICT GUIDELINES:
+- NO generic corporate hype, empty motivational language, or buzzwords (NEVER use 'positive momentum', 'stellar performance', 'driving meaningful outcomes', 'leveraging peak days', 'strategic velocity').
+- Reference EXACT numbers, percentages, member names, and project names from the context.
+- If completed tasks is low (<3) or there is no previous period baseline, explicitly state that sample size is low rather than claiming velocity gains.
+- Only mention peak productivity days if peakProductivityDay is non-null.
 - Do NOT output markdown code fences or backticks — ONLY the raw JSON object.`;
 
     const contextData = {

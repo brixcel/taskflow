@@ -356,7 +356,7 @@ export default function AIProductivityInsights({
                     >
                       <Check size={11} />
                       <span>{metrics.tasksCompleted} Completed</span>
-                      {metrics.velocityChangePct !== undefined && metrics.velocityChangePct !== 0 && (
+                      {metrics.hasVelocityBaseline && metrics.velocityChangePct !== undefined && metrics.velocityChangePct !== 0 && (
                         <span style={{ opacity: 0.85, fontSize: 10 }}>
                           ({metrics.velocityChangePct > 0 ? `+${metrics.velocityChangePct}%` : `${metrics.velocityChangePct}%`})
                         </span>
@@ -383,7 +383,7 @@ export default function AIProductivityInsights({
                     </div>
                   )}
 
-                  {metrics.highestWorkloadMember?.name && (
+                  {metrics.highestWorkloadMember?.name && metrics.highestWorkloadMember?.activeCount >= 4 && (
                     <div
                       style={{
                         display: 'inline-flex',
