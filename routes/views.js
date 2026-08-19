@@ -15,7 +15,7 @@ router.use(requireAuth, resolveTeam);
 const SYSTEM_PRESET_VIEWS = [
   {
     id: 'preset-my-high-priority',
-    name: '🔥 My High Priority',
+    name: 'My High Priority',
     description: 'High and urgent priority tasks assigned to you',
     icon: '🔥',
     color: '#ef4444',
@@ -32,7 +32,7 @@ const SYSTEM_PRESET_VIEWS = [
   },
   {
     id: 'preset-overdue',
-    name: '⚠️ Overdue Tasks',
+    name: 'Overdue Tasks',
     description: 'Active tasks whose due dates have passed',
     icon: '⚠️',
     color: '#f59e0b',
@@ -48,7 +48,7 @@ const SYSTEM_PRESET_VIEWS = [
   },
   {
     id: 'preset-due-this-week',
-    name: '📅 Due This Week',
+    name: 'Due This Week',
     description: 'Upcoming tasks scheduled for completion within the next 7 days',
     icon: '📅',
     color: '#3b82f6',
@@ -64,7 +64,7 @@ const SYSTEM_PRESET_VIEWS = [
   },
   {
     id: 'preset-unassigned',
-    name: '👤 Unassigned Tasks',
+    name: 'Unassigned Tasks',
     description: 'Open tasks awaiting assignment to a team member',
     icon: '👤',
     color: '#8b5cf6',
@@ -80,7 +80,7 @@ const SYSTEM_PRESET_VIEWS = [
   },
   {
     id: 'preset-recently-completed',
-    name: '✅ Recently Completed',
+    name: 'Recently Completed',
     description: 'Tasks successfully marked as done',
     icon: '✅',
     color: '#10b981',

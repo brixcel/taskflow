@@ -11,6 +11,11 @@ import {
   Plus,
   Bookmark,
   Eye,
+  Flame,
+  AlertTriangle,
+  Clock,
+  UserX,
+  CheckCircle2,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import ProjectIcon from './ProjectIcon';
@@ -263,6 +268,35 @@ function UserChip({ name, email, onLogout }) {
   );
 }
 
+// ── View Icon Helper ───────────────────────────────────────────────────────
+function cleanViewName(name) {
+  if (!name) return '';
+  // Strip any leading emoji sequences if present in legacy records
+  return name.replace(/^[\p{Extended_Pictographic}\u200d\uFE0F\s]+/gu, '').trim() || name;
+}
+
+function ViewIcon({ icon, id, color }) {
+  if (id === 'preset-my-high-priority' || icon === '🔥') {
+    return <Flame size={14} style={{ color: color || '#f87171', flexShrink: 0 }} />;
+  }
+  if (id === 'preset-overdue' || icon === '⚠️') {
+    return <AlertTriangle size={14} style={{ color: color || '#fbbf24', flexShrink: 0 }} />;
+  }
+  if (id === 'preset-due-this-week' || icon === '📅' || icon === '🗓️') {
+    return <Clock size={14} style={{ color: color || '#60a5fa', flexShrink: 0 }} />;
+  }
+  if (id === 'preset-unassigned' || icon === '👤') {
+    return <UserX size={14} style={{ color: color || '#a78bfa', flexShrink: 0 }} />;
+  }
+  if (id === 'preset-recently-completed' || icon === '✅') {
+    return <CheckCircle2 size={14} style={{ color: color || '#34d399', flexShrink: 0 }} />;
+  }
+  if (icon && typeof icon === 'string' && icon.length <= 4 && /\p{Extended_Pictographic}/u.test(icon)) {
+    return <span style={{ fontSize: 13, lineHeight: 1, flexShrink: 0 }}>{icon}</span>;
+  }
+  return <Bookmark size={14} style={{ color: color || '#8a8f98', flexShrink: 0 }} />;
+}
+
 // ── Sidebar ────────────────────────────────────────────────────────────────
 export default function Sidebar({
   teams = [],
@@ -294,25 +328,12 @@ export default function Sidebar({
     if (view) {
       navigate(`/dashboard?view=${view}`);
     } else {
-      navigate(`/dashboard?tab=${tab}`);
-    }
-    onClose();
-  };
-
-  const handleProjectClick = (projId) => {
-    onSelectProject(projId);
-    if (projId) {
-      navigate(`/dashboard?projectId=${projId}`);
-    } else {
       navigate('/dashboard');
     }
-    onClose();
   };
 
-  const isDashboard = location.pathname === '/dashboard';
-  const searchParams = new URLSearchParams(location.search);
-  const currentView = searchParams.get('view');
-  const isCalendar = isDashboard && currentView === 'calendar';
+  const isMyTasks = activeTab === 'mine' && !activeProjectId && !activeViewId;
+  const isAllTasks = activeTab === 'all' && !activeProjectId && !activeViewId;
 
   return (
     <>
@@ -323,75 +344,106 @@ export default function Sidebar({
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 35,
-            background: 'rgba(0, 0, 0, 0.5)',
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 40,
             backdropFilter: 'blur(2px)',
           }}
-          aria-hidden="true"
+          className="md:hidden"
         />
       )}
 
-      <aside className={`app-sidebar${isOpen ? ' mobile-open' : ''}`} aria-label="Main Navigation">
-        {/* Logo */}
-        <button
-          onClick={() => { handleNav('all'); }}
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
-          aria-label="Go to dashboard"
+      {/* Sidebar panel */}
+      <aside
+        style={{
+          width: 240,
+          background: '#0d0e10',
+          borderRight: '1px solid #1e2023',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          flexShrink: 0,
+          zIndex: 50,
+          transition: 'transform 0.2s ease',
+        }}
+        className={`
+          fixed md:static top-0 left-0 bottom-0
+          ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+      >
+        {/* Wordmark */}
+        <Logo />
+
+        {/* Workspace / Team Switcher */}
+        <TeamSwitcher
+          teams={teams}
+          activeTeam={activeTeam}
+          onTeamSwitch={onTeamSwitch}
+        />
+
+        {/* Scrollable nav area */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '0 8px',
+          }}
         >
-          <Logo />
-        </button>
+          {/* Main Navigation */}
+          <div style={{ marginBottom: 4 }}>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.06em',
+                color: '#50545c',
+                textTransform: 'uppercase',
+                padding: '0 8px',
+                display: 'block',
+                marginBottom: 4,
+              }}
+            >
+              Workspace
+            </span>
 
-        {/* Team switcher */}
-        <TeamSwitcher teams={teams} activeTeam={activeTeam} onTeamSwitch={(t) => { onTeamSwitch(t); onClose(); }} />
+            <button
+              type="button"
+              onClick={() => {
+                handleNav('mine');
+                onClose();
+              }}
+              className={`sidebar-item${isMyTasks ? ' active' : ''}`}
+              style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+            >
+              <CheckSquare size={15} />
+              My Tasks
+            </button>
 
-        {/* Divider */}
-        <div style={{ margin: '0 12px 8px', borderTop: '1px solid #1f2123' }} />
+            <button
+              type="button"
+              onClick={() => {
+                handleNav('all');
+                onClose();
+              }}
+              className={`sidebar-item${isAllTasks ? ' active' : ''}`}
+              style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+            >
+              <ListTodo size={15} />
+              All Tasks
+            </button>
 
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: '0 12px', overflowY: 'auto' }} aria-label="Main navigation">
-          <p
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.06em',
-              color: '#50545c',
-              padding: '0 8px',
-              marginBottom: 4,
-              textTransform: 'uppercase',
-            }}
-          >
-            Workspace
-          </p>
-
-          <button
-            type="button"
-            onClick={() => handleNav('mine')}
-            className={`sidebar-item${isDashboard && activeTab === 'mine' && !activeProjectId && !isCalendar ? ' active' : ''}`}
-            style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
-          >
-            <CheckSquare size={15} />
-            My Tasks
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleNav('all')}
-            className={`sidebar-item${isDashboard && activeTab === 'all' && !activeProjectId && !isCalendar ? ' active' : ''}`}
-            style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
-          >
-            <ListTodo size={15} />
-            All Tasks
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleNav('all', 'calendar')}
-            className={`sidebar-item${isCalendar ? ' active' : ''}`}
-            style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
-          >
-            <Calendar size={15} />
-            Calendar
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleNav('all', 'calendar');
+                onClose();
+              }}
+              className={`sidebar-item${location.search.includes('view=calendar') ? ' active' : ''}`}
+              style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+            >
+              <Calendar size={15} />
+              Calendar
+            </button>
+          </div>
 
           {/* ─── Saved Views Section (Phase 44) ─────────────────────────── */}
           <div style={{ marginTop: 16, marginBottom: 4 }}>
@@ -442,6 +494,7 @@ export default function Sidebar({
             {savedViews.length > 0 ? (
               savedViews.slice(0, 8).map((view) => {
                 const isActive = activeViewId === view.id;
+                const displayName = cleanViewName(view.name);
                 return (
                   <button
                     key={view.id}
@@ -451,6 +504,7 @@ export default function Sidebar({
                       onClose();
                     }}
                     className={`sidebar-item${isActive ? ' active' : ''}`}
+                    title={displayName}
                     style={{
                       width: '100%',
                       border: 'none',
@@ -461,18 +515,22 @@ export default function Sidebar({
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
+                      padding: '6px 8px',
+                      borderRadius: 6,
                     }}
                   >
-                    <span style={{ fontSize: 13, lineHeight: 1 }}>{view.icon || '👁️'}</span>
+                    <ViewIcon id={view.id} icon={view.icon} color={view.color} />
                     <span
                       style={{
                         flex: 1,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
+                        fontSize: 13,
+                        fontWeight: isActive ? 600 : 400,
                       }}
                     >
-                      {view.name}
+                      {displayName}
                     </span>
                   </button>
                 );
@@ -687,7 +745,7 @@ export default function Sidebar({
               Settings
             </NavLink>
           </div>
-        </nav>
+        </div>
 
         {/* User chip */}
         <UserChip name={userName} email={userEmail} onLogout={onLogout} />
