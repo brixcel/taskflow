@@ -105,10 +105,11 @@ async function createSession({ userId, teamId = null, userAgent = '', ipAddress 
       expiresAt,
     };
 
-    // 1. Fetch current active sessions for the user to check concurrency limit
+    // 1. Fetch current active sessions for the user to check concurrency limit & IP anomalies
     const userSetKey = `user_sessions:${userId}`;
     const existingSessionIds = await redis.smembers(userSetKey);
     const activeSessions = [];
+    const knownIps = new Set();
 
     for (const sid of existingSessionIds) {
       const raw = await redis.get(`session:${sid}`);
@@ -119,6 +120,7 @@ async function createSession({ userId, teamId = null, userAgent = '', ipAddress 
       }
       try {
         const parsed = JSON.parse(raw);
+        if (parsed.ipAddress) knownIps.add(parsed.ipAddress);
         // If session is already expired according to its explicit expiresAt, prune it
         if (parsed.expiresAt && new Date(parsed.expiresAt).getTime() <= Date.now()) {
           await redis.del(`session:${sid}`);
@@ -132,6 +134,11 @@ async function createSession({ userId, teamId = null, userAgent = '', ipAddress 
       } catch (_) {
         await redis.srem(userSetKey, sid);
       }
+    }
+
+    const isNewLocation = knownIps.size > 0 && ipAddress && !knownIps.has(ipAddress);
+    if (isNewLocation) {
+      recordAuthEvent({ event: 'new_ip_session', status: 'info' });
     }
 
     // 2. Enforce Least-Recently-Active (LRU) Eviction if limit reached or exceeded

@@ -189,6 +189,57 @@ router.post('/login', authLimiter, turnstileGuard, validate(schemas.login), asyn
   }
 });
 
+// ─── POST /auth/refresh — Refresh JWT Access Token ───────────────────────────
+//
+// Refreshes the JWT token for an active, valid server-side Redis session.
+// Allows short-lived JWT lifetimes with seamless, secure session renewal.
+
+router.post('/refresh', requireAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { id: true, email: true, name: true, emailVerified: true, isDeleted: true },
+    });
+
+    if (!user || user.isDeleted) {
+      return res.status(401).json({ error: 'User account not found or deactivated' });
+    }
+
+    const membership = await prisma.teamMembership.findFirst({
+      where: { userId: user.id },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
+
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        sid: req.sessionId,
+        ...(membership ? { teamId: membership.teamId } : {}),
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: jwtExpiresIn }
+    );
+
+    recordAuthEvent({ event: 'token_refresh', status: 'success' });
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        emailVerified: Boolean(user.emailVerified),
+      },
+    });
+  } catch (error) {
+    if (logger && logger.error) logger.error({ err: error }, 'POST /auth/refresh error');
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
 // ─── GET /auth/sessions — List Active Sessions & Devices ────────────
 
 router.get('/sessions', requireAuth, async (req, res) => {
