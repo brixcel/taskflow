@@ -367,7 +367,7 @@ export default function Sidebar({
       {/* Sidebar panel */}
       <aside
         style={{
-          width: 240,
+          width: 256,
           background: '#0d0e10',
           borderRight: '1px solid #1e2023',
           display: 'flex',
