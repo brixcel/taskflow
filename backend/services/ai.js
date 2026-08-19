@@ -1454,14 +1454,15 @@ async function aggregateProductivityMetrics({
     };
   }
 
-  // Project slowdowns (Projects with pending tasks where no task completed in past 5 days)
-  const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+  // Project slowdowns: only flag if a project has open pending tasks, has overdue items, and NO task updates or completions in the past 14 days
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
   const projectSlowdowns = [];
   for (const p of projects) {
     const projectTasks = tasks.filter(t => t.projectId === p.id);
     const pendingInProject = projectTasks.filter(t => t.status !== 'done');
-    const recentCompletions = projectTasks.filter(t => t.status === 'done' && new Date(t.updatedAt) >= fiveDaysAgo);
-    if (pendingInProject.length > 0 && recentCompletions.length === 0) {
+    const hasRecentActivity = projectTasks.some(t => new Date(t.updatedAt) >= fourteenDaysAgo);
+    const hasOverdue = projectTasks.some(t => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now);
+    if (pendingInProject.length > 0 && !hasRecentActivity && hasOverdue) {
       projectSlowdowns.push({
         projectId: p.id,
         name: p.name,
@@ -1562,7 +1563,7 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
 
   if (Array.isArray(projectSlowdowns) && projectSlowdowns.length > 0) {
     for (const ps of projectSlowdowns.slice(0, 2)) {
-      bottlenecks.push(`Project "${ps.name}" has slowed over the past 5 days with ${ps.pendingCount} pending task${ps.pendingCount === 1 ? '' : 's'} and no recent completions.`);
+      bottlenecks.push(`Project "${ps.name}" has slowed with ${ps.pendingCount} pending task${ps.pendingCount === 1 ? '' : 's'} and overdue blockers.`);
     }
   }
 
@@ -1623,7 +1624,7 @@ function generateFallbackInsights(metrics, scopeName = 'Your team') {
   }
 
   if (projectSlowdowns.length > 0) {
-    summaryParts.push(`"${projectSlowdowns[0].name}" has slowed over the past 5 days.`);
+    summaryParts.push(`"${projectSlowdowns[0].name}" has slowed with overdue items.`);
   }
 
   const summary = summaryParts.join(' ');
@@ -1686,7 +1687,7 @@ Your task is to analyze aggregated team productivity metrics and output structur
 
 Output MUST be a valid JSON object matching this schema:
 {
-  "summary": "Executive summary paragraph (2-3 sentences max). Factual and grounded.",
+  "summary": "Executive summary paragraph (2-3 sentences max). Factual, grounded, and concise.",
   "highlights": ["Array of 2 to 4 positive accomplishments or velocity milestones"],
   "bottlenecks": ["Array of 1 to 3 overdue warnings, stalled projects, or blockers. If none, state 'No critical overdue blockers or stalled projects detected.'"],
   "workloadAnalysis": ["Array of 1 to 3 observations on team capacity and workload balance"],
@@ -1696,7 +1697,10 @@ Output MUST be a valid JSON object matching this schema:
 STRICT GUIDELINES:
 - NO generic corporate hype, empty motivational language, or buzzwords (NEVER use 'positive momentum', 'stellar performance', 'driving meaningful outcomes', 'leveraging peak days', 'strategic velocity').
 - Reference EXACT numbers, percentages, member names, and project names from the context.
-- If completed tasks is low (<3) or there is no previous period baseline, explicitly state that sample size is low rather than claiming velocity gains.
+- If 'stalledProjects' is empty, do NOT claim any projects are stalled or slowed. State 'No critical overdue blockers or stalled projects detected.' in bottlenecks.
+- If 'overdueCount' is 0, explicitly note that all tasks are on track without overdue items.
+- If there is no previous period baseline ('hasVelocityBaseline' is false), report completion volume objectively without calling it a '0% change' or 'flat velocity'.
+- If completed tasks is low (<3), explicitly note that sample size is low.
 - Only mention peak productivity days if peakProductivityDay is non-null.
 - Do NOT output markdown code fences or backticks — ONLY the raw JSON object.`;
 
@@ -1705,7 +1709,9 @@ STRICT GUIDELINES:
       timeframe: metrics.timeRange.label,
       tasksCompleted: metrics.tasksCompleted,
       tasksCreated: metrics.tasksCreated,
-      velocityChangePct: metrics.velocityChangePct,
+      completionRate: `${metrics.completionRate}%`,
+      velocityChangePct: metrics.hasVelocityBaseline ? metrics.velocityChangePct : null,
+      hasVelocityBaseline: metrics.hasVelocityBaseline,
       overdueCount: metrics.overdueCount,
       activeWorkloadCount: metrics.activeWorkloadCount,
       peakProductivityDay: metrics.peakProductivityDay,

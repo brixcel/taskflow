@@ -651,8 +651,15 @@ export default function Settings() {
     <div className="app-shell">
       <Sidebar
         activeProjectId={null}
-        onSelectProject={() => navigate('/dashboard')}
+        activeTeam={activeTeam}
+        projects={[]}
+        savedViews={[]}
+        onSelectProject={(projId) => navigate(projId ? `/dashboard?projectId=${projId}` : '/dashboard')}
         onNewProject={() => navigate('/dashboard')}
+        onAIPlanProject={() => navigate('/dashboard')}
+        onSelectView={(view) => navigate('/dashboard')}
+        onNewView={() => navigate('/dashboard')}
+        onTabChange={(tab) => navigate(`/dashboard?tab=${tab}`)}
         onTeamSwitch={(team) => {
           setActiveTeam(team);
           localStorage.setItem('team', JSON.stringify(team));
@@ -663,7 +670,6 @@ export default function Settings() {
         }}
         userName={user?.name}
         userEmail={user?.email}
-        currentTeam={activeTeam}
         teams={teams}
         isOpen={mobileSidebarOpen}
         onClose={() => setMobileSidebarOpen(false)}
