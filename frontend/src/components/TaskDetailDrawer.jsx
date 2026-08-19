@@ -168,6 +168,15 @@ export default function TaskDetailDrawer({
   onStatusChange,
   onDelete,
 }) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const activeTeam = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('team'));
+    } catch {
+      return null;
+    }
+  })();
+
   const [task,         setTask]         = useState(initialTask);
   const [loading,      setLoading]      = useState(true);
   const [comments,     setComments]     = useState([]);

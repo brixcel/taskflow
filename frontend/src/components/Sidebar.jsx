@@ -181,87 +181,75 @@ function UserChip({ name, email, onLogout }) {
   const initials = (name || 'U').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
   return (
-    <div style={{ padding: '12px', borderTop: '1px solid var(--color-sidebar-border, #1f2123)' }}>
-      {/* Theme Toggle pill */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 12,
-          padding: '0 4px',
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 500,
-            color: 'var(--color-sidebar-fg, #888888)',
-            letterSpacing: '0.02em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Theme
-        </span>
-        <ThemeToggle variant="segmented" showLabels={false} size="sm" />
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
-        <span
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 6,
-            background: 'var(--color-sidebar-bg-active, #222427)',
-            border: '1px solid var(--color-sidebar-border, #2a2d31)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 11,
-            fontWeight: 600,
-            color: 'var(--color-sidebar-fg-active, #c8ccd2)',
-            flexShrink: 0,
-          }}
-        >
-          {initials}
-        </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p
+    <div style={{ padding: '10px 12px', borderTop: '1px solid #1e2024', background: '#0e0f11' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, flex: 1 }}>
+          <span
             style={{
-              margin: 0,
-              fontSize: 13,
-              fontWeight: 500,
-              color: 'var(--color-sidebar-fg-active, #c8ccd2)',
-              letterSpacing: '-0.01em',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              background: '#222427',
+              border: '1px solid #2a2d31',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#f0f1f3',
+              flexShrink: 0,
             }}
           >
-            {name || 'User'}
-          </p>
-          {email && (
+            {initials}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <p
               style={{
                 margin: 0,
-                fontSize: 11,
-                color: 'var(--color-sidebar-fg-mute, #50545c)',
+                fontSize: 13,
+                fontWeight: 500,
+                color: '#f0f1f3',
+                letterSpacing: '-0.01em',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}
             >
-              {email}
+              {name || 'User'}
             </p>
-          )}
+            {email && (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  color: '#71767f',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {email}
+              </p>
+            )}
+          </div>
         </div>
+        <ThemeToggle variant="icon" size="sm" />
       </div>
       <button
         onClick={onLogout}
         className="sidebar-item"
-        style={{ padding: '6px 8px', color: 'var(--color-sidebar-fg-mute, #50545c)' }}
+        style={{
+          padding: '5px 8px',
+          color: '#8a8f98',
+          fontSize: 12,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          borderRadius: 4,
+          margin: 0,
+        }}
       >
-        <LogOut size={14} />
+        <LogOut size={13} />
         Log out
       </button>
     </div>
@@ -404,10 +392,10 @@ export default function Sidebar({
           <div style={{ marginBottom: 4 }}>
             <span
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 600,
-                letterSpacing: '0.06em',
-                color: '#50545c',
+                letterSpacing: '0.04em',
+                color: '#71767f',
                 textTransform: 'uppercase',
                 padding: '0 8px',
                 display: 'block',
@@ -424,7 +412,7 @@ export default function Sidebar({
                 onClose();
               }}
               className={`sidebar-item${isMyTasks ? ' active' : ''}`}
-              style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+              style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer', color: isMyTasks ? '#ffffff' : '#d1d5db' }}
             >
               <CheckSquare size={15} />
               My Tasks
@@ -437,7 +425,7 @@ export default function Sidebar({
                 onClose();
               }}
               className={`sidebar-item${isAllTasks ? ' active' : ''}`}
-              style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+              style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer', color: isAllTasks ? '#ffffff' : '#d1d5db' }}
             >
               <ListTodo size={15} />
               All Tasks
@@ -450,7 +438,7 @@ export default function Sidebar({
                 onClose();
               }}
               className={`sidebar-item${location.search.includes('view=calendar') ? ' active' : ''}`}
-              style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer' }}
+              style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', font: 'inherit', cursor: 'pointer', color: location.search.includes('view=calendar') ? '#ffffff' : '#d1d5db' }}
             >
               <Calendar size={15} />
               Calendar
@@ -470,10 +458,10 @@ export default function Sidebar({
             >
               <span
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 600,
-                  letterSpacing: '0.06em',
-                  color: '#50545c',
+                  letterSpacing: '0.04em',
+                  color: '#71767f',
                   textTransform: 'uppercase',
                 }}
               >
@@ -529,6 +517,7 @@ export default function Sidebar({
                       gap: 8,
                       padding: '6px 8px',
                       borderRadius: 6,
+                      color: isActive ? '#ffffff' : '#d1d5db',
                     }}
                   >
                     <ViewIcon id={view.id} icon={view.icon} color={view.color} />
@@ -548,7 +537,7 @@ export default function Sidebar({
                 );
               })
             ) : (
-              <p style={{ margin: '4px 8px', fontSize: 11, color: '#50545c' }}>
+              <p style={{ margin: '4px 8px', fontSize: 11, color: '#71767f' }}>
                 No views saved yet
               </p>
             )}
@@ -567,10 +556,10 @@ export default function Sidebar({
             >
               <span
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 600,
-                  letterSpacing: '0.06em',
-                  color: '#50545c',
+                  letterSpacing: '0.04em',
+                  color: '#71767f',
                   textTransform: 'uppercase',
                 }}
               >
@@ -685,6 +674,7 @@ export default function Sidebar({
                       type="button"
                       onClick={() => handleProjectClick(p.id)}
                       className={`sidebar-item${isProjActive ? ' active' : ''}`}
+                      title={p.name}
                       style={{
                         width: '100%',
                         border: 'none',
@@ -696,9 +686,10 @@ export default function Sidebar({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '6px 8px',
+                        color: isProjActive ? '#ffffff' : '#d1d5db',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
                         <span
                           style={{
                             width: 18,
@@ -719,7 +710,6 @@ export default function Sidebar({
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                             fontSize: 13,
-                            color: isProjActive ? 'var(--color-sidebar-fg-active, #ffffff)' : 'var(--color-sidebar-fg, #888888)',
                           }}
                         >
                           {p.name}
@@ -729,11 +719,14 @@ export default function Sidebar({
                         <span
                           style={{
                             fontSize: 11,
-                            padding: '1px 5px',
+                            padding: '1px 6px',
                             borderRadius: 10,
-                            backgroundColor: '#26282d',
-                            color: '#8a8f98',
+                            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            color: '#9ca3af',
                             fontWeight: 600,
+                            marginLeft: 6,
+                            flexShrink: 0,
                           }}
                         >
                           {taskCount}
