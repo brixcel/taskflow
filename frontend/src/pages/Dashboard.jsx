@@ -805,6 +805,8 @@ export default function Dashboard() {
   const [drillDownFilter, setDrillDownFilter] = useState(null);
 
   const handleTabChange = (tab) => {
+    setActiveView(null);
+    setDrillDownFilter(null);
     const nextParams = new URLSearchParams(searchParams);
     if (tab === 'mine') nextParams.set('tab', 'mine');
     else nextParams.delete('tab');
@@ -841,18 +843,33 @@ export default function Dashboard() {
   }, [fetchViews]);
 
   const handleSelectView = (view) => {
+    if (!view) {
+      setActiveView(null);
+      return;
+    }
     setActiveView(view);
+    setDrillDownFilter(null);
+    setShowCommandPalette(false);
+
+    // Clear project filter in query params so the saved view shows team-wide
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('projectId');
+
+    const f = view.filters || {};
+    if (f.assignee === 'me') {
+      nextParams.set('tab', 'mine');
+    } else {
+      nextParams.delete('tab');
+    }
+    setSearchParams(nextParams);
+
     if (view.viewType && view.viewType !== viewMode) {
       handleViewModeChange(view.viewType);
     }
-    const f = view.filters || {};
-    if (f.assignee === 'me') {
-      handleTabChange('mine');
-    } else {
-      handleTabChange('all');
-    }
     if (f.search) {
       setSearchInput(f.search);
+    } else {
+      setSearchInput('');
     }
   };
 
@@ -1353,6 +1370,27 @@ export default function Dashboard() {
   };
 
   const displayedTasks = tasks.filter((task) => {
+    // 1. Saved View Filters
+    if (activeView) {
+      const f = activeView.filters || {};
+      if (f.status && task.status !== f.status) return false;
+      if (f.priority) {
+        const allowed = Array.isArray(f.priority) ? f.priority : String(f.priority).split(',');
+        if (!allowed.includes(task.priority)) return false;
+      }
+      if (f.overdue && !isOverdue(task.dueDate, task.status)) return false;
+      if (f.assignee === 'unassigned' && task.assigneeId) return false;
+      if (f.assignee === 'me' && currentUserId && task.assigneeId !== currentUserId) return false;
+      if (f.dueRange === 'this_week') {
+        if (!task.dueDate) return false;
+        const now = new Date();
+        const due = new Date(task.dueDate);
+        const diffDays = (due - now) / (1000 * 60 * 60 * 24);
+        if (diffDays < 0 || diffDays > 7) return false;
+      }
+    }
+
+    // 2. DrillDown Filter
     if (!drillDownFilter) return true;
     if (drillDownFilter.type === 'status') {
       return task.status === drillDownFilter.value;
@@ -1373,6 +1411,8 @@ export default function Dashboard() {
   const totalCount = displayedTasks.length;
 
   const handleSelectProject = (projId) => {
+    setActiveView(null);
+    setDrillDownFilter(null);
     const nextParams = new URLSearchParams(searchParams);
     if (projId) {
       nextParams.set('projectId', projId);
@@ -1629,57 +1669,6 @@ export default function Dashboard() {
         {/* ── Main content ─────────────────────────────────────────────────── */}
         <main id="main-content" style={{ flex: 1, padding: '24px 24px 40px' }}>
 
-          {/* Active Saved View Banner (Phase 44) */}
-          {activeView && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 16px',
-                background: 'var(--color-canvas-card, #1a1d21)',
-                border: '1px solid var(--color-canvas-hairline, #2e3238)',
-                borderRadius: 8,
-                marginBottom: 16,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 16 }}>{activeView.icon || '👁️'}</span>
-                <div>
-                  <strong style={{ fontSize: 13, color: 'var(--color-canvas-fg, #f3f4f6)' }}>
-                    {activeView.name}
-                  </strong>
-                  {activeView.description && (
-                    <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--color-canvas-muted, #9ca3af)' }}>
-                      {activeView.description}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {!activeView.isPreset && (
-                  <button
-                    onClick={() => {
-                      setEditingView(activeView);
-                      setShowCustomViewModal(true);
-                    }}
-                    className="btn-secondary"
-                    style={{ height: 26, fontSize: 11, padding: '0 8px' }}
-                  >
-                    Edit View
-                  </button>
-                )}
-                <button
-                  onClick={handleClearActiveView}
-                  className="btn-secondary"
-                  style={{ height: 26, fontSize: 11, padding: '0 8px' }}
-                >
-                  Clear View
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Dev Sentry test tools */}
           {import.meta.env.DEV && (
             <div style={{
@@ -1847,7 +1836,7 @@ export default function Dashboard() {
               {/* Heading */}
               <div>
                 <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.5px', lineHeight: '28px' }}>
-                  {drillDownFilter ? `Tasks: ${drillDownFilter.label}` : activeTab === 'mine' ? 'My Tasks' : 'All Tasks'}
+                  {drillDownFilter ? `Tasks: ${drillDownFilter.label}` : activeView ? activeView.name : activeTab === 'mine' ? 'My Tasks' : 'All Tasks'}
                 </h1>
                 {totalCount > 0 && (
                   <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--color-canvas-body, #50545c)' }}>
