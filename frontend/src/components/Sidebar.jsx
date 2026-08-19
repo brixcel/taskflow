@@ -46,7 +46,7 @@ function TeamSwitcher({ teams, activeTeam, onTeamSwitch }) {
   }, [open]);
 
   return (
-    <div className="px-3 mb-4" ref={ref}>
+    <div className="px-3 mb-4" ref={ref} style={{ position: 'relative' }}>
       <button
         onClick={() => teams.length > 1 && setOpen(v => !v)}
         style={{
@@ -112,7 +112,8 @@ function TeamSwitcher({ teams, activeTeam, onTeamSwitch }) {
           style={{
             position: 'absolute',
             left: 12,
-            width: 196,
+            right: 12,
+            width: 'calc(100% - 24px)',
             background: '#1a1b1d',
             border: '1px solid #2a2d31',
             borderRadius: 8,
@@ -360,14 +361,14 @@ export default function Sidebar({
           borderRight: '1px solid #1e2023',
           display: 'flex',
           flexDirection: 'column',
-          height: '100%',
+          height: '100vh',
           flexShrink: 0,
-          zIndex: 50,
+          zIndex: 40,
           transition: 'transform 0.2s ease',
         }}
         className={`
-          fixed md:static top-0 left-0 bottom-0
-          ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          fixed md:sticky top-0 left-0 bottom-0
+          ${isOpen ? 'translate-x-0 !z-50' : '-translate-x-full md:translate-x-0'}
         `}
       >
         {/* Wordmark */}
@@ -445,8 +446,11 @@ export default function Sidebar({
             </button>
           </div>
 
+          {/* Section divider */}
+          <div style={{ height: 1, background: '#1c1e22', margin: '14px 8px 10px 8px' }} />
+
           {/* ─── Saved Views Section (Phase 44) ─────────────────────────── */}
-          <div style={{ marginTop: 16, marginBottom: 4 }}>
+          <div style={{ marginBottom: 4 }}>
             <div
               style={{
                 display: 'flex',
@@ -543,8 +547,11 @@ export default function Sidebar({
             )}
           </div>
 
+          {/* Section divider */}
+          <div style={{ height: 1, background: '#1c1e22', margin: '14px 8px 10px 8px' }} />
+
           {/* ─── Projects Section ─────────────────────────────────────────── */}
-          <div style={{ marginTop: 16, marginBottom: 4 }}>
+          <div style={{ marginBottom: 4 }}>
             <div
               style={{
                 display: 'flex',
@@ -739,7 +746,10 @@ export default function Sidebar({
             )}
           </div>
 
-          <div style={{ marginTop: 16 }}>
+          {/* Section divider */}
+          <div style={{ height: 1, background: '#1c1e22', margin: '14px 8px 10px 8px' }} />
+
+          <div>
             <NavLink
               to="/settings"
               end

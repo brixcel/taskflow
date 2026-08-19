@@ -18,7 +18,7 @@
   --radius-pill: 9999px;
 
   /* Sidebar dimension */
-  --sidebar-width: 220px;
+  --sidebar-width: 256px;
 }
 
 /* ── Light Mode Root Variables ───────────────────────────────────────────── */
@@ -280,6 +280,7 @@ body {
 .app-shell {
   display: flex;
   min-height: 100svh;
+  width: 100%;
   background: var(--color-canvas-bg, #f6f7f8);
 }
 
@@ -298,8 +299,8 @@ body {
 }
 
 .app-main {
-  margin-left: var(--sidebar-width);
   flex: 1;
+  min-width: 0;
   min-height: 100svh;
   background: var(--color-canvas-main, #ffffff);
   display: flex;
@@ -1006,7 +1007,7 @@ textarea {
   justify-content: center;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .mobile-nav-toggle {
     display: none !important;
   }

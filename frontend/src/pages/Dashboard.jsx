@@ -1484,43 +1484,6 @@ export default function Dashboard() {
                 </button>
               ))}
             </div>
-
-            {/* View Switcher: Board vs List vs Calendar */}
-            <div className="view-switcher-pill" role="radiogroup" aria-label="Task view mode">
-              <button
-                type="button"
-                onClick={() => handleViewModeChange('board')}
-                className={`view-switcher-btn ${viewMode === 'board' ? 'active' : ''}`}
-                aria-checked={viewMode === 'board'}
-                role="radio"
-                title="Kanban Board View"
-              >
-                <Kanban size={13} />
-                Board
-              </button>
-              <button
-                type="button"
-                onClick={() => handleViewModeChange('list')}
-                className={`view-switcher-btn ${viewMode === 'list' ? 'active' : ''}`}
-                aria-checked={viewMode === 'list'}
-                role="radio"
-                title="List View"
-              >
-                <ListTodo size={13} />
-                List
-              </button>
-              <button
-                type="button"
-                onClick={() => handleViewModeChange('calendar')}
-                className={`view-switcher-btn ${viewMode === 'calendar' ? 'active' : ''}`}
-                aria-checked={viewMode === 'calendar'}
-                role="radio"
-                title="Calendar View"
-              >
-                <Calendar size={13} />
-                Calendar
-              </button>
-            </div>
           </div>
 
           {/* Search / Command Palette + ThemeToggle + New task */}
@@ -1831,7 +1794,57 @@ export default function Dashboard() {
 
           {/* Page header (shown if not in project banner mode) */}
           {!activeProjectId && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* View Switcher: Board vs List vs Calendar (placed directly above columns) */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <div className="view-switcher-pill" role="radiogroup" aria-label="Task view mode">
+                  <button
+                    type="button"
+                    onClick={() => handleViewModeChange('board')}
+                    className={`view-switcher-btn ${viewMode === 'board' ? 'active' : ''}`}
+                    aria-checked={viewMode === 'board'}
+                    role="radio"
+                    title="Kanban Board View"
+                  >
+                    <Kanban size={13} />
+                    Board
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleViewModeChange('list')}
+                    className={`view-switcher-btn ${viewMode === 'list' ? 'active' : ''}`}
+                    aria-checked={viewMode === 'list'}
+                    role="radio"
+                    title="List View"
+                  >
+                    <ListTodo size={13} />
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleViewModeChange('calendar')}
+                    className={`view-switcher-btn ${viewMode === 'calendar' ? 'active' : ''}`}
+                    aria-checked={viewMode === 'calendar'}
+                    role="radio"
+                    title="Calendar View"
+                  >
+                    <Calendar size={13} />
+                    Calendar
+                  </button>
+                </div>
+
+                {drillDownFilter && (
+                  <button
+                    className="btn-secondary"
+                    onClick={handleClearFilter}
+                    style={{ height: 30, fontSize: 12, padding: '0 10px' }}
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
+
+              {/* Heading */}
               <div>
                 <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-canvas-ink, #0f1011)', letterSpacing: '-0.5px', lineHeight: '28px' }}>
                   {drillDownFilter ? `Tasks: ${drillDownFilter.label}` : activeTab === 'mine' ? 'My Tasks' : 'All Tasks'}
@@ -1842,16 +1855,6 @@ export default function Dashboard() {
                   </p>
                 )}
               </div>
-
-              {drillDownFilter && (
-                <button
-                  className="btn-secondary"
-                  onClick={handleClearFilter}
-                  style={{ height: 30, fontSize: 12, padding: '0 10px' }}
-                >
-                  Clear filter
-                </button>
-              )}
             </div>
           )}
 
