@@ -1,299 +1,198 @@
-# TaskFlow — Multi-Tenant Task Management Platform
+# TaskFlow
 
-[![CI Pipeline](https://github.com/brixcel/taskflow/actions/workflows/ci.yml/badge.svg)](https://github.com/brixcel/taskflow/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-22.x-green.svg)](https://nodejs.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16.x-blue.svg)](https://www.postgresql.org)
-[![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748.svg)](https://www.prisma.io)
-[![React](https://img.shields.io/badge/React-18.x-61DAFB.svg)](https://react.dev)
+A real-time, multi-tenant project and task management platform built for modern engineering and product teams.
 
-TaskFlow is a production-hardened, multi-tenant task and project management platform built with Node.js/Express, Prisma ORM, PostgreSQL, and React. Architected with strict tenant isolation, role-based access controls (RBAC), end-to-end input validation, automated disaster recovery, and compliance features (GDPR-lite export & account soft-deletion).
+[![CI](https://github.com/brixcel/taskflow/actions/workflows/ci.yml/badge.svg)](https://github.com/brixcel/taskflow/actions/workflows/ci.yml)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org)
+[![PostgreSQL](https://img.shields.io/badge/postgresql-15%2B-blue.svg)](https://www.postgresql.org)
+[![React](https://img.shields.io/badge/react-19-61dafb.svg)](https://react.dev)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+TaskFlow provides collaborative project tracking with multi-tenant workspace isolation, flexible board and list views, real-time updates via WebSockets, time tracking, developer webhooks, and AI-assisted task workflows.
 
 ---
 
-## 🏛 Architecture Overview
+## Key Features
 
-TaskFlow isolates customer data at the database level using a shared-database, shared-schema multi-tenant design with strict tenant partitioning. Every tenant operates as an independent **Team**, and all resources (Tasks, Comments, Activities, Memberships) are explicitly scoped by `teamId`.
+- **Multi-Tenant Workspaces & RBAC**: Shared-database architecture with strict tenant scoping. Role-based access control (`owner`, `admin`, `member`) ensures secure data boundaries across teams.
+- **Task & Project Management**: Manage tasks across Kanban boards, list views, and calendar views. Supports subtasks, watchers, task templates, custom saved views, file attachments, and activity history.
+- **Real-Time Collaboration**: Instant status synchronization, comment streams, and live user notifications powered by Socket.IO.
+- **Time Tracking & Metrics**: Built-in time tracking per task, workload analytics, and Prometheus metrics for operational observability.
+- **Developer API & Integrations**: RESTful API with API key authentication, HMAC-signed outbound webhooks, GitHub PR/commit linking, and Discord/Slack integrations.
+- **AI-Assisted Workflows**: Task summarization, subtask generation, and priority suggestions with controlled token budgeting.
+- **Security & Privacy**: Zod schema validation, input sanitization, rate-limited auth endpoints, and user data export/erasure endpoints.
 
-### Entity-Relationship Diagram (ERD)
+---
+
+## Architecture & Data Model
+
+TaskFlow implements a multi-tenant hierarchy where all operational resources are scoped to a **Team**.
 
 ```mermaid
-erDiagram
-    User ||--o{ TeamMembership : "belongs to"
-    User ||--o{ Team : "owns"
-    User ||--o{ Task : "creates"
-    User ||--o{ Task : "assigned to"
-    User ||--o{ Comment : "authors"
-    User ||--o{ Activity : "triggers"
-    User ||--o{ PasswordResetToken : "has"
-    User ||--o{ EmailVerificationToken : "has"
-
-    Team ||--o{ TeamMembership : "has"
-    Team ||--o{ Task : "contains"
-
-    Task ||--o{ Comment : "contains"
-    Task ||--o{ Activity : "logs"
-
-    User {
-        string id PK
-        string email UK
-        string passwordHash
-        string name
-        boolean emailVerified
-        boolean isDeleted
-        datetime deletedAt
-        datetime createdAt
-    }
-
-    Team {
-        string id PK
-        string name
-        string ownerId FK
-        datetime createdAt
-    }
-
-    TeamMembership {
-        string userId PK,FK
-        string teamId PK,FK
-        string role "owner | admin | member"
-        datetime joinedAt
-    }
-
-    Task {
-        string id PK
-        string title
-        string description
-        string status "todo | in_progress | done"
-        datetime dueDate
-        string assigneeId FK
-        string createdById FK
-        string teamId FK
-        datetime createdAt
-        datetime updatedAt
-    }
-
-    Comment {
-        string id PK
-        string content
-        string taskId FK
-        string authorId FK
-        datetime createdAt
-    }
-
-    Activity {
-        string id PK
-        string taskId FK
-        string userId FK
-        string action
-        string details
-        datetime createdAt
-    }
-
-    PasswordResetToken {
-        string id PK
-        string tokenHash UK
-        string userId FK
-        datetime expiresAt
-        datetime usedAt
-    }
-
-    EmailVerificationToken {
-        string id PK
-        string tokenHash UK
-        string userId FK
-        datetime expiresAt
-        datetime usedAt
-    }
+graph TD
+    Client[React + Vite Frontend] <-->|REST API / WebSockets| Server[Node.js / Express API]
+    Server <--> DB[(PostgreSQL + Prisma ORM)]
+    Server <--> Cache[(Redis Cache & Sessions)]
+    Server --> Integrations[GitHub / Slack / Webhooks]
 ```
 
----
+### Core Entity Relationships
 
-## 🔒 Tenant-Scoping Architecture
-
-### Why Scoping Lives in Shared Middleware
-
-In multi-tenant SaaS applications, placing tenant checks inside individual route handlers is error-prone — forgetting a single `where: { teamId }` filter results in critical cross-tenant data leaks. 
-
-TaskFlow enforces multi-tenancy at the middleware layer using `resolveTeam` and `resolveTeamFromParam`:
-
-```
-Incoming Request
-       │
-       ▼
-[ authenticateToken ] ──► Verifies JWT signature & attaches req.user
-       │
-       ▼
-[ resolveTeam ]        ──► Re-checks membership against live DB on EVERY request
-       │                   ├─ Validates X-Team-Id header OR selects user's active team
-       │                   ├─ Attaches req.teamId and req.teamRole
-       │                   └─ Returns 403 if user is not a member (or 404 if no teams)
-       │
-       ▼
-[ Route Handler ]     ──► Uses scopedTaskQuery helper to guarantee where: { teamId }
-```
-
-### Key Security Invariants
-1. **Never Trust Client-Sent `teamId` in Request Bodies**: The team ID is always derived server-side from `req.teamId` populated by `resolveTeam`.
-2. **Cross-Tenant Requests Return 404 (Not 403)**: Accessing a resource belonging to another team returns `404 Not Found` rather than `403 Forbidden` to prevent resource enumeration attacks.
-3. **Real-time DB Membership Verification**: Membership is checked against PostgreSQL on every single HTTP request rather than trusting stale JWT claims, ensuring instantaneous access revocation when a member is removed.
+- **User**: Authentication, profile settings, API keys, notifications, and personal preferences.
+- **Team & TeamMembership**: Top-level tenant boundary. Memberships govern user roles (`owner`, `admin`, `member`).
+- **Project**: Team-scoped container for grouping related tasks and milestones.
+- **Task**: Core unit of work, containing status, assignees, subtasks, attachments, comments, time entries, and audit logs.
+- **Integrations & Webhooks**: Scoped to teams/projects with secret-based signature verification.
 
 ---
 
-## 🛡️ Multi-Tenant Isolation Testing
+## Tech Stack
 
-Isolation is verified by an automated test suite (`__tests__/team-isolation.test.js` & `__tests__/security.test.js`) that runs against real PostgreSQL transactions:
-
-```bash
-cd backend
-npm test __tests__/team-isolation.test.js
-```
-
-### Verified Isolation Vectors:
-- **Task Isolation**: User B in Team B cannot `GET /tasks` belonging to Team A.
-- **Cross-Team Mutation**: User B cannot `PATCH` or `DELETE` User A's task (returns `404`).
-- **Comment Isolation**: User B cannot view or post comments on Team A's tasks (returns `404`).
-- **Activity Log Isolation**: Audit entries for Team A's tasks are completely invisible to Team B (returns `404`).
-- **Immediate Revocation**: Removing User B from a team in the database instantly blocks their next request with `403/404` without waiting for token expiration.
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 19, Vite, Tailwind CSS, Radix UI Primitives, Lucide Icons, Axios |
+| **Backend** | Node.js, Express 5, Prisma ORM 7, Socket.IO, Zod |
+| **Database & Cache** | PostgreSQL 15+, Redis (ioredis) |
+| **Observability** | Prometheus (`prom-client`), Sentry error tracking, structured logging |
+| **Testing** | Jest, Supertest |
 
 ---
 
-## 👥 Role-Based Access Control (RBAC)
-
-TaskFlow implements three hierarchical team roles: `owner`, `admin`, and `member`.
-
-| Capability | Owner | Admin | Member |
-|---|:---:|:---:|:---:|
-| **View Team Tasks, Comments & Activity** | ✅ | ✅ | ✅ |
-| **Create & Update Assigned Tasks** | ✅ | ✅ | ✅ |
-| **Delete Own Created Tasks** | ✅ | ✅ | ✅ |
-| **Delete Any Member's Tasks** | ✅ | ✅ | ❌ |
-| **Update Team Name / Settings** | ✅ | ✅ | ❌ |
-| **Invite & Add Members** | ✅ | ✅ | ❌ |
-| **Change Member Roles** | ✅ | ❌ | ❌ |
-| **Remove Members** | ✅ | ❌ | ❌ |
-| **Transfer Team Ownership / Delete Team** | ✅ | ❌ | ❌ |
-| **Self-Removal from Team (Single Owner Guard)** | ❌ (Guarded) | ✅ | ✅ |
-
-*Note: An owner cannot leave a team without transferring ownership or deleting the team, preventing orphaned teams.*
-
----
-
-## 🔄 Zero-Downtime Migration & Backfill Strategy
-
-When introducing multi-tenancy to pre-existing single-tenant databases, TaskFlow uses a safe 3-step zero-downtime migration strategy:
-
-1. **Phase A (Schema Expansion)**: Add `teamId` as a nullable column (`teamId String?`).
-2. **Phase B (Data Migration & Backfill)**: Run `scripts/backfill-teams.js` to create default personal teams for all existing users, establish `owner` memberships, and assign all existing tasks to the respective user's team.
-3. **Phase C (Constraint Enforcement)**: Apply `NOT NULL` constraint and foreign key relation on `teamId` with `onDelete: Cascade`.
-
----
-
-## 🔐 Security Hardening
-
-- **Security Headers (`helmet`)**: Enforces Strict-Transport-Security, X-Content-Type-Options (`nosniff`), X-Frame-Options (`DENY`), and Content-Security-Policy.
-- **Strict Origin CORS**: Whitelist-locked to `process.env.CORS_ORIGIN` (wildcards prohibited with credentials).
-- **Brute-Force Rate Limiting**:
-  - `/auth/login` & `/auth/register`: 20 requests per 15 minutes.
-  - `/auth/forgot-password`: 5 requests per 15 minutes (with uniform responses to prevent account enumeration).
-- **Cryptographic Security**:
-  - Passwords hashed using `bcrypt` (salt rounds 10).
-  - Password reset & email verification tokens generated via `crypto.randomBytes(32)` and stored as one-way `SHA-256` hashes in PostgreSQL.
-- **Input Validation & Sanitization**:
-  - Strict type checking and constraint validation via **Zod v4**.
-  - HTML/script stripping on user-supplied strings via **xss**.
-- **Observability & Error Scrubbing**:
-  - Sentry error tracking patched with sensitive field scrubbing (`password`, `token`, `authorization` headers).
-  - Production error handler returns clean generic 500s without stack traces or path leaks.
-
----
-
-## 💾 Automated Backups & Disaster Recovery
-
-TaskFlow includes an automated backup engine (`scripts/backup.js`) and restoration utility (`scripts/restore.js`) with Point-In-Time validation.
-
-```bash
-# Generate compressed snapshot with SHA-256 checksum
-node scripts/backup.js
-
-# Restore database from backup snapshot
-node scripts/restore.js backups/taskflow_backup_YYYYMMDD_HHMMSS.json.gz
-
-# Run full backup & restore verification suite
-bash scripts/test-backup-restore.sh
-```
-
-See [BACKUP-RESTORE-RUNBOOK.md](file:///home/brexc/projects/taskflow/BACKUP-RESTORE-RUNBOOK.md) for full disaster recovery procedures, backup rotation policies, and offsite replication guides.
-
----
-
-## 📜 Compliance & Privacy (GDPR-Lite)
-
-- **Data Portability (`GET /users/me/export`)**: Exports a full JSON archive of the user's profile, owned teams, created tasks, assigned tasks, comments, and activity audit logs.
-- **Right to Erasure (`DELETE /users/me`)**:
-  - Soft-deletes user account (`isDeleted: true`, `deletedAt: now()`).
-  - Anonymizes personal identifiable information (`name -> "Deleted User"`, `email -> "deleted_<uuid>@deleted.taskflow"`).
-  - Invalidates all active JWT tokens and sessions.
-- **Legal Agreements**:
-  - [Terms of Service](file:///home/brexc/projects/taskflow/frontend/src/pages/Terms.jsx) (`/terms`)
-  - [Privacy Policy](file:///home/brexc/projects/taskflow/frontend/src/pages/Privacy.jsx) (`/privacy`)
-
----
-
-## 🚀 Quickstart & Development Setup
+## Getting Started
 
 ### Prerequisites
-- Node.js 20+
-- PostgreSQL 15+ (or Docker)
 
-### 1. Backend Setup
+- **Node.js**: `20.x` or higher
+- **PostgreSQL**: `15.x` or higher
+- **Redis**: `7.x` or higher (optional for local dev, recommended for caching/sessions)
+
+### 1. Clone & Install
+
 ```bash
-cd backend
+git clone https://github.com/brixcel/taskflow.git
+cd taskflow
+
+# Install backend dependencies
 npm install
+
+# Install frontend dependencies
+cd frontend && npm install && cd ..
+```
+
+### 2. Environment Configuration
+
+Copy the sample environment files and configure your local credentials:
+
+```bash
+# Backend configuration
 cp .env.example .env
 
-# Run Prisma migrations & client generation
+# Frontend configuration
+cp frontend/.env.example frontend/.env
+```
+
+Key environment variables in `.env`:
+
+```ini
+PORT=3000
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/taskflow?schema=public"
+JWT_SECRET="your-development-jwt-secret-min-32-chars"
+CORS_ORIGIN="http://localhost:5173"
+REDIS_URL="redis://localhost:6379"
+```
+
+### 3. Database Migration & Setup
+
+Generate the Prisma client and apply database migrations:
+
+```bash
 npx prisma migrate dev
 npx prisma generate
-
-# Start development server
-npm run dev
 ```
 
-### 2. Frontend Setup
+*(Optional)* If migrating legacy single-tenant data:
+```bash
+node scripts/backfill-teams.js
+```
+
+### 4. Running Locally
+
+Start the backend API server:
+```bash
+npm run dev
+# API running on http://localhost:3000
+```
+
+In a separate terminal, start the frontend development server:
 ```bash
 cd frontend
-npm install
-cp .env.example .env
-
-# Start Vite dev server
 npm run dev
-```
-
-### 3. Run Automated Test Suite
-```bash
-cd backend
-npm test
+# Frontend running on http://localhost:5173
 ```
 
 ---
 
-## 🚢 Production Deployment
+## Testing
 
-### Production Environment Variables (`backend/.env`)
-```ini
-NODE_ENV=production
-PORT=3000
-DATABASE_URL="postgresql://user:pass@db-host.internal:5432/taskflow_prod?sslmode=require"
-JWT_SECRET="<64-char-random-hex-key>"
-CORS_ORIGIN="https://app.taskflow.com"
-APP_URL="https://app.taskflow.com"
-RESEND_API_KEY="re_..."
-EMAIL_FROM="TaskFlow <noreply@taskflow.com>"
-SENTRY_DSN="https://...@o0.ingest.sentry.io/..."
-```
+TaskFlow includes comprehensive automated unit, integration, and security test suites.
 
-### Docker Deployment
 ```bash
-# Build and launch isolated production containers
-docker-compose up -d --build
+# Run all backend tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tenant isolation & security test suites
+npm test -- __tests__/team-isolation.test.js
+npm test -- __tests__/security.test.js
 ```
+
+---
+
+## Project Structure
+
+```text
+taskflow/
+├── backend/                  # (or root) Express API server & routes
+│   ├── routes/               # Modular REST route handlers
+│   ├── middleware/           # Auth, tenant resolver, rate limiting, sanitization
+│   ├── services/             # Realtime (Socket.IO), email, AI, webhook delivery
+│   └── __tests__/            # Jest test suites (unit, integration, RBAC, isolation)
+├── frontend/                 # React 19 + Vite client
+│   ├── src/
+│   │   ├── components/       # Reusable UI & Radix components
+│   │   ├── pages/            # View pages (Board, List, Calendar, Settings)
+│   │   ├── services/         # API client & socket listeners
+│   │   └── state/            # Application state management
+├── prisma/                   # Prisma schema, migrations, and seed scripts
+├── scripts/                  # Maintenance, backup/restore, and backfill utilities
+└── docs/                     # Architectural specs and runbooks
+```
+
+---
+
+## Documentation
+
+- [Architecture & System Design](file:///home/brexc/projects/taskflow/ARCHITECTURE.md)
+- [REST API Reference](file:///home/brexc/projects/taskflow/API.md)
+- [Production Deployment Guide](file:///home/brexc/projects/taskflow/DEPLOYMENT.md)
+- [Backup & Disaster Recovery Runbook](file:///home/brexc/projects/taskflow/BACKUP-RESTORE-RUNBOOK.md)
+- [Engineering Charter](file:///home/brexc/projects/taskflow/SYNCTASK_2_0_ENGINEERING_CHARTER.md)
+
+---
+
+## Security & Responsible Disclosure
+
+Security and tenant isolation are foundational design principles of TaskFlow:
+- **Tenant Scoping**: All resource queries are strictly bounded by verified team memberships resolved at the middleware layer.
+- **Input Sanitization**: All user inputs are validated with strict schemas (`zod`) and sanitized against XSS attacks before storage.
+- **Cryptographic Standards**: Secure password hashing with bcrypt, constant-time token comparison for reset/verification links, and HMAC-SHA256 signatures for outgoing webhooks.
+
+To report security vulnerabilities, please contact the maintainers directly or open a private advisory on GitHub rather than filing a public issue.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
